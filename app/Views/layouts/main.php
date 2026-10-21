@@ -265,6 +265,18 @@ a.link:hover{opacity:0.8}
         </div>
     </div>
     <?php endif ?>
+    <?php if (function_exists('isMaintenanceMode') && isMaintenanceMode()) : ?>
+    <div class="bg-amber-600 text-white px-4 py-2 text-xs sm:text-sm font-semibold flex flex-wrap items-center justify-between gap-2 shadow-md sticky top-0 z-[10001]">
+        <div class="flex items-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-base"></i>
+            <span><strong>MAINTENANCE ACTIVE (Season 2 In-Dev):</strong> Public site is paused for 4 days with HTTP 503. You are browsing with admin clearance.</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="badge badge-warning badge-sm text-neutral font-bold">Admin Clearance</span>
+            <a href="/admin" class="btn btn-xs btn-neutral text-white">Admin Controls</a>
+        </div>
+    </div>
+    <?php endif ?>
     <nav aria-label="Main navigation"><div class="navbar bg-base-100 shadow-md" style="z-index:9999; position:sticky; top:0">
         <div class="navbar-start">
             <div class="dropdown">

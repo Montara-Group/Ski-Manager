@@ -36,6 +36,7 @@ class Filters extends BaseFilters
         'seasongate' => \App\Filters\SeasonGate::class,
         'featuregate' => \App\Filters\FeatureGate::class,
         'admin'         => \App\Filters\AdminFilter::class,
+        'maintenance'   => \App\Filters\MaintenanceFilter::class,
         'markdown'      => \App\Filters\MarkdownNegotiationFilter::class,
         'cors'          => Cors::class,
 
@@ -80,6 +81,7 @@ class Filters extends BaseFilters
      */
     public array $globals = [
         'before' => [
+            'maintenance',
             // 'honeypot',
             'csrf' => ['except' => ['roadmap/vote/*']],
             'invalidchars',

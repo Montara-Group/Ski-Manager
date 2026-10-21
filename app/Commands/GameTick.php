@@ -13,6 +13,11 @@ class GameTick extends BaseCommand
 
     public function run(array $params)
     {
+        if (function_exists('isMaintenanceMode') && isMaintenanceMode()) {
+            CLI::write('Maintenance mode is active — Season 2 development underway. Game tick paused to safeguard player finances.', 'yellow');
+            return;
+        }
+
         $db = db_connect();
         if (function_exists('checkAutoSeasonRollover')) {
             checkAutoSeasonRollover();

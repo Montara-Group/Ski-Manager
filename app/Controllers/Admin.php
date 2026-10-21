@@ -405,9 +405,18 @@ class Admin extends BaseController
         $db = db_connect();
         $season = $db->table('seasons')->where('active', 1)->get()->getRowArray();
         if ($season) {
-            $new = $season['maintenance'] ? 0 : 1;
-            $db->table('seasons')->where('id', $season['id'])->update(['maintenance' => $new]);
-        $this->auditLog('maintenance', null, $new ? 'enabled' : 'disabled');
+            $new = !empty($season['maintenance']) ? 0 : 1;
+            $update = ['maintenance' => $new];
+            if ($new === 1) {
+                if (empty($season['maintenance_until'])) {
+                    $update['maintenance_until'] = date('Y-m-d H:i:s', time() + 345600); // 4 days
+                }
+                if (empty($season['maintenance_message'])) {
+                    $update['maintenance_message'] = 'Ski Manager is temporarily paused for 4 days of scheduled maintenance and active development for the launch of Season 2.';
+                }
+            }
+            $db->table('seasons')->where('id', $season['id'])->update($update);
+            $this->auditLog('maintenance', null, $new ? 'enabled' : 'disabled');
             return redirect()->to('/admin')->with('success', 'Maintenance mode ' . ($new ? 'enabled' : 'disabled'));
         }
         return redirect()->to('/admin')->with('error', 'No active season');

@@ -14,13 +14,15 @@ class SeasonGate implements FilterInterface
             return;
         }
 
+        // Maintenance is handled cleanly by MaintenanceFilter
+        if (function_exists('isMaintenanceMode') && isMaintenanceMode()) {
+            return;
+        }
+
         $db = db_connect();
         $season = $db->table('seasons')->where('active', 1)->get()->getRowArray();
 
-        if ($season && strtotime($season['start_date']) > time()) {
-        if ($season && ($season["maintenance"] ?? 0)) {
-            return redirect()->to("/");
-        }
+        if ($season && !empty($season['start_date']) && strtotime($season['start_date']) > time()) {
             return redirect()->to('/coming-soon');
         }
     }

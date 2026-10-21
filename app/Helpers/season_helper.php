@@ -1,8 +1,131 @@
 <?php
 
+/**
+ * Check if the site is currently in maintenance mode.
+ * Supports both filesystem flag (WRITEPATH . 'maintenance.flag') for instant zero-DB toggling
+ * and the database 'seasons' table maintenance fields.
+ */
+function isMaintenanceMode(): bool
+{
+    static $isMaint = null;
+    if ($isMaint !== null) {
+        return $isMaint;
+    }
+
+    // 1. Filesystem flag override (instant switch)
+    if (defined('WRITEPATH') && file_exists(WRITEPATH . 'maintenance.flag')) {
+        $isMaint = true;
+        return true;
+    }
+
+    // 2. Database seasons maintenance flag
+    try {
+        $db = db_connect();
+        if (!$db->tableExists('seasons')) {
+            $isMaint = false;
+            return false;
+        }
+
+        $fields = $db->getFieldNames('seasons');
+        if (!in_array('maintenance', $fields, true)) {
+            $isMaint = false;
+            return false;
+        }
+
+        $row = $db->table('seasons')
+            ->where('maintenance', 1)
+            ->orderBy('season_number', 'DESC')
+            ->get()
+            ->getRowArray();
+
+        if (!$row) {
+            $isMaint = false;
+            return false;
+        }
+
+        // Check if maintenance period has expired
+        if (!empty($row['maintenance_until'])) {
+            $untilTs = strtotime($row['maintenance_until']);
+            if ($untilTs && time() >= $untilTs) {
+                $isMaint = false;
+                return false;
+            }
+        }
+
+        $isMaint = true;
+        return true;
+    } catch (\Throwable $e) {
+        log_message('error', 'isMaintenanceMode error: ' . $e->getMessage());
+        $isMaint = false;
+        return false;
+    }
+}
+
+/**
+ * Get detailed maintenance state, scheduled reopening time, and notice message.
+ */
+function getMaintenanceInfo(): array
+{
+    $default = [
+        'enabled'           => false,
+        'until'             => '2026-10-25 18:00:00 UTC',
+        'message'           => 'Ski Manager is temporarily paused for 4 days of scheduled maintenance and active development for the launch of Season 2.',
+        'remaining_seconds' => 0,
+    ];
+
+    if (defined('WRITEPATH') && file_exists(WRITEPATH . 'maintenance.flag')) {
+        $raw = @file_get_contents(WRITEPATH . 'maintenance.flag');
+        $parsed = json_decode($raw, true);
+        if (is_array($parsed)) {
+            $default = array_merge($default, $parsed);
+        }
+        $default['enabled'] = true;
+    }
+
+    try {
+        $db = db_connect();
+        if ($db->tableExists('seasons')) {
+            $fields = $db->getFieldNames('seasons');
+            if (in_array('maintenance', $fields, true)) {
+                $row = $db->table('seasons')
+                    ->where('maintenance', 1)
+                    ->orderBy('season_number', 'DESC')
+                    ->get()
+                    ->getRowArray();
+                if ($row) {
+                    $default['enabled'] = true;
+                    if (!empty($row['maintenance_until'])) {
+                        $default['until'] = $row['maintenance_until'] . ' UTC';
+                        $rem = strtotime($row['maintenance_until']) - time();
+                        $default['remaining_seconds'] = max(0, $rem);
+                        if ($rem <= 0) {
+                            $default['enabled'] = false;
+                        }
+                    }
+                    if (!empty($row['maintenance_message'])) {
+                        $default['message'] = $row['maintenance_message'];
+                    }
+                }
+            }
+        }
+    } catch (\Throwable $e) {
+        // Fall back gracefully
+    }
+
+    if ($default['remaining_seconds'] === 0 && !empty($default['until'])) {
+        $default['remaining_seconds'] = max(0, strtotime($default['until']) - time());
+    }
+
+    return $default;
+}
+
 function checkAutoSeasonRollover(): void
 {
     try {
+        if (isMaintenanceMode()) {
+            return;
+        }
+
         $db = db_connect();
         if (!$db->tableExists('seasons')) return;
 
@@ -84,6 +207,12 @@ function getDaysUntilNextSeason(): int
 
 function triggerSeasonRollover(?int $targetSeasonNumber = null): bool
 {
+    // Prevent season rollover while maintenance mode is active
+    if (isMaintenanceMode()) {
+        log_message('notice', 'Season rollover blocked because maintenance mode is active.');
+        return false;
+    }
+
     $db = db_connect();
     if (!$db->tableExists('seasons')) return false;
 
