@@ -2,7 +2,7 @@ import Foundation
 import SwiftUI
 import Observation
 
-/// Master State Store & Offline Simulation Engine for Ski Manager iOS
+/// Master State Store & Hybrid Online/Offline Simulation Engine for Ski Manager iOS
 /// Uses Swift 6 Observation framework (`@Observable`) and isolated concurrency.
 @Observable
 @MainActor
@@ -11,11 +11,15 @@ public final class ResortStore {
     
     public var resort: Resort
     public var selectedSector: Int = 1
+    
+    // Online & Cloud Sync State
+    public var isOnline: Bool = true
     public var isCloudSyncing: Bool = false
+    public var connectionStatusText: String = "Connecting to ski-manager.net..."
     public var lastSyncDate: Date? = nil
     public var cloudSyncError: String? = nil
     public var cloudAccountUsername: String? = nil
-    public var isSimulationRunning: Bool = false
+    public var onlineLeaderboard: [LeaderboardEntry] = []
     public var lastBonusAwardMessage: String? = nil
     
     // MARK: - Persistence Keys
@@ -29,6 +33,34 @@ public final class ResortStore {
             self.resort = savedResort
         } else {
             self.resort = Resort.makeParkCityTemplate()
+        }
+        
+        // Auto connect and sync on app launch
+        Task { [weak self] in
+            await self?.performInitialOnlineConnection()
+        }
+    }
+    
+    // MARK: - Initial Online Connection & Telemetry Pull
+    
+    public func performInitialOnlineConnection() async {
+        do {
+            let health = try await SkiManagerAPIClient.shared.checkServerHealth()
+            isOnline = health.isHealthy
+            connectionStatusText = health.message
+            
+            // Fetch online leaderboard
+            if let board = try? await SkiManagerAPIClient.shared.fetchLeaderboard() {
+                self.onlineLeaderboard = board
+            }
+            
+            // Sync resort baseline if online
+            if isOnline {
+                _ = await syncWithLiveWebsite()
+            }
+        } catch {
+            isOnline = false
+            connectionStatusText = "Operating Offline (Cached Data)"
         }
     }
     
@@ -115,6 +147,9 @@ public final class ResortStore {
         
         // 10. Save Snapshot to Local Disk
         saveToDisk()
+        
+        // 11. Background Push to ski-manager.net
+        triggerBackgroundPush()
     }
     
     // MARK: - Daily Bonus Engine
@@ -144,6 +179,7 @@ public final class ResortStore {
         
         lastBonusAwardMessage = "Claimed +€\(cashReward.formatted()) and +\(genepisReward) 🌿 Génépis!"
         saveToDisk()
+        triggerBackgroundPush()
         return (cashReward, genepisReward)
     }
     
@@ -207,6 +243,7 @@ public final class ResortStore {
         guard let index = resort.realSegments.firstIndex(where: { $0.id == id }) else { return }
         resort.realSegments[index].isOpen.toggle()
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     public func buildRealSegment(id: Int) -> Bool {
@@ -227,6 +264,7 @@ public final class ResortStore {
             at: 0
         )
         saveToDisk()
+        triggerBackgroundPush()
         return true
     }
     
@@ -264,14 +302,49 @@ public final class ResortStore {
                 }
             }
             
+            // Refresh leaderboard
+            if let board = try? await SkiManagerAPIClient.shared.fetchLeaderboard() {
+                self.onlineLeaderboard = board
+            }
+            
             lastSyncDate = Date()
+            isOnline = true
+            connectionStatusText = "Online · Connected to ski-manager.net"
             isCloudSyncing = false
             saveToDisk()
             return true
         } catch {
             cloudSyncError = error.localizedDescription
+            isOnline = false
+            connectionStatusText = "Offline (Cached Data)"
             isCloudSyncing = false
             return false
+        }
+    }
+    
+    // Background push telemetry to server without blocking UI
+    private func triggerBackgroundPush() {
+        Task { [weak self] in
+            guard let self = self else { return }
+            let payload = ClientSyncPayload(
+                cash: self.resort.cash,
+                game_day: self.resort.gameDay,
+                daily_visitors: self.resort.totalVisitorsToday,
+                ticket_price_adult: self.resort.ticketPriceAdult,
+                ticket_price_child: self.resort.ticketPriceChild,
+                built_segments_count: self.resort.realSegments.filter { $0.isBuilt }.count,
+                outstanding_loan: self.resort.outstandingLoan
+            )
+            do {
+                _ = try await SkiManagerAPIClient.shared.pushSync(payload: payload)
+                await MainActor.run {
+                    self.isOnline = true
+                    self.connectionStatusText = "Online · Synced"
+                    self.lastSyncDate = Date()
+                }
+            } catch {
+                // Keep local changes seamlessly
+            }
         }
     }
     
@@ -296,6 +369,7 @@ public final class ResortStore {
         }
         resort.groomerConditionPct = max(20, resort.groomerConditionPct - 2)
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     public func makeSnowOnEquippedSlopes() {
@@ -315,6 +389,7 @@ public final class ResortStore {
         }
         resort.weather.baseDepthCm += 6
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     public func repairGroomer() -> Bool {
@@ -327,6 +402,7 @@ public final class ResortStore {
             at: 0
         )
         saveToDisk()
+        triggerBackgroundPush()
         return true
     }
     
@@ -341,6 +417,7 @@ public final class ResortStore {
             at: 0
         )
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     public func boostStaffMorale(id: UUID) {
@@ -354,6 +431,7 @@ public final class ResortStore {
             at: 0
         )
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     // MARK: - Mountain Builder Actions
@@ -378,6 +456,7 @@ public final class ResortStore {
             at: 0
         )
         saveToDisk()
+        triggerBackgroundPush()
         return true
     }
     
@@ -405,6 +484,7 @@ public final class ResortStore {
             at: 0
         )
         saveToDisk()
+        triggerBackgroundPush()
         return true
     }
     
@@ -420,6 +500,7 @@ public final class ResortStore {
             at: 0
         )
         saveToDisk()
+        triggerBackgroundPush()
         return true
     }
     
@@ -435,6 +516,7 @@ public final class ResortStore {
             at: 0
         )
         saveToDisk()
+        triggerBackgroundPush()
         return true
     }
     
@@ -442,30 +524,35 @@ public final class ResortStore {
         guard let idx = resort.buildings.firstIndex(where: { $0.id == id }) else { return }
         resort.buildings[idx].isOpen.toggle()
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     public func toggleLiftStatus(id: UUID) {
         guard let index = resort.lifts.firstIndex(where: { $0.id == id }) else { return }
         resort.lifts[index].status = resort.lifts[index].status == .running ? .closed : .running
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     public func toggleSlopeStatus(id: UUID) {
         guard let index = resort.slopes.firstIndex(where: { $0.id == id }) else { return }
         resort.slopes[index].isOpen.toggle()
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     public func hireStaff(name: String, role: StaffRole) -> Bool {
         let member = StaffMember(name: name, role: role, skillStars: Int.random(in: 3...5), moralePercent: 90)
         resort.staff.append(member)
         saveToDisk()
+        triggerBackgroundPush()
         return true
     }
     
     public func fireStaff(id: UUID) {
         resort.staff.removeAll(where: { $0.id == id })
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     public func takeLoan(amount: Int) {
@@ -476,6 +563,7 @@ public final class ResortStore {
             at: 0
         )
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     public func repayLoan(amount: Int) -> Bool {
@@ -489,6 +577,7 @@ public final class ResortStore {
             at: 0
         )
         saveToDisk()
+        triggerBackgroundPush()
         return true
     }
     
@@ -496,11 +585,13 @@ public final class ResortStore {
         resort.ticketPriceAdult = max(20, min(250, adult))
         resort.ticketPriceChild = max(10, min(150, child))
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     public func resetToTemplate() {
         self.resort = Resort.makeParkCityTemplate()
         saveToDisk()
+        triggerBackgroundPush()
     }
     
     // MARK: - Local Disk Persistence Engine

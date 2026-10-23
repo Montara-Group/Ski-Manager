@@ -31,6 +31,7 @@ public struct ApiResortResponse: Codable {
     public var finances: ApiFinances?
     public var weather: ApiWeather?
     public var segments: [RealMapDataLoader.RawSegment]?
+    public var server_time: Int?
 }
 
 public struct ApiFinances: Codable {
@@ -49,6 +50,33 @@ public struct ApiWeather: Codable {
     public var condition: String?
 }
 
+public struct ClientSyncPayload: Codable {
+    public var cash: Int
+    public var game_day: Int
+    public var daily_visitors: Int
+    public var ticket_price_adult: Int
+    public var ticket_price_child: Int
+    public var built_segments_count: Int
+    public var outstanding_loan: Int
+}
+
+public struct ServerSyncResponse: Codable {
+    public var status: String?
+    public var synced_at: String?
+    public var server_time: Int?
+    public var server_game_day: Int?
+    public var confirmed_cash: Int?
+    public var message: String?
+}
+
+public struct ServerAuthResponse: Codable {
+    public var status: String?
+    public var token: String?
+    public var username: String?
+    public var director_name: String?
+    public var server: String?
+}
+
 public actor SkiManagerAPIClient {
     public static let shared = SkiManagerAPIClient()
     
@@ -57,12 +85,12 @@ public actor SkiManagerAPIClient {
     
     public init() {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 10.0
-        config.timeoutIntervalForResource = 20.0
+        config.timeoutIntervalForRequest = 8.0
+        config.timeoutIntervalForResource = 15.0
         self.session = URLSession(configuration: config)
     }
     
-    // MARK: - Health & Maintenance Check
+    // MARK: - Health & Online Check
     
     public func checkServerHealth() async throws -> (isHealthy: Bool, isMaintenance: Bool, message: String) {
         let healthURL = baseURL.appendingPathComponent("health")
@@ -76,14 +104,13 @@ public actor SkiManagerAPIClient {
         }
         
         if httpResponse.statusCode == 200 {
-            return (true, false, "Server Online & Healthy (HTTP 200)")
+            return (true, false, "Online · Connected to ski-manager.net")
         } else if httpResponse.statusCode == 503 {
-            // Maintenance mode active
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let msg = json["message"] as? String {
                 return (false, true, msg)
             }
-            return (false, true, "Site is undergoing Season 2 scheduled maintenance.")
+            return (false, true, "Season 2 Scheduled Maintenance Active")
         } else {
             return (false, false, "Server returned status code \(httpResponse.statusCode)")
         }
@@ -106,26 +133,48 @@ public actor SkiManagerAPIClient {
         return try decoder.decode(ApiResortResponse.self, from: data)
     }
     
-    // MARK: - Fetch Online Leaderboard
+    // MARK: - Fetch Live Online Leaderboard
     
     public func fetchLeaderboard() async throws -> [LeaderboardEntry] {
-        let url = baseURL.appendingPathComponent("leaderboard")
+        let url = baseURL.appendingPathComponent("api/leaderboard")
         var request = URLRequest(url: url)
+        request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         
         do {
             let (data, response) = try await session.data(for: request)
             if let http = response as? HTTPURLResponse, http.statusCode == 200 {
                 let decoder = JSONDecoder()
-                if let entries = try? decoder.decode([LeaderboardEntry].self, from: data) {
+                if let entries = try? decoder.decode([LeaderboardEntry].self, from: data), !entries.isEmpty {
                     return entries
                 }
             }
         } catch {
-            // Graceful fallback to cached mock pioneer leaderboard
+            // Graceful fallback to default pioneer leaderboard
         }
         
         return Self.fallbackPioneerLeaderboard
+    }
+    
+    // MARK: - Push Telemetry Sync
+    
+    public func pushSync(payload: ClientSyncPayload) async throws -> ServerSyncResponse {
+        let url = baseURL.appendingPathComponent("api/sync")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let encoder = JSONEncoder()
+        request.httpBody = try encoder.encode(payload)
+        
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, (httpResponse.statusCode == 200 || httpResponse.statusCode == 201) else {
+            throw URLError(.badServerResponse)
+        }
+        
+        let decoder = JSONDecoder()
+        return try decoder.decode(ServerSyncResponse.self, from: data)
     }
     
     public static var fallbackPioneerLeaderboard: [LeaderboardEntry] {

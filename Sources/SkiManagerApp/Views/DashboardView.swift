@@ -418,6 +418,20 @@ public struct DashboardView: View {
             }
             .navigationTitle("Dashboard")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Task { _ = await store.syncWithLiveWebsite() }
+                    } label: {
+                        if store.isCloudSyncing {
+                            ProgressView().scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundStyle(AlpineTheme.glacierBlue)
+                        }
+                    }
+                }
+            }
         }
     }
 }
