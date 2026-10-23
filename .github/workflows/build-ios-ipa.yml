@@ -1,0 +1,80 @@
+name: Build Ski Manager iOS IPA
+
+on:
+  push:
+    paths:
+      - 'ios/**'
+      - '.github/workflows/build-ios-ipa.yml'
+    branches:
+      - main
+      - staging
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    name: Compile & Package iOS IPA
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Select Latest Xcode & iPhoneOS SDK
+        run: |
+          LATEST_XCODE=$(find /Applications -maxdepth 1 -name "Xcode*.app" | sort -V | tail -n 1)
+          if [ -n "$LATEST_XCODE" ]; then
+            echo "Selecting Xcode: $LATEST_XCODE"
+            sudo xcode-select -s "$LATEST_XCODE"
+          fi
+          xcodebuild -version
+
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "Active iPhoneOS SDK Path: $SDK_PATH"
+          echo "Active iPhoneOS SDK Version: $SDK_VERSION"
+
+      - name: Compile Native SwiftUI Executable
+        run: |
+          mkdir -p build/Payload/SkiManagerApp.app
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version)
+          TARGET="arm64-apple-ios17.0"
+          
+          echo "Compiling for Target: $TARGET using SDK $SDK_VERSION"
+          
+          # Gather all Swift source files recursively
+          SWIFT_FILES=$(find ios/Sources/SkiManagerApp -name "*.swift")
+          echo "Found source files to compile:"
+          echo "$SWIFT_FILES"
+          
+          # Compile native 64-bit iOS binary
+          xcrun -sdk iphoneos swiftc \
+            -target "$TARGET" \
+            -sdk "$SDK_PATH" \
+            -module-name SkiManagerApp \
+            -O \
+            -parse-as-library \
+            -emit-executable \
+            -o build/Payload/SkiManagerApp.app/SkiManagerApp \
+            $SWIFT_FILES
+
+      - name: Package & Sign IPA
+        run: |
+          # Copy Info.plist into app bundle
+          cp ios/Info.plist build/Payload/SkiManagerApp.app/Info.plist
+          
+          # Ad-hoc codesign for Sideloadly / AltStore / TrollStore
+          codesign --force --deep --sign - build/Payload/SkiManagerApp.app
+          
+          # Package into installable IPA archive
+          cd build
+          zip -qr SkiManager-iOS.ipa Payload
+          ls -lh SkiManager-iOS.ipa
+          echo "IPA archive created successfully."
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SkiManager-iOS-IPA
+          path: build/SkiManager-iOS.ipa
+          retention-days: 14
