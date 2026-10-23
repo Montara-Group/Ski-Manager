@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 public struct CloudSyncView: View {
@@ -9,6 +10,7 @@ public struct CloudSyncView: View {
     @State private var leaderboard: [LeaderboardEntry] = []
     @State private var isLoadingLeaderboard: Bool = false
     @State private var showingResetConfirmation: Bool = false
+    @State private var syncSuccessBanner: Bool = false
     
     public init() {}
     
@@ -40,7 +42,10 @@ public struct CloudSyncView: View {
                             Spacer()
                             
                             Button {
-                                Task { await performHealthCheck() }
+                                Task {
+                                    await performHealthCheck()
+                                    await syncMountain()
+                                }
                             } label: {
                                 Image(systemName: "arrow.clockwise")
                                     .font(.subheadline)
@@ -64,7 +69,39 @@ public struct CloudSyncView: View {
                             Capsule().fill(.ultraThinMaterial)
                         }
                         
-                        Text("Ski Manager runs seamlessly offline with full local persistence. When network access is available, resort telemetry and leaderboard standings synchronize automatically.")
+                        // Sync Button & Last Sync Time
+                        VStack(alignment: .leading, spacing: 8) {
+                            Button {
+                                Task { await syncMountain() }
+                            } label: {
+                                HStack {
+                                    if store.isCloudSyncing {
+                                        ProgressView()
+                                            .tint(.white)
+                                            .padding(.trailing, 6)
+                                    } else {
+                                        Image(systemName: "arrow.triangle.2.circlepath.icloud.fill")
+                                    }
+                                    Text(store.isCloudSyncing ? "Synchronizing Mountain..." : "Sync with ski-manager.net")
+                                    Spacer()
+                                }
+                                .font(.subheadline.weight(.semibold))
+                            }
+                            .buttonStyle(AlpineGlassButtonStyle())
+                            .disabled(store.isCloudSyncing)
+                            
+                            if let lastSync = store.lastSyncDate {
+                                Text("Last synchronized: \(lastSync.formatted(date: .abbreviated, time: .shortened))")
+                                    .font(.caption2)
+                                    .foregroundStyle(AlpineTheme.forestGreen)
+                            } else if let err = store.cloudSyncError {
+                                Text("Sync status: \(err)")
+                                    .font(.caption2)
+                                    .foregroundStyle(AlpineTheme.avalancheRed)
+                            }
+                        }
+                        
+                        Text("Ski Manager runs seamlessly offline with full authentic local trail data. When connected, resort data synchronizes live with the backend database.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -165,7 +202,7 @@ public struct CloudSyncView: View {
                         } label: {
                             HStack {
                                 Image(systemName: "arrow.counterclockwise.circle.fill")
-                                Text("Reset to Park City Template")
+                                Text("Reset to Authentic Park City Setup")
                                 Spacer()
                             }
                             .frame(maxWidth: .infinity)
@@ -180,6 +217,7 @@ public struct CloudSyncView: View {
             .navigationBarTitleDisplayMode(.large)
             .task {
                 await performHealthCheck()
+                await syncMountain()
                 await loadLeaderboard()
             }
             .confirmationDialog(
@@ -192,7 +230,7 @@ public struct CloudSyncView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This will restore the starting Park City layout with 7 lifts, 7 trails, and standard capital.")
+                Text("This will restore the authentic starting Park City layout matching Demo.php with 73 real trail segments and €250,000 treasury.")
             }
         }
     }
@@ -208,6 +246,10 @@ public struct CloudSyncView: View {
             isServerMaintenance = false
             serverStatusText = "Operating in Offline Simulation Mode"
         }
+    }
+    
+    private func syncMountain() async {
+        _ = await store.syncWithLiveWebsite()
     }
     
     private func loadLeaderboard() async {

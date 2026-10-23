@@ -18,7 +18,10 @@ let package = Package(
         .executableTarget(
             name: "SkiManagerApp",
             dependencies: [],
-            path: "Sources/SkiManagerApp"
+            path: "Sources/SkiManagerApp",
+            resources: [
+                .process("Resources")
+            ]
         )
     ]
 )

@@ -19,6 +19,7 @@ class MaintenanceFilter implements FilterInterface
         'logout',
         'admin',
         'register', // Allow reaching auth controller if needed for admin verification
+        'api',      // Allow native mobile app API communication
     ];
 
     public function before(RequestInterface $request, $arguments = null)

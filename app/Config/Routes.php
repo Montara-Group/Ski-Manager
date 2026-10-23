@@ -116,6 +116,8 @@ $routes->get('/transportation', 'Buildings::show/transportation');
 $routes->get('/updates', 'Updates::index');
 $routes->match(['get', 'head'], '/health', 'Health::index');
 $routes->get('/maintenance', 'Home::maintenance');
+$routes->get('/api/resort-data', 'Api::resortData');
+$routes->options('/api/resort-data', 'Api::resortData');
 $routes->match(['get', 'head'], '/roadmap', 'Roadmap::index');
 $routes->post('/roadmap/vote/(:num)', 'Roadmap::vote/$1');
 $routes->post('/roadmap/suggest', 'Roadmap::suggest');

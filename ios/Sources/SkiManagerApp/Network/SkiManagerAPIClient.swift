@@ -23,6 +23,32 @@ public struct LeaderboardEntry: Identifiable, Codable, Equatable {
     }
 }
 
+public struct ApiResortResponse: Codable {
+    public var status: String?
+    public var resort_name: String?
+    public var resort_map: String?
+    public var game_day: Int?
+    public var finances: ApiFinances?
+    public var weather: ApiWeather?
+    public var segments: [RealMapDataLoader.RawSegment]?
+}
+
+public struct ApiFinances: Codable {
+    public var cash: Int?
+    public var daily_visitors: Int?
+    public var total_income: Int?
+    public var total_expenses: Int?
+}
+
+public struct ApiWeather: Codable {
+    public var game_day: Int?
+    public var temperature: Int?
+    public var snowfall: Int?
+    public var base_depth: Int?
+    public var wind_speed: Int?
+    public var condition: String?
+}
+
 public actor SkiManagerAPIClient {
     public static let shared = SkiManagerAPIClient()
     
@@ -61,6 +87,23 @@ public actor SkiManagerAPIClient {
         } else {
             return (false, false, "Server returned status code \(httpResponse.statusCode)")
         }
+    }
+    
+    // MARK: - Fetch Authentic Mountain & Resort Data
+    
+    public func fetchResortData() async throws -> ApiResortResponse {
+        let url = baseURL.appendingPathComponent("api/resort-data")
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw URLError(.badServerResponse)
+        }
+        
+        let decoder = JSONDecoder()
+        return try decoder.decode(ApiResortResponse.self, from: data)
     }
     
     // MARK: - Fetch Online Leaderboard

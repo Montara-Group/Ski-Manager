@@ -63,6 +63,11 @@ jobs:
           # Copy Info.plist into app bundle
           cp ios/Info.plist build/Payload/SkiManagerApp.app/Info.plist
           
+          # Copy authentic trail map resources (ParkCity.jpg, RealMapData.json)
+          if [ -d "ios/Sources/SkiManagerApp/Resources" ]; then
+            cp -r ios/Sources/SkiManagerApp/Resources/* build/Payload/SkiManagerApp.app/
+          fi
+          
           # Ad-hoc codesign for Sideloadly / AltStore / TrollStore
           codesign --force --deep --sign - build/Payload/SkiManagerApp.app
           
