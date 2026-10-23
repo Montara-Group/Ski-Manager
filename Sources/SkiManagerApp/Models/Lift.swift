@@ -4,6 +4,7 @@ import SwiftUI
 public enum LiftType: String, Codable, CaseIterable, Identifiable {
     case magicCarpet = "Magic Carpet"
     case fixedDouble = "Fixed 2-Seater Chair"
+    case fixedQuad = "Fixed 4-Seater Chair"
     case expressQuad = "High-Speed Quad"
     case sixPackExpress = "6-Seater Express"
     case gondola = "8-Passenger Gondola"
@@ -15,7 +16,7 @@ public enum LiftType: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .magicCarpet:
             return "figure.snowboarding"
-        case .fixedDouble, .expressQuad, .sixPackExpress:
+        case .fixedDouble, .fixedQuad, .expressQuad, .sixPackExpress:
             return "chairlift.fill"
         case .gondola:
             return "cablecar.fill"
@@ -28,6 +29,7 @@ public enum LiftType: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .magicCarpet: return 800
         case .fixedDouble: return 1200
+        case .fixedQuad: return 1800
         case .expressQuad: return 2400
         case .sixPackExpress: return 3200
         case .gondola: return 2800
@@ -39,6 +41,7 @@ public enum LiftType: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .magicCarpet: return 45000
         case .fixedDouble: return 120000
+        case .fixedQuad: return 220000
         case .expressQuad: return 350000
         case .sixPackExpress: return 600000
         case .gondola: return 950000
@@ -50,6 +53,7 @@ public enum LiftType: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .magicCarpet: return 60
         case .fixedDouble: return 180
+        case .fixedQuad: return 280
         case .expressQuad: return 420
         case .sixPackExpress: return 650
         case .gondola: return 950
@@ -61,6 +65,7 @@ public enum LiftType: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .magicCarpet: return 1.2
         case .fixedDouble: return 2.3
+        case .fixedQuad: return 2.6
         case .expressQuad: return 5.0
         case .sixPackExpress: return 5.5
         case .gondola: return 6.0
