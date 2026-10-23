@@ -48,12 +48,12 @@ public struct MainTabView: View {
                 }
                 .tag(3)
             
-            // TAB 4: Season Progression & Local Settings
+            // TAB 4: Online Network, Leaderboard & Season
             SeasonSettingsView()
                 .tabItem {
                     Label(
-                        "Season",
-                        systemImage: selectedTab == 4 ? "gearshape.2.fill" : "gearshape.2"
+                        "Online",
+                        systemImage: selectedTab == 4 ? "globe.americas.fill" : "globe"
                     )
                 }
                 .tag(4)

@@ -4,13 +4,9 @@ import SwiftUI
 public struct SeasonSettingsView: View {
     @Environment(ResortStore.self) private var store
     
-    @State private var serverStatusText: String = "Operating Locally (Offline-First)"
-    @State private var isServerOnline: Bool = true
-    @State private var isServerMaintenance: Bool = false
-    @State private var leaderboard: [LeaderboardEntry] = []
-    @State private var isLoadingLeaderboard: Bool = false
     @State private var showingResetConfirmation: Bool = false
     @State private var fastForwardSuccess: Bool = false
+    @State private var isRefreshingLeaderboard: Bool = false
     
     public init() {}
     
@@ -18,103 +14,151 @@ public struct SeasonSettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // Top Stats Bar
+                    // Top Snapshot Bar
                     ResortStatsBarView()
                         .padding(.horizontal, 16)
                     
-                    // MARK: - 1. Local App Offline Status Card
+                    // MARK: - 1. Live Online Server Connection Card
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 12) {
                             ZStack {
                                 Circle()
-                                    .fill(AlpineTheme.forestGreen.opacity(0.18))
+                                    .fill((store.isOnline ? AlpineTheme.forestGreen : AlpineTheme.peakAmber).opacity(0.18))
                                     .frame(width: 44, height: 44)
-                                Image(systemName: "internaldrive.fill")
+                                Image(systemName: store.isOnline ? "globe.americas.fill" : "wifi.slash")
                                     .font(.title3)
-                                    .foregroundStyle(AlpineTheme.forestGreen)
+                                    .foregroundStyle(store.isOnline ? AlpineTheme.forestGreen : AlpineTheme.peakAmber)
                             }
                             
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Local Offline Simulation Engine")
+                                Text("Ski Manager Online Network")
                                     .font(.headline)
-                                Text("Active Engine: Native Swift 6")
+                                Text("Endpoint: https://ski-manager.net")
                                     .font(.caption2)
                                     .foregroundStyle(.secondary)
                             }
                             
                             Spacer()
                             
-                            Text("LOCAL")
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background { Capsule().fill(AlpineTheme.forestGreen.opacity(0.2)) }
-                                .foregroundStyle(AlpineTheme.forestGreen)
+                            HStack(spacing: 5) {
+                                Circle()
+                                    .fill(store.isOnline ? AlpineTheme.forestGreen : AlpineTheme.peakAmber)
+                                    .frame(width: 8, height: 8)
+                                Text(store.isOnline ? "ONLINE" : "CACHED")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(store.isOnline ? AlpineTheme.forestGreen : AlpineTheme.peakAmber)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background { Capsule().fill(Color.primary.opacity(0.06)) }
                         }
                         
                         Divider().background(Color.white.opacity(0.1))
                         
-                        VStack(spacing: 6) {
-                            HStack {
-                                Text("Storage Location")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text("Device Sandboxed Documents")
-                                    .font(.caption.weight(.semibold))
+                        VStack(spacing: 8) {
+                            Button {
+                                Task {
+                                    _ = await store.syncWithLiveWebsite()
+                                }
+                            } label: {
+                                HStack {
+                                    if store.isCloudSyncing {
+                                        ProgressView().tint(.white).padding(.trailing, 4)
+                                    } else {
+                                        Image(systemName: "arrow.triangle.2.circlepath")
+                                    }
+                                    Text(store.isCloudSyncing ? "Synchronizing Mountain..." : "Sync with ski-manager.net Now")
+                                    Spacer()
+                                    if let lastSync = store.lastSyncDate {
+                                        Text(lastSync.formatted(date: .omitted, time: .shortened))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .font(.subheadline.weight(.semibold))
                             }
+                            .buttonStyle(AlpineGlassButtonStyle())
+                            .disabled(store.isCloudSyncing)
+                            
                             HStack {
-                                Text("Save File")
-                                    .font(.caption)
+                                Text("All changes sync automatically in the background with ski-manager.net while maintaining instant offline fallback.")
+                                    .font(.caption2)
                                     .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(ResortStore.localSaveFileSizeFormatted)
-                                    .font(.caption.weight(.semibold))
-                                    .monospacedDigit()
-                            }
-                            HStack {
-                                Text("Network Requirement")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text("None (100% Offline Capable)")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(AlpineTheme.forestGreen)
                             }
                         }
                     }
                     .alpineGlassCard()
                     .padding(.horizontal, 16)
                     
-                    // MARK: - 2. Fast Simulation Tools
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Simulation Controls")
-                            .font(.headline)
-                            .padding(.horizontal, 16)
-                        
-                        Button {
-                            for _ in 1...5 {
-                                store.advanceDay()
+                    // MARK: - 2. Live Global Pioneer Leaderboard
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Label("Global Pioneer Leaderboard", systemImage: "trophy.fill")
+                                .font(.headline)
+                                .foregroundStyle(.primary)
+                            
+                            Spacer()
+                            
+                            Button {
+                                Task {
+                                    isRefreshingLeaderboard = true
+                                    if let board = try? await SkiManagerAPIClient.shared.fetchLeaderboard() {
+                                        store.onlineLeaderboard = board
+                                    }
+                                    isRefreshingLeaderboard = false
+                                }
+                            } label: {
+                                if isRefreshingLeaderboard {
+                                    ProgressView().scaleEffect(0.7)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(AlpineTheme.glacierBlue)
+                                }
                             }
-                            withAnimation(AlpineTheme.bouncySpring) {
-                                fastForwardSuccess = true
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: "forward.end.fill")
-                                Text("Fast Forward 5 Game Days")
-                                Spacer()
-                                Text("+5 Days")
-                                    .font(.caption2.weight(.bold))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background { Capsule().fill(Color.black.opacity(0.2)) }
-                            }
-                            .font(.subheadline.weight(.semibold))
                         }
-                        .buttonStyle(AlpineGlassButtonStyle(isProminent: true))
                         .padding(.horizontal, 16)
-                        .sensoryFeedback(.impact(weight: .heavy), trigger: fastForwardSuccess)
+                        
+                        LazyVStack(spacing: 8) {
+                            ForEach(store.onlineLeaderboard.prefix(10)) { entry in
+                                HStack(spacing: 12) {
+                                    // Rank
+                                    Text("#\(entry.rankPosition)")
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(entry.rankPosition <= 3 ? AlpineTheme.peakAmber : .secondary)
+                                        .frame(width: 32, alignment: .leading)
+                                        .monospacedDigit()
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(entry.username)
+                                            .font(.subheadline.weight(.semibold))
+                                        if let resort = entry.resortName {
+                                            Text(resort)
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        Text("€\(entry.cash.formatted())")
+                                            .font(.subheadline.weight(.bold))
+                                            .foregroundStyle(AlpineTheme.forestGreen)
+                                            .monospacedDigit()
+                                        Text("\(entry.reputation)% Rep")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(12)
+                                .background {
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .fill(.ultraThinMaterial)
+                                }
+                                .padding(.horizontal, 16)
+                            }
+                        }
                     }
                     
                     // MARK: - 3. Season 2 Expansion Banner
@@ -139,45 +183,35 @@ public struct SeasonSettingsView: View {
                     .alpineGlassCard()
                     .padding(.horizontal, 16)
                     
-                    // MARK: - 4. Cloud Sync (Optional)
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Label("Cloud Sync (Optional)", systemImage: "icloud.fill")
-                                .font(.headline)
-                            Spacer()
-                            Text(serverStatusText)
-                                .font(.caption2.weight(.bold))
-                                .foregroundStyle(isServerOnline ? AlpineTheme.forestGreen : AlpineTheme.peakAmber)
-                        }
+                    // MARK: - 4. Local Simulation & Storage Diagnostics
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Local Diagnostics & Simulation")
+                            .font(.headline)
+                            .padding(.horizontal, 16)
                         
                         Button {
-                            Task {
-                                _ = await store.syncWithLiveWebsite()
-                                await performHealthCheck()
+                            for _ in 1...5 {
+                                store.advanceDay()
+                            }
+                            withAnimation(AlpineTheme.bouncySpring) {
+                                fastForwardSuccess = true
                             }
                         } label: {
                             HStack {
-                                if store.isCloudSyncing {
-                                    ProgressView().tint(.white).padding(.trailing, 4)
-                                } else {
-                                    Image(systemName: "arrow.triangle.2.circlepath")
-                                }
-                                Text(store.isCloudSyncing ? "Syncing..." : "Sync with ski-manager.net")
+                                Image(systemName: "forward.end.fill")
+                                Text("Advance 5 Days (Fast Sim)")
                                 Spacer()
+                                Text("+5 Days")
+                                    .font(.caption2.weight(.bold))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background { Capsule().fill(Color.black.opacity(0.2)) }
                             }
-                            .font(.caption.weight(.semibold))
+                            .font(.subheadline.weight(.semibold))
                         }
                         .buttonStyle(AlpineGlassButtonStyle())
-                        .disabled(store.isCloudSyncing)
-                    }
-                    .alpineGlassCard()
-                    .padding(.horizontal, 16)
-                    
-                    // MARK: - 5. Factory Reset to Demo Mountain
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Data Management")
-                            .font(.headline)
-                            .padding(.horizontal, 16)
+                        .padding(.horizontal, 16)
+                        .sensoryFeedback(.impact(weight: .heavy), trigger: fastForwardSuccess)
                         
                         Button(role: .destructive) {
                             showingResetConfirmation = true
@@ -195,7 +229,7 @@ public struct SeasonSettingsView: View {
                 }
                 .padding(.vertical, 12)
             }
-            .navigationTitle("Season & Settings")
+            .navigationTitle("Season & Online")
             .navigationBarTitleDisplayMode(.inline)
             .confirmationDialog(
                 "Reset Mountain to Factory Starter?",
@@ -209,21 +243,6 @@ public struct SeasonSettingsView: View {
             } message: {
                 Text("This will restore the authentic starting setup matching Demo.php with 4 lifts, 8 slopes, 3 buildings, 4 staff, and €250,000 cash.")
             }
-            .task {
-                await performHealthCheck()
-            }
-        }
-    }
-    
-    private func performHealthCheck() async {
-        do {
-            let result = try await SkiManagerAPIClient.shared.checkServerHealth()
-            isServerOnline = result.isHealthy
-            isServerMaintenance = result.isMaintenance
-            serverStatusText = result.message
-        } catch {
-            isServerOnline = false
-            serverStatusText = "Offline Mode Active"
         }
     }
 }
