@@ -1,3 +1,4 @@
+import Foundation
 import SwiftUI
 
 public struct MainTabView: View {
@@ -7,47 +8,52 @@ public struct MainTabView: View {
     
     public var body: some View {
         TabView(selection: $selectedTab) {
-            MountainView()
+            // TAB 0: Website Dashboard
+            DashboardView(selectedTab: $selectedTab)
                 .tabItem {
                     Label(
-                        "Mountain",
-                        systemImage: selectedTab == 0 ? "mountain.2.fill" : "mountain.2"
+                        "Dashboard",
+                        systemImage: selectedTab == 0 ? "gauge.open.with.lines.needle.33percent" : "gauge.high"
                     )
                 }
                 .tag(0)
             
-            ResortOpsView()
+            // TAB 1: Authentic Trail Map (ParkCity.jpg + 73 Leaflet Segments)
+            MountainView()
                 .tabItem {
                     Label(
-                        "Resort Ops",
-                        systemImage: "gauge.with.dots.needle.bottom.50percent"
+                        "Trail Map",
+                        systemImage: selectedTab == 1 ? "map.fill" : "map"
                     )
                 }
                 .tag(1)
             
-            FinancesView()
+            // TAB 2: Commercial Village & Lodges
+            VillageBuildingsView()
                 .tabItem {
                     Label(
-                        "Finances",
-                        systemImage: "chart.line.uptrend.xyaxis"
+                        "Village",
+                        systemImage: selectedTab == 2 ? "building.2.fill" : "building.2"
                     )
                 }
                 .tag(2)
             
-            StaffLodgeView()
+            // TAB 3: Staff, Tickets & Bank Operations
+            OperationsView()
                 .tabItem {
                     Label(
-                        "Staff & Village",
-                        systemImage: selectedTab == 3 ? "person.3.sequence.fill" : "person.3.sequence"
+                        "Operations",
+                        systemImage: selectedTab == 3 ? "chart.line.uptrend.xyaxis.circle.fill" : "chart.line.uptrend.xyaxis"
                     )
                 }
                 .tag(3)
             
-            CloudSyncView()
+            // TAB 4: Season Progression & Local Settings
+            SeasonSettingsView()
                 .tabItem {
                     Label(
-                        "Sync",
-                        systemImage: selectedTab == 4 ? "cloud.fill" : "cloud"
+                        "Season",
+                        systemImage: selectedTab == 4 ? "gearshape.2.fill" : "gearshape.2"
                     )
                 }
                 .tag(4)

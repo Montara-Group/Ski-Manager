@@ -16,15 +16,16 @@ public final class ResortStore {
     public var cloudSyncError: String? = nil
     public var cloudAccountUsername: String? = nil
     public var isSimulationRunning: Bool = false
+    public var lastBonusAwardMessage: String? = nil
     
     // MARK: - Persistence Keys
     
-    private let saveFileName = "ski_manager_resort_v3.json"
+    private let saveFileName = "ski_manager_resort_v4.json"
     
     // MARK: - Initialization
     
     public init() {
-        if let savedResort = Self.loadFromDisk(filename: "ski_manager_resort_v3.json") {
+        if let savedResort = Self.loadFromDisk(filename: "ski_manager_resort_v4.json") {
             self.resort = savedResort
         } else {
             self.resort = Resort.makeParkCityTemplate()
@@ -40,13 +41,13 @@ public final class ResortStore {
         // 2. Weather Dynamics
         updateMountainWeather()
         
-        // 3. Visitor Attendance Equation
+        // 3. Visitor Attendance Equation matching website algorithm
         let priceFactor = max(0.5, 1.6 - (Double(resort.ticketPriceAdult) / 68.0) * 0.6)
         let openSlopesFactor = Double(resort.openSlopesCount) / Double(max(1, resort.openSlopesCount + 2))
         let snowQualityFactor = Double(resort.weather.newSnowfall24hCm > 10 ? 1.25 : 1.0)
         let repFactor = Double(resort.reputationScore) / 100.0
         
-        let baseVisitors = Double.random(in: 420...650)
+        let baseVisitors = Double.random(in: 420...680)
         let calculatedVisitors = Int(baseVisitors * priceFactor * openSlopesFactor * snowQualityFactor * repFactor * resort.difficulty.visitorMultiplier)
         resort.totalVisitorsToday = max(180, calculatedVisitors)
         
@@ -67,12 +68,12 @@ public final class ResortStore {
         
         // 5. Append Ledger Records
         var newTx: [GameTransaction] = []
-        newTx.append(GameTransaction(title: "Lift Tickets (Day \(resort.gameDay))", amount: ticketRev, category: .ticketSales, gameDay: resort.gameDay))
+        newTx.append(GameTransaction(title: "Lift Ticket Sales (Day \(resort.gameDay))", amount: ticketRev, category: .ticketSales, gameDay: resort.gameDay))
         if lodgeRev > 0 {
             newTx.append(GameTransaction(title: "Lodge & Dining Receipts", amount: lodgeRev, category: .buildingRevenue, gameDay: resort.gameDay))
         }
-        newTx.append(GameTransaction(title: "Staff Salaries", amount: -staffCost, category: .staffWages, gameDay: resort.gameDay))
-        newTx.append(GameTransaction(title: "Lift Fleet Maintenance", amount: -liftMaint, category: .liftMaintenance, gameDay: resort.gameDay))
+        newTx.append(GameTransaction(title: "Staff Payroll Deductions", amount: -staffCost, category: .staffWages, gameDay: resort.gameDay))
+        newTx.append(GameTransaction(title: "Lift Fleet Electricity & Maintenance", amount: -liftMaint, category: .liftMaintenance, gameDay: resort.gameDay))
         if slopeUpkeep > 0 {
             newTx.append(GameTransaction(title: "Slope Grooming Upkeep", amount: -slopeUpkeep, category: .slopeMaintenance, gameDay: resort.gameDay))
         }
@@ -95,7 +96,7 @@ public final class ResortStore {
             }
         }
         
-        // 7. Slope Snow Compaction & Grooming Decay on Real Map Slopes
+        // 7. Slope Snow Compaction & Grooming Decay
         for i in resort.realSegments.indices where resort.realSegments[i].isSlope && resort.realSegments[i].isBuilt {
             if resort.realSegments[i].isOpen {
                 let decay = Int.random(in: 8...16)
@@ -103,14 +104,47 @@ public final class ResortStore {
             }
         }
         
-        // 8. Staff Morale Dynamics
+        // 8. Groomer Durability Degradation
+        resort.groomerConditionPct = max(20, resort.groomerConditionPct - Int.random(in: 1...3))
+        
+        // 9. Staff Morale Dynamics
         for i in resort.staff.indices {
             let moraleDelta = netProfit > 0 ? Int.random(in: 0...2) : -Int.random(in: 1...3)
             resort.staff[i].moralePercent = max(25, min(100, resort.staff[i].moralePercent + moraleDelta))
         }
         
-        // 9. Save Snapshot to Disk
+        // 10. Save Snapshot to Local Disk
         saveToDisk()
+    }
+    
+    // MARK: - Daily Bonus Engine
+    
+    @discardableResult
+    public func claimDailyBonus() -> (cash: Int, genepis: Int)? {
+        guard resort.canClaimDailyBonus else { return nil }
+        
+        let streak = resort.dailyBonusStreak
+        let cashReward = 5000 + (streak * 750)
+        let genepisReward = 5 + min(10, streak)
+        
+        resort.cash += cashReward
+        resort.genepis += genepisReward
+        resort.lastBonusClaimDay = resort.gameDay
+        resort.dailyBonusStreak += 1
+        
+        resort.transactions.insert(
+            GameTransaction(
+                title: "Daily Bonus Streak Day #\(streak)",
+                amount: cashReward,
+                category: .ticketSales,
+                gameDay: resort.gameDay
+            ),
+            at: 0
+        )
+        
+        lastBonusAwardMessage = "Claimed +€\(cashReward.formatted()) and +\(genepisReward) 🌿 Génépis!"
+        saveToDisk()
+        return (cashReward, genepisReward)
     }
     
     // MARK: - Weather Engine
@@ -241,19 +275,7 @@ public final class ResortStore {
         }
     }
     
-    // MARK: - Legacy Lift & Slope Operations
-    
-    public func toggleLiftStatus(id: UUID) {
-        guard let index = resort.lifts.firstIndex(where: { $0.id == id }) else { return }
-        resort.lifts[index].status = resort.lifts[index].status == .running ? .closed : .running
-        saveToDisk()
-    }
-    
-    public func toggleSlopeStatus(id: UUID) {
-        guard let index = resort.slopes.firstIndex(where: { $0.id == id }) else { return }
-        resort.slopes[index].isOpen.toggle()
-        saveToDisk()
-    }
+    // MARK: - Mountain Maintenance Actions
     
     public func groomAllSlopes() {
         let groomCost = resort.realSegments.filter { $0.isSlope && $0.isBuilt }.count * 85
@@ -272,6 +294,7 @@ public final class ResortStore {
             resort.slopes[i].groomingPercent = 95
             resort.slopes[i].snowQuality = .groomedCorduroy
         }
+        resort.groomerConditionPct = max(20, resort.groomerConditionPct - 2)
         saveToDisk()
     }
     
@@ -294,7 +317,46 @@ public final class ResortStore {
         saveToDisk()
     }
     
-    // MARK: - Mountain Custom Builder Actions
+    public func repairGroomer() -> Bool {
+        let cost = 3200
+        guard resort.cash >= cost, resort.groomerConditionPct < 100 else { return false }
+        resort.cash -= cost
+        resort.groomerConditionPct = 100
+        resort.transactions.insert(
+            GameTransaction(title: "PistenBully 600 Factory Overhaul", amount: -cost, category: .slopeMaintenance, gameDay: resort.gameDay),
+            at: 0
+        )
+        saveToDisk()
+        return true
+    }
+    
+    public func repairLift(id: UUID) {
+        guard let idx = resort.lifts.firstIndex(where: { $0.id == id }) else { return }
+        let cost = 2400
+        guard resort.cash >= cost else { return }
+        resort.cash -= cost
+        resort.lifts[idx].conditionPercent = 100
+        resort.transactions.insert(
+            GameTransaction(title: "Mechanical Overhaul: \(resort.lifts[idx].name)", amount: -cost, category: .liftMaintenance, gameDay: resort.gameDay),
+            at: 0
+        )
+        saveToDisk()
+    }
+    
+    public func boostStaffMorale(id: UUID) {
+        guard let idx = resort.staff.firstIndex(where: { $0.id == id }) else { return }
+        let cost = 350
+        guard resort.cash >= cost else { return }
+        resort.cash -= cost
+        resort.staff[idx].moralePercent = min(100, resort.staff[idx].moralePercent + 20)
+        resort.transactions.insert(
+            GameTransaction(title: "Director Spot Bonus: \(resort.staff[idx].name)", amount: -cost, category: .staffWages, gameDay: resort.gameDay),
+            at: 0
+        )
+        saveToDisk()
+    }
+    
+    // MARK: - Mountain Builder Actions
     
     public func buildLift(name: String, type: LiftType, sector: Int, length: Int, rise: Int) -> Bool {
         let cost = type.baseConstructionCost
@@ -361,6 +423,39 @@ public final class ResortStore {
         return true
     }
     
+    public func upgradeBuilding(id: UUID) -> Bool {
+        guard let idx = resort.buildings.firstIndex(where: { $0.id == id }) else { return false }
+        let cost = resort.buildings[idx].nextUpgradeCost
+        guard resort.cash >= cost, resort.buildings[idx].upgradeLevel < 5 else { return false }
+        
+        resort.cash -= cost
+        resort.buildings[idx].upgradeLevel += 1
+        resort.transactions.insert(
+            GameTransaction(title: "Upgraded \(resort.buildings[idx].name) to Level \(resort.buildings[idx].upgradeLevel)", amount: -cost, category: .capitalInvestment, gameDay: resort.gameDay),
+            at: 0
+        )
+        saveToDisk()
+        return true
+    }
+    
+    public func toggleBuildingOpen(id: UUID) {
+        guard let idx = resort.buildings.firstIndex(where: { $0.id == id }) else { return }
+        resort.buildings[idx].isOpen.toggle()
+        saveToDisk()
+    }
+    
+    public func toggleLiftStatus(id: UUID) {
+        guard let index = resort.lifts.firstIndex(where: { $0.id == id }) else { return }
+        resort.lifts[index].status = resort.lifts[index].status == .running ? .closed : .running
+        saveToDisk()
+    }
+    
+    public func toggleSlopeStatus(id: UUID) {
+        guard let index = resort.slopes.firstIndex(where: { $0.id == id }) else { return }
+        resort.slopes[index].isOpen.toggle()
+        saveToDisk()
+    }
+    
     public func hireStaff(name: String, role: StaffRole) -> Bool {
         let member = StaffMember(name: name, role: role, skillStars: Int.random(in: 3...5), moralePercent: 90)
         resort.staff.append(member)
@@ -408,9 +503,9 @@ public final class ResortStore {
         saveToDisk()
     }
     
-    // MARK: - Disk Persistence Engine
+    // MARK: - Local Disk Persistence Engine
     
-    private func saveToDisk() {
+    public func saveToDisk() {
         guard let url = Self.documentsURL?.appendingPathComponent(saveFileName) else { return }
         do {
             let encoder = JSONEncoder()
@@ -437,7 +532,16 @@ public final class ResortStore {
         }
     }
     
-    private static var documentsURL: URL? {
+    public static var localSaveFileSizeFormatted: String {
+        guard let url = documentsURL?.appendingPathComponent("ski_manager_resort_v4.json"),
+              let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let size = attrs[.size] as? Int64 else {
+            return "64 KB (Bundled)"
+        }
+        return ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+    }
+    
+    public static var documentsURL: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
     }
 }
