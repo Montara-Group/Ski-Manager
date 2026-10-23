@@ -50,6 +50,9 @@ public enum AlpineTheme {
     /// Snappy tactile spring for buttons, detents, and toggles
     public static let snappySpring = Animation.spring(response: 0.32, dampingFraction: 0.82, blendDuration: 0)
     
+    /// Fluid responsive spring for map view navigation and zooming
+    public static let fluidSpring = Animation.spring(response: 0.45, dampingFraction: 0.85, blendDuration: 0)
+    
     /// Bouncy spring for modal appearances and celebratory badges
     public static let bouncySpring = Animation.spring(response: 0.40, dampingFraction: 0.68, blendDuration: 0)
     
