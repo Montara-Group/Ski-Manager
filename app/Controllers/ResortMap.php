@@ -10,7 +10,7 @@ class ResortMap extends BaseController
         'ParkCity'       => ['name' => 'Park City',       'location' => 'Utah, USA',       'image' => '/img/ParkCity.jpg',       'width' => 600, 'height' => 340],
         'DeerValley'     => ['name' => 'Deer Valley',     'location' => 'Utah, USA',       'image' => '/img/DeerValley.jpg',     'width' => 600, 'height' => 340],
         'AspenSnowmass'  => ['name' => 'Aspen Snowmass',  'location' => 'Colorado, USA',   'image' => '/img/AspenSnowmass.jpg',  'width' => 600, 'height' => 340],
-        'BigSkyCombo'    => ['name' => 'Big Sky',         'location' => 'Montana, USA',    'image' => '/img/BigSky.jpg',         'width' => 600, 'height' => 340],
+        'BigSkyCombo'    => ['name' => 'Big Sky',         'location' => 'Montana, USA',    'image' => '/img/BigSkyCombo.jpg',    'width' => 600, 'height' => 340],
         'Vail'           => ['name' => 'Vail',            'location' => 'Colorado, USA',   'image' => '/img/Vail.jpg',           'width' => 600, 'height' => 340],
         'PalisadesTahoe' => ['name' => 'Palisades Tahoe', 'location' => 'California, USA', 'image' => '/img/PalisadesTahoe.jpg', 'width' => 600, 'height' => 340],
         'Killington'     => ['name' => 'Killington',      'location' => 'Vermont, USA',    'image' => '/img/Killington.jpg',     'width' => 600, 'height' => 340],
@@ -24,7 +24,7 @@ class ResortMap extends BaseController
             $fin = db_connect()->table('player_finances')
                 ->where('user_id', $userId)
                 ->get()->getRowArray();
-            if ($fin && !empty($fin['resort_map'])) {
+            if ($fin && !empty($fin['resort_map']) && isset(self::RESORT_MAPS[$fin['resort_map']])) {
                 return $fin['resort_map'];
             }
         }
@@ -33,7 +33,11 @@ class ResortMap extends BaseController
 
     private function isAdmin(): bool
     {
-        return auth()->id() === 1;
+        if (!function_exists('auth') || !auth()->loggedIn()) {
+            return false;
+        }
+        $user = auth()->user();
+        return auth()->id() === 1 || ($user && $user->inGroup('admin', 'superadmin'));
     }
 
     public function changeMap()
@@ -106,13 +110,20 @@ class ResortMap extends BaseController
         $segments = $segQuery->findAll();
 
         $builtSegmentIds = [];
+        $builtItems      = [];
+        $userCash        = 0;
         if ($userId) {
             $built = $db->table('player_items')
-                ->select('segment_id')
+                ->select('id, segment_id, item_type, subtype, name, length_meters, capacity, difficulty, sector, status, snow_quality')
                 ->where('user_id', $userId)
                 ->where('segment_id IS NOT NULL')
                 ->get()->getResultArray();
             $builtSegmentIds = array_column($built, 'segment_id');
+            foreach ($built as $b) {
+                $builtItems[(int) $b['segment_id']] = $b;
+            }
+            $finRow   = $db->table('player_finances')->select('cash')->where('user_id', $userId)->get()->getRowArray();
+            $userCash = (int) ($finRow['cash'] ?? 0);
         }
 
         $releasedSectorIds = array_column(array_filter($sectors, fn($s) => $s['released']), 'id');
@@ -122,16 +133,18 @@ class ResortMap extends BaseController
         }
 
         return view('resort_map/index', [
-            'resortMap'       => $resortMap,
-            'resortMaps'      => self::RESORT_MAPS,
-            'mapConfig'       => $mapConfig,
-            'segments'        => $segments,
-            'sectors'         => $sectors,
-            'builtSegmentIds' => $builtSegmentIds,
-            'isAdmin'         => $isAdmin,
-            'liftCount'       => $lifts,
-            'slopeCount'      => $slopes,
-            'segmentCount'    => count($segments),
+            'resortMap'         => $resortMap,
+            'resortMaps'        => self::RESORT_MAPS,
+            'mapConfig'         => $mapConfig,
+            'segments'          => $segments,
+            'sectors'           => $sectors,
+            'builtSegmentIds'   => $builtSegmentIds,
+            'builtItems'        => $builtItems,
+            'userCash'          => $userCash,
+            'isAdmin'           => $isAdmin,
+            'liftCount'         => $lifts,
+            'slopeCount'        => $slopes,
+            'segmentCount'      => count($segments),
             'releasedSectorIds' => $releasedSectorIds,
         ]);
     }
@@ -146,7 +159,7 @@ class ResortMap extends BaseController
 
         if (!$isAdmin) {
             $vis = $db->table('resort_sectors')
-                ->select('name')
+                ->select('id')
                 ->where('resort_map', $resortMap)
                 ->where('visible', 1)
                 ->get()->getResultArray();
@@ -166,39 +179,79 @@ class ResortMap extends BaseController
     public function saveSegment()
     {
         if (!$this->isAdmin()) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
 
         $data  = $this->request->getJSON(true);
         $model = new MapSegmentModel();
 
-        $row = [
-            'type'          => $data['type'] ?? 'lift',
-            'name'          => $data['name'] ?? 'Unnamed',
-            'points'        => json_encode($data['points'] ?? []),
-            'length_meters' => (int) ($data['length_meters'] ?? 0),
-            'sector'        => $data['sector'] ?? '',
-            'difficulty'    => $data['difficulty'] ?? '',
-            'resort_map'    => $this->getSelectedMap(),
-            'active'        => 1,
-        ];
+        $rawPoints = $data['points'] ?? [];
+        if (is_string($rawPoints)) {
+            $rawPoints = json_decode($rawPoints, true) ?? [];
+        }
+        $cleanPoints = [];
+        foreach ($rawPoints as $pt) {
+            if (is_array($pt) && count($pt) >= 2) {
+                $cleanPoints[] = [round((float) ($pt[0] ?? 0), 4), round((float) ($pt[1] ?? 0), 4)];
+            } elseif (is_array($pt) && isset($pt['lat'], $pt['lng'])) {
+                $cleanPoints[] = [round((float) $pt['lat'], 4), round((float) $pt['lng'], 4)];
+            }
+        }
 
-        if (!empty($data['id'])) {
-            $model->update($data['id'], $row);
-            return $this->response->setJSON([
-                'success'    => true,
-                'id'         => (int) $data['id'],
-                'segment'    => array_merge(['id' => (int) $data['id']], $row),
+        if (count($cleanPoints) < 2) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'success'    => false,
+                'error'      => 'A segment requires at least 2 points.',
                 'csrf_token' => csrf_token(),
                 'csrf_hash'  => csrf_hash(),
             ]);
         }
 
-        $id = $model->insert($row);
+        $type       = trim((string) ($data['type'] ?? 'lift')) ?: 'lift';
+        $difficulty = $type === 'lift' ? '' : trim((string) ($data['difficulty'] ?? ''));
+        $sectorId   = (int) ($data['sector'] ?? 0);
+        $lengthM    = max(1, (int) ($data['length_meters'] ?? 0));
+        $name       = trim((string) ($data['name'] ?? '')) ?: 'Unnamed';
+
+        $row = [
+            'type'          => $type,
+            'name'          => $name,
+            'points'        => json_encode($cleanPoints),
+            'length_meters' => $lengthM,
+            'sector'        => $sectorId,
+            'difficulty'    => $difficulty,
+            'resort_map'    => $this->getSelectedMap(),
+            'active'        => 1,
+        ];
+
+        if (!empty($data['id'])) {
+            $segId = (int) $data['id'];
+            $model->update($segId, $row);
+
+            // Keep built player_items metadata in sync with updated segment details
+            db_connect()->table('player_items')
+                ->where('segment_id', $segId)
+                ->update([
+                    'name'          => $name,
+                    'length_meters' => $lengthM,
+                    'difficulty'    => $difficulty ?: null,
+                    'sector'        => $sectorId,
+                ]);
+
+            return $this->response->setJSON([
+                'success'    => true,
+                'id'         => $segId,
+                'segment'    => array_merge(['id' => $segId], $row),
+                'csrf_token' => csrf_token(),
+                'csrf_hash'  => csrf_hash(),
+            ]);
+        }
+
+        $id = (int) $model->insert($row);
         return $this->response->setJSON([
             'success'    => true,
-            'id'         => (int) $id,
-            'segment'    => array_merge(['id' => (int) $id], $row),
+            'id'         => $id,
+            'segment'    => array_merge(['id' => $id], $row),
             'csrf_token' => csrf_token(),
             'csrf_hash'  => csrf_hash(),
         ]);
@@ -207,11 +260,11 @@ class ResortMap extends BaseController
     public function deleteSegment($id = null)
     {
         if (!$this->isAdmin()) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
 
         if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing ID']);
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing ID', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
 
         (new MapSegmentModel())->delete($id);
@@ -227,22 +280,25 @@ class ResortMap extends BaseController
     {
         $userId = auth()->id();
         if (!$userId) {
-            return $this->response->setStatusCode(401)->setJSON(['error' => 'Login required']);
+            return $this->response->setStatusCode(401)->setJSON(['error' => 'Login required', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
 
         $data      = $this->request->getJSON(true);
         $segmentId = $data['segment_id'] ?? null;
-        $liftType  = $data['lift_type']  ?? null;
+        $liftType  = $data['lift_type']  ?? 'chair_fixed';
+        if ($liftType === 'fixed') {
+            $liftType = 'chair_fixed';
+        }
         $seats     = (int) ($data['seats'] ?? 4);
         $slopeType = $data['slope_type'] ?? null;
 
         if (!$segmentId) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing segment']);
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing segment', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
 
         $segment = (new MapSegmentModel())->find($segmentId);
         if (!$segment) {
-            return $this->response->setStatusCode(404)->setJSON(['error' => 'Segment not found']);
+            return $this->response->setStatusCode(404)->setJSON(['error' => 'Segment not found', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
 
         $db = db_connect();
@@ -252,7 +308,7 @@ class ResortMap extends BaseController
             ->where('segment_id', $segmentId)
             ->countAllResults();
         if ($exists) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => 'Already built']);
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Already built', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
 
         $length = (float) ($segment['length_meters'] ?? 0);
@@ -261,37 +317,51 @@ class ResortMap extends BaseController
         $fin  = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
         $cash = (int) ($fin['cash'] ?? 0);
         if ($cash < $cost) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => 'Not enough money', 'cost' => $cost, 'cash' => $cash]);
+            return $this->response->setStatusCode(400)->setJSON([
+                'error'      => 'Not enough cash ($' . number_format($cost) . ' required, $' . number_format($cash) . ' available)',
+                'cost'       => $cost,
+                'cash'       => $cash,
+                'csrf_token' => csrf_token(),
+                'csrf_hash'  => csrf_hash(),
+            ]);
         }
 
         $db->table('player_finances')->where('user_id', $userId)->update(['cash' => $cash - $cost]);
 
-        $db->table('player_items')->insert([
-            'user_id'    => $userId,
-            'segment_id' => $segmentId,
+        $itemData = [
+            'user_id'       => $userId,
+            'segment_id'    => (int) $segmentId,
             'item_type'     => $segment['type'] === 'lift' ? 'lift' : 'slope',
             'subtype'       => $segment['type'] === 'lift' ? $liftType : ($slopeType ?? $segment['type']),
             'name'          => $segment['name'] ?? 'Unnamed',
             'length_meters' => (int) ($segment['length_meters'] ?? 0),
             'capacity'      => match($segment['type'] === 'lift' ? $liftType : '') { 'button' => 1000, 'chair_fixed' => 2400, 'chair_detach' => 3400, 'gondola' => 3500, 'cable_car' => 4000, default => 0 },
-            'difficulty'    => $segment['difficulty'] ?? null,
+            'difficulty'    => $segment['difficulty'] ?: null,
             'sector'        => (int) ($segment['sector'] ?? 0),
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
+            'created_at'    => date('Y-m-d H:i:s'),
+        ];
+        $db->table('player_items')->insert($itemData);
 
-        return $this->response->setJSON(['success' => true, 'cost' => $cost, 'new_cash' => $cash - $cost]);
+        return $this->response->setJSON([
+            'success'    => true,
+            'cost'       => $cost,
+            'new_cash'   => $cash - $cost,
+            'item'       => $itemData,
+            'csrf_token' => csrf_token(),
+            'csrf_hash'  => csrf_hash(),
+        ]);
     }
 
     private function calcCost(string $type, ?string $liftType, int $seats, float $meters): int
     {
         if ($type === 'lift') {
             $base = match ($liftType) {
-                'button'     => 80,
+                'button'       => 80,
                 'chair_fixed'  => 150,
                 'chair_detach' => 250,
-                'gondola'    => 400,
-                'cable_car'  => 600,
-                default      => 2000,
+                'gondola'      => 400,
+                'cable_car'    => 600,
+                default        => 150,
             };
             $mult = match ($seats) {
                 1 => 0.7, 2 => 1.0, 3 => 1.15, 4 => 1.3, 6 => 1.6, 8 => 2.0, 10 => 2.5, 20 => 4.0, 30 => 5.0, default => 1.0,
@@ -304,130 +374,161 @@ class ResortMap extends BaseController
     public function saveMidstation($id = null)
     {
         if (!$this->isAdmin()) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
         $data = $this->request->getJSON(true);
-        $id   = $data['segment_id'] ?? null;
+        $id   = $id ?: ($data['segment_id'] ?? null);
         if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing ID']);
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing ID', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
         (new MapSegmentModel())->update($id, ['midstations' => json_encode($data['midstations'] ?? [])]);
-        return $this->response->setJSON(['success' => true]);
+        return $this->response->setJSON(['success' => true, 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
     }
 
     public function createSector()
     {
         if (!$this->isAdmin()) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
         $data = $this->request->getJSON(true);
         $db   = db_connect();
-        $db->table('resort_sectors')->insert([
+        $row  = [
             'resort_map'      => $this->getSelectedMap(),
-            'name'            => $data['name'] ?? 'New Sector',
+            'name'            => trim((string) ($data['name'] ?? 'New Sector')) ?: 'New Sector',
             'description'     => $data['description'] ?? '',
             'color'           => $data['color'] ?? '#3b82f6',
-            'visible'         => 0,
+            'visible'         => 1,
             'released'        => 0,
             'sort_order'      => 0,
-            'boundary_points' => '[]',
+            'boundary_points' => json_encode($data['boundary_points'] ?? []),
+        ];
+        $db->table('resort_sectors')->insert($row);
+        $newId = (int) $db->insertID();
+        return $this->response->setJSON([
+            'success'    => true,
+            'id'         => $newId,
+            'sector'     => array_merge(['id' => $newId], $row),
+            'csrf_token' => csrf_token(),
+            'csrf_hash'  => csrf_hash(),
         ]);
-        return $this->response->setJSON(['success' => true, 'id' => $db->insertID()]);
     }
 
     public function toggleSector($id = null)
     {
         if (!$this->isAdmin()) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
         
         if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing ID']);
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing ID', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
         $db     = db_connect();
         $sector = $db->table('resort_sectors')->where('id', $id)->get()->getRowArray();
         if (!$sector) {
-            return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found']);
+            return $this->response->setStatusCode(404)->setJSON(['error' => 'Not found', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
-        $db->table('resort_sectors')->where('id', $id)->update(['visible' => $sector['visible'] ? 0 : 1]);
-        return $this->response->setJSON(['success' => true, 'visible' => !$sector['visible']]);
+        $newVis = $sector['visible'] ? 0 : 1;
+        $db->table('resort_sectors')->where('id', $id)->update(['visible' => $newVis]);
+        return $this->response->setJSON([
+            'success'    => true,
+            'visible'    => (bool) $newVis,
+            'csrf_token' => csrf_token(),
+            'csrf_hash'  => csrf_hash(),
+        ]);
     }
 
     public function deleteSector($id = null)
     {
         if (!$this->isAdmin()) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
         
         if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing ID']);
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing ID', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
         db_connect()->table('resort_sectors')->where('id', $id)->delete();
-        return $this->response->setJSON(['success' => true]);
+        // Reset segments that belonged to this deleted sector back to 0
+        db_connect()->table('map_segments')->where('sector', (int) $id)->update(['sector' => 0]);
+        return $this->response->setJSON([
+            'success'    => true,
+            'csrf_token' => csrf_token(),
+            'csrf_hash'  => csrf_hash(),
+        ]);
     }
 
     public function saveSectorBoundary($id = null)
     {
         if (!$this->isAdmin()) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
         $data = $this->request->getJSON(true);
-        $id   = $data['id'] ?? null;
+        $id   = $id ?: ($data['id'] ?? null);
         if (!$id) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing ID']);
+            return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing ID', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
+        $bp = $data['boundary_points'] ?? [];
         db_connect()->table('resort_sectors')->where('id', $id)->update([
-            'boundary_points' => json_encode($data['boundary_points'] ?? []),
+            'boundary_points' => json_encode($bp),
         ]);
-        return $this->response->setJSON(['success' => true]);
+        return $this->response->setJSON([
+            'success'         => true,
+            'id'              => (int) $id,
+            'boundary_points' => $bp,
+            'csrf_token'      => csrf_token(),
+            'csrf_hash'       => csrf_hash(),
+        ]);
     }
 
     public function createSectorWithBoundary()
     {
-        if (!$this->isAdmin()) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
-        }
-        $data = $this->request->getJSON(true);
-        $db   = db_connect();
-        $db->table('resort_sectors')->insert([
-            'resort_map'      => $this->getSelectedMap(),
-            'name'            => $data['name'] ?? 'New Sector',
-            'description'     => $data['description'] ?? '',
-            'color'           => $data['color'] ?? '#3b82f6',
-            'visible'         => 0,
-            'released'        => 0,
-            'sort_order'      => 0,
-            'boundary_points' => json_encode($data['boundary_points'] ?? []),
-        ]);
-        return $this->response->setJSON(['success' => true, 'id' => $db->insertID()]);
+        return $this->createSector();
     }
 
     public function autoAssignSectors()
     {
         if (!$this->isAdmin()) {
-            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized']);
+            return $this->response->setStatusCode(403)->setJSON(['error' => 'Unauthorized', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
         }
         $resortMap = $this->getSelectedMap();
         $db        = db_connect();
         $sectors   = $db->table('resort_sectors')->where('resort_map', $resortMap)->get()->getResultArray();
-        $segments  = (new MapSegmentModel())->where('resort_map', $resortMap)->where('active', 1)->findAll();
+        $segModel  = new MapSegmentModel();
+        $segments  = $segModel->where('resort_map', $resortMap)->where('active', 1)->findAll();
         $count     = 0;
+        $updated   = [];
 
         foreach ($segments as $seg) {
             $pts = json_decode($seg['points'], true);
             if (empty($pts)) continue;
-            $ref = $pts[0];
+            // Check start point, midpoint, and end point
+            $midIdx     = (int) floor(count($pts) / 2);
+            $testPoints = [$pts[0], $pts[$midIdx], $pts[count($pts) - 1]];
             foreach ($sectors as $sec) {
                 $bp = json_decode($sec['boundary_points'], true);
-                if (empty($bp)) continue;
-                if ($this->pip($ref, $bp)) {
-                    (new MapSegmentModel())->update($seg['id'], ['sector' => $sec['name']]);
+                if (empty($bp) || count($bp) < 3) continue;
+                $matched = false;
+                foreach ($testPoints as $tp) {
+                    if ($this->pip($tp, $bp)) {
+                        $matched = true;
+                        break;
+                    }
+                }
+                if ($matched) {
+                    $secId = (int) $sec['id'];
+                    $segModel->update($seg['id'], ['sector' => $secId]);
+                    $updated[(int) $seg['id']] = $secId;
                     $count++;
                     break;
                 }
             }
         }
-        return $this->response->setJSON(['success' => true, 'assigned' => $count]);
+        return $this->response->setJSON([
+            'success'    => true,
+            'assigned'   => $count,
+            'updated'    => $updated,
+            'csrf_token' => csrf_token(),
+            'csrf_hash'  => csrf_hash(),
+        ]);
     }
 
     private function pip(array $pt, array $poly): bool
