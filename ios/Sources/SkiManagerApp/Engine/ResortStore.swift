@@ -294,6 +294,73 @@ public final class ResortStore {
         saveToDisk()
     }
     
+    // MARK: - Mountain Custom Builder Actions
+    
+    public func buildLift(name: String, type: LiftType, sector: Int, length: Int, rise: Int) -> Bool {
+        let cost = type.baseConstructionCost
+        guard resort.cash >= cost else { return false }
+        
+        resort.cash -= cost
+        let newLift = Lift(
+            name: name,
+            liftType: type,
+            sectorNumber: sector,
+            lengthMeters: length,
+            verticalRiseMeters: rise,
+            status: .running,
+            conditionPercent: 100
+        )
+        resort.lifts.append(newLift)
+        resort.transactions.insert(
+            GameTransaction(title: "Constructed \(name) (\(type.rawValue))", amount: -cost, category: .capitalInvestment, gameDay: resort.gameDay),
+            at: 0
+        )
+        saveToDisk()
+        return true
+    }
+    
+    public func cutSlope(name: String, difficulty: SlopeDifficulty, sector: Int, length: Int, verticalDrop: Int, snowmaking: Bool, nightSkiing: Bool) -> Bool {
+        let cost = difficulty.baseCutCost + (snowmaking ? 20000 : 0) + (nightSkiing ? 15000 : 0)
+        guard resort.cash >= cost else { return false }
+        
+        resort.cash -= cost
+        let newSlope = Slope(
+            name: name,
+            difficulty: difficulty,
+            sectorNumber: sector,
+            lengthMeters: length,
+            verticalDropMeters: verticalDrop,
+            groomingPercent: 90,
+            snowmakingEquipped: snowmaking,
+            nightSkiingLighted: nightSkiing,
+            isOpen: true,
+            snowDepthCm: resort.weather.baseDepthCm,
+            snowQuality: .groomedCorduroy
+        )
+        resort.slopes.append(newSlope)
+        resort.transactions.insert(
+            GameTransaction(title: "Carved \(name) Trail (\(difficulty.shortLabel))", amount: -cost, category: .capitalInvestment, gameDay: resort.gameDay),
+            at: 0
+        )
+        saveToDisk()
+        return true
+    }
+    
+    public func constructBuilding(name: String, type: BuildingType, sector: Int) -> Bool {
+        let cost = type.baseBuildCost
+        guard resort.cash >= cost else { return false }
+        
+        resort.cash -= cost
+        let building = ResortBuilding(name: name, buildingType: type, upgradeLevel: 1, isOpen: true, sectorNumber: sector)
+        resort.buildings.append(building)
+        resort.transactions.insert(
+            GameTransaction(title: "Built \(name) Facility", amount: -cost, category: .capitalInvestment, gameDay: resort.gameDay),
+            at: 0
+        )
+        saveToDisk()
+        return true
+    }
+    
     public func hireStaff(name: String, role: StaffRole) -> Bool {
         let member = StaffMember(name: name, role: role, skillStars: Int.random(in: 3...5), moralePercent: 90)
         resort.staff.append(member)
