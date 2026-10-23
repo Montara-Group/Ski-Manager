@@ -19,12 +19,12 @@ public final class ResortStore {
     
     // MARK: - Persistence Keys
     
-    private let saveFileName = "ski_manager_resort_v2.json"
+    private let saveFileName = "ski_manager_resort_v3.json"
     
     // MARK: - Initialization
     
     public init() {
-        if let savedResort = Self.loadFromDisk(filename: "ski_manager_resort_v2.json") {
+        if let savedResort = Self.loadFromDisk(filename: "ski_manager_resort_v3.json") {
             self.resort = savedResort
         } else {
             self.resort = Resort.makeParkCityTemplate()
@@ -41,14 +41,14 @@ public final class ResortStore {
         updateMountainWeather()
         
         // 3. Visitor Attendance Equation
-        let priceFactor = max(0.5, 1.6 - (Double(resort.ticketPriceAdult) / 85.0) * 0.6)
-        let openSlopesFactor = Double(resort.openSlopesCount) / Double(max(1, resort.slopes.count))
+        let priceFactor = max(0.5, 1.6 - (Double(resort.ticketPriceAdult) / 68.0) * 0.6)
+        let openSlopesFactor = Double(resort.openSlopesCount) / Double(max(1, resort.openSlopesCount + 2))
         let snowQualityFactor = Double(resort.weather.newSnowfall24hCm > 10 ? 1.25 : 1.0)
         let repFactor = Double(resort.reputationScore) / 100.0
         
-        let baseVisitors = Double.random(in: 1800...3200)
+        let baseVisitors = Double.random(in: 420...650)
         let calculatedVisitors = Int(baseVisitors * priceFactor * openSlopesFactor * snowQualityFactor * repFactor * resort.difficulty.visitorMultiplier)
-        resort.totalVisitorsToday = max(250, calculatedVisitors)
+        resort.totalVisitorsToday = max(180, calculatedVisitors)
         
         // 4. Financial Calculations
         let ticketRev = resort.dailyTicketRevenue
@@ -83,35 +83,23 @@ public final class ResortStore {
         // Prepend and cap at last 50 transactions
         resort.transactions = (newTx + resort.transactions).prefix(50).map { $0 }
         
-        // 6. Wear & Tear on Lifts
-        for i in resort.lifts.indices {
-            if resort.lifts[i].status == .running {
+        // 6. Wear & Tear on Real Map Lifts
+        for i in resort.realSegments.indices where resort.realSegments[i].isLift && resort.realSegments[i].isBuilt {
+            if resort.realSegments[i].isOpen {
                 let wear = Int.random(in: 1...3)
-                resort.lifts[i].conditionPercent = max(20, resort.lifts[i].conditionPercent - wear)
-                resort.lifts[i].passengersToday = Int(Double(resort.totalVisitorsToday) * Double.random(in: 0.6...1.4))
-                
-                // Lift mechanics repair active lifts
+                resort.realSegments[i].conditionPercent = max(25, resort.realSegments[i].conditionPercent - wear)
                 let mechanicCount = resort.staff.filter { $0.role == .mechanic }.count
                 if mechanicCount > 0 {
-                    resort.lifts[i].conditionPercent = min(100, resort.lifts[i].conditionPercent + (mechanicCount * 2))
+                    resort.realSegments[i].conditionPercent = min(100, resort.realSegments[i].conditionPercent + (mechanicCount * 2))
                 }
-            } else {
-                resort.lifts[i].passengersToday = 0
             }
         }
         
-        // 7. Slope Snow Compaction & Grooming Decay
-        for i in resort.slopes.indices {
-            if resort.slopes[i].isOpen {
-                // Grooming decays as skiers ride
-                let decay = Int.random(in: 8...18)
-                resort.slopes[i].groomingPercent = max(10, resort.slopes[i].groomingPercent - decay)
-                resort.slopes[i].skiersToday = Int(Double(resort.totalVisitorsToday) * Double.random(in: 0.4...1.2))
-                
-                // Add new snow from weather
-                resort.slopes[i].snowDepthCm = max(30, resort.slopes[i].snowDepthCm + resort.weather.newSnowfall24hCm - 2)
-            } else {
-                resort.slopes[i].skiersToday = 0
+        // 7. Slope Snow Compaction & Grooming Decay on Real Map Slopes
+        for i in resort.realSegments.indices where resort.realSegments[i].isSlope && resort.realSegments[i].isBuilt {
+            if resort.realSegments[i].isOpen {
+                let decay = Int.random(in: 8...16)
+                resort.realSegments[i].groomingPercent = max(15, resort.realSegments[i].groomingPercent - decay)
             }
         }
         
@@ -179,7 +167,81 @@ public final class ResortStore {
         )
     }
     
-    // MARK: - Mountain Operations Actions
+    // MARK: - Real Map Segment Operations
+    
+    public func toggleRealSegmentOpen(id: Int) {
+        guard let index = resort.realSegments.firstIndex(where: { $0.id == id }) else { return }
+        resort.realSegments[index].isOpen.toggle()
+        saveToDisk()
+    }
+    
+    public func buildRealSegment(id: Int) -> Bool {
+        guard let index = resort.realSegments.firstIndex(where: { $0.id == id }) else { return false }
+        let seg = resort.realSegments[index]
+        guard !seg.isBuilt else { return true }
+        
+        let cost = seg.constructionCost
+        guard resort.cash >= cost else { return false }
+        
+        resort.cash -= cost
+        resort.realSegments[index].isBuilt = true
+        resort.realSegments[index].isOpen = true
+        
+        let txTitle = seg.isLift ? "Constructed \(seg.name)" : "Carved \(seg.name) Trail"
+        resort.transactions.insert(
+            GameTransaction(title: txTitle, amount: -cost, category: .capitalInvestment, gameDay: resort.gameDay),
+            at: 0
+        )
+        saveToDisk()
+        return true
+    }
+    
+    // MARK: - Live Website Data Sync
+    
+    public func syncWithLiveWebsite() async -> Bool {
+        isCloudSyncing = true
+        cloudSyncError = nil
+        
+        do {
+            let apiData = try await SkiManagerAPIClient.shared.fetchResortData()
+            
+            // Sync server values
+            if let serverFin = apiData.finances {
+                resort.cash = serverFin.cash ?? resort.cash
+                resort.totalVisitorsToday = serverFin.daily_visitors ?? resort.totalVisitorsToday
+            }
+            if let serverWeather = apiData.weather {
+                resort.gameDay = serverWeather.game_day ?? resort.gameDay
+                resort.weather.temperatureCelsius = Double(serverWeather.temperature ?? -4)
+                resort.weather.baseDepthCm = serverWeather.base_depth ?? resort.weather.baseDepthCm
+                resort.weather.newSnowfall24hCm = serverWeather.snowfall ?? resort.weather.newSnowfall24hCm
+                resort.weather.windSpeedKmh = serverWeather.wind_speed ?? resort.weather.windSpeedKmh
+            }
+            
+            // Sync real segments from server if provided
+            if let apiSegments = apiData.segments, !apiSegments.isEmpty {
+                for apiSeg in apiSegments {
+                    if let idx = resort.realSegments.firstIndex(where: { $0.id == apiSeg.id }) {
+                        resort.realSegments[idx].name = apiSeg.name
+                        resort.realSegments[idx].difficulty = apiSeg.difficulty
+                        resort.realSegments[idx].points = apiSeg.points
+                        resort.realSegments[idx].lengthMeters = apiSeg.length_meters ?? resort.realSegments[idx].lengthMeters
+                    }
+                }
+            }
+            
+            lastSyncDate = Date()
+            isCloudSyncing = false
+            saveToDisk()
+            return true
+        } catch {
+            cloudSyncError = error.localizedDescription
+            isCloudSyncing = false
+            return false
+        }
+    }
+    
+    // MARK: - Legacy Lift & Slope Operations
     
     public func toggleLiftStatus(id: UUID) {
         guard let index = resort.lifts.firstIndex(where: { $0.id == id }) else { return }
@@ -194,19 +256,20 @@ public final class ResortStore {
     }
     
     public func groomAllSlopes() {
-        let groomerCount = resort.staff.filter { $0.role == .groomer }.count
-        let groomCost = resort.slopes.count * 120
-        guard resort.cash >= groomCost else { return }
+        let groomCost = resort.realSegments.filter { $0.isSlope && $0.isBuilt }.count * 85
+        guard resort.cash >= groomCost, groomCost > 0 else { return }
         
         resort.cash -= groomCost
         resort.transactions.insert(
-            GameTransaction(title: "Full Mountain Corduroy Grooming Fleet", amount: -groomCost, category: .slopeMaintenance, gameDay: resort.gameDay),
+            GameTransaction(title: "PistenBully 600 Corduroy Grooming Fleet", amount: -groomCost, category: .slopeMaintenance, gameDay: resort.gameDay),
             at: 0
         )
         
-        let efficiencyBonus = min(100, 75 + (groomerCount * 5))
+        for i in resort.realSegments.indices where resort.realSegments[i].isSlope && resort.realSegments[i].isBuilt {
+            resort.realSegments[i].groomingPercent = 95
+        }
         for i in resort.slopes.indices {
-            resort.slopes[i].groomingPercent = efficiencyBonus
+            resort.slopes[i].groomingPercent = 95
             resort.slopes[i].snowQuality = .groomedCorduroy
         }
         saveToDisk()
@@ -214,12 +277,12 @@ public final class ResortStore {
     
     public func makeSnowOnEquippedSlopes() {
         guard resort.weather.isSnowmakingOptimal else { return }
-        let snowmakingCost = resort.slopes.filter { $0.snowmakingEquipped }.count * 350
+        let snowmakingCost = 2500
         guard resort.cash >= snowmakingCost else { return }
         
         resort.cash -= snowmakingCost
         resort.transactions.insert(
-            GameTransaction(title: "Snowmaking Power & Water Reservoir Draw", amount: -snowmakingCost, category: .snowmakingEnergy, gameDay: resort.gameDay),
+            GameTransaction(title: "TechnoAlpin Snowmaking Water & Energy Draw", amount: -snowmakingCost, category: .snowmakingEnergy, gameDay: resort.gameDay),
             at: 0
         )
         
@@ -229,73 +292,6 @@ public final class ResortStore {
         }
         resort.weather.baseDepthCm += 6
         saveToDisk()
-    }
-    
-    // MARK: - Mountain Builder Actions
-    
-    public func buildLift(name: String, type: LiftType, sector: Int, length: Int, rise: Int) -> Bool {
-        let cost = type.baseConstructionCost
-        guard resort.cash >= cost else { return false }
-        
-        resort.cash -= cost
-        let newLift = Lift(
-            name: name,
-            liftType: type,
-            sectorNumber: sector,
-            lengthMeters: length,
-            verticalRiseMeters: rise,
-            status: .running,
-            conditionPercent: 100
-        )
-        resort.lifts.append(newLift)
-        resort.transactions.insert(
-            GameTransaction(title: "Constructed \(name) (\(type.rawValue))", amount: -cost, category: .capitalInvestment, gameDay: resort.gameDay),
-            at: 0
-        )
-        saveToDisk()
-        return true
-    }
-    
-    public func cutSlope(name: String, difficulty: SlopeDifficulty, sector: Int, length: Int, verticalDrop: Int, snowmaking: Bool, nightSkiing: Bool) -> Bool {
-        let cost = difficulty.baseCutCost + (snowmaking ? 20000 : 0) + (nightSkiing ? 15000 : 0)
-        guard resort.cash >= cost else { return false }
-        
-        resort.cash -= cost
-        let newSlope = Slope(
-            name: name,
-            difficulty: difficulty,
-            sectorNumber: sector,
-            lengthMeters: length,
-            verticalDropMeters: verticalDrop,
-            groomingPercent: 90,
-            snowmakingEquipped: snowmaking,
-            nightSkiingLighted: nightSkiing,
-            isOpen: true,
-            snowDepthCm: resort.weather.baseDepthCm,
-            snowQuality: .groomedCorduroy
-        )
-        resort.slopes.append(newSlope)
-        resort.transactions.insert(
-            GameTransaction(title: "Carved \(name) Trail (\(difficulty.shortLabel))", amount: -cost, category: .capitalInvestment, gameDay: resort.gameDay),
-            at: 0
-        )
-        saveToDisk()
-        return true
-    }
-    
-    public func constructBuilding(name: String, type: BuildingType, sector: Int) -> Bool {
-        let cost = type.baseBuildCost
-        guard resort.cash >= cost else { return false }
-        
-        resort.cash -= cost
-        let building = ResortBuilding(name: name, buildingType: type, upgradeLevel: 1, isOpen: true, sectorNumber: sector)
-        resort.buildings.append(building)
-        resort.transactions.insert(
-            GameTransaction(title: "Built \(name) Facility", amount: -cost, category: .capitalInvestment, gameDay: resort.gameDay),
-            at: 0
-        )
-        saveToDisk()
-        return true
     }
     
     public func hireStaff(name: String, role: StaffRole) -> Bool {
@@ -314,7 +310,7 @@ public final class ResortStore {
         resort.outstandingLoan += amount
         resort.cash += amount
         resort.transactions.insert(
-            GameTransaction(title: "Alpine Commercial Bank Loan Disbursed", amount: amount, category: .capitalInvestment, gameDay: resort.gameDay),
+            GameTransaction(title: "Park City Commercial Bank Loan Disbursed", amount: amount, category: .capitalInvestment, gameDay: resort.gameDay),
             at: 0
         )
         saveToDisk()

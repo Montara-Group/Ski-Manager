@@ -10,9 +10,9 @@ public enum ResortDifficulty: String, Codable, CaseIterable, Identifiable {
     
     public var startingCash: Int {
         switch self {
-        case .casual: return 750000
-        case .standard: return 400000
-        case .expert: return 180000
+        case .casual: return 400000
+        case .standard: return 250000
+        case .expert: return 120000
         }
     }
     
@@ -48,30 +48,36 @@ public struct Resort: Identifiable, Codable, Equatable {
     public var weather: MountainWeather
     public var transactions: [GameTransaction]
     
-    // Selected Sector (1: Base Village, 2: Advanced Peaks Expansion)
+    // Authentic Website Leaflet Database Segments & Sectors
+    public var realSegments: [RealMapSegment]
+    public var realSectors: [RealMapSector]
+    
+    // Unlocked Sectors (1: Base Village, 2: Advanced Peaks)
     public var unlockedSectors: [Int]
     
     public init(
         id: UUID = UUID(),
         name: String = "Park City Mountain Resort",
-        mapName: String = "Park City, Utah",
+        mapName: String = "Park City",
         difficulty: ResortDifficulty = .standard,
         seasonNumber: Int = 1,
         gameDay: Int = 42,
-        cash: Int = 425000,
-        genepis: Int = 150,
-        reputationScore: Int = 82,
-        ticketPriceAdult: Int = 85,
-        ticketPriceChild: Int = 45,
-        totalVisitorsToday: Int = 2480,
-        outstandingLoan: Int = 100000,
+        cash: Int = 250000,
+        genepis: Int = 10,
+        reputationScore: Int = 85,
+        ticketPriceAdult: Int = 68,
+        ticketPriceChild: Int = 38,
+        totalVisitorsToday: Int = 480,
+        outstandingLoan: Int = 0,
         lifts: [Lift] = [],
         slopes: [Slope] = [],
         staff: [StaffMember] = [],
         buildings: [ResortBuilding] = [],
         weather: MountainWeather = MountainWeather(),
         transactions: [GameTransaction] = [],
-        unlockedSectors: [Int] = [1, 2]
+        realSegments: [RealMapSegment] = [],
+        realSectors: [RealMapSector] = [],
+        unlockedSectors: [Int] = [1]
     ) {
         self.id = id
         self.name = name
@@ -92,6 +98,8 @@ public struct Resort: Identifiable, Codable, Equatable {
         self.buildings = buildings
         self.weather = weather
         self.transactions = transactions
+        self.realSegments = realSegments
+        self.realSectors = realSectors
         self.unlockedSectors = unlockedSectors
     }
     
@@ -116,11 +124,15 @@ public struct Resort: Identifiable, Codable, Equatable {
     }
     
     public var dailyLiftMaintenance: Int {
-        lifts.filter { $0.status == .running }.reduce(0) { $0 + $1.dailyMaintenanceCost }
+        let realLiftCost = realSegments.filter { $0.isLift && $0.isBuilt && $0.isOpen }.count * 180
+        let customLiftCost = lifts.filter { $0.status == .running }.reduce(0) { $0 + $1.dailyMaintenanceCost }
+        return max(realLiftCost, customLiftCost)
     }
     
     public var dailySlopeUpkeep: Int {
-        slopes.filter { $0.isOpen }.reduce(0) { $0 + $1.dailyUpkeepCost }
+        let realSlopeCost = realSegments.filter { $0.isSlope && $0.isBuilt && $0.isOpen }.count * 85
+        let customSlopeCost = slopes.filter { $0.isOpen }.reduce(0) { $0 + $1.dailyUpkeepCost }
+        return max(realSlopeCost, customSlopeCost)
     }
     
     public var dailyBuildingUpkeep: Int {
@@ -140,103 +152,121 @@ public struct Resort: Identifiable, Codable, Equatable {
     }
     
     public var totalMountainCapacityPerHour: Int {
-        lifts.filter { $0.status == .running }.reduce(0) { $0 + $1.hourlyCapacity }
+        let realLiftsCap = realSegments.filter { $0.isLift && $0.isBuilt && $0.isOpen }.reduce(0) { $0 + $1.capacity }
+        let customLiftsCap = lifts.filter { $0.status == .running }.reduce(0) { $0 + $1.hourlyCapacity }
+        return max(realLiftsCap, customLiftsCap)
     }
     
     public var totalSkiableLengthKm: Double {
-        let totalMeters = slopes.reduce(0) { $0 + $1.lengthMeters }
-        return Double(totalMeters) / 1000.0
+        let builtRealMeters = realSegments.filter { $0.isSlope && $0.isBuilt }.reduce(0) { $0 + $1.lengthMeters }
+        let customMeters = slopes.reduce(0) { $0 + $1.lengthMeters }
+        return Double(max(builtRealMeters, customMeters)) / 1000.0
     }
     
     public var openSlopesCount: Int {
-        slopes.filter { $0.isOpen }.count
+        let realOpen = realSegments.filter { $0.isSlope && $0.isBuilt && $0.isOpen }.count
+        let customOpen = slopes.filter { $0.isOpen }.count
+        return max(realOpen, customOpen)
     }
     
     public var runningLiftsCount: Int {
-        lifts.filter { $0.status == .running }.count
+        let realRunning = realSegments.filter { $0.isLift && $0.isBuilt && $0.isOpen }.count
+        let customRunning = lifts.filter { $0.status == .running }.count
+        return max(realRunning, customRunning)
     }
     
     public var mountainSafetyScore: Int {
         let patrollerCount = staff.filter { $0.role == .skiPatrol }.count
-        let totalSlopesCount = max(1, slopes.count)
+        let totalSlopesCount = max(1, openSlopesCount)
         let patrollerRatio = Double(patrollerCount) / Double(totalSlopesCount)
         var score = Int(patrollerRatio * 100.0 * 2.5)
         
-        // Deduct for extreme avalanche risks or blizzard conditions
         score -= (weather.avalancheDangerLevel - 1) * 8
         if weather.windSpeedKmh > 40 { score -= 12 }
         
-        return max(15, min(100, score))
+        return max(20, min(100, score))
     }
     
-    // MARK: - Template Park City Mountain
+    // MARK: - Template Park City Mountain matching Demo.php
     
     public static func makeParkCityTemplate() -> Resort {
+        let (bundledSegments, bundledSectors) = RealMapDataLoader.loadBundledMapData()
+        
+        // Starting lifts matching Demo.php
         let defaultLifts = [
-            Lift(name: "First Time Express", liftType: .magicCarpet, sectorNumber: 1, lengthMeters: 280, verticalRiseMeters: 45, status: .running, conditionPercent: 98),
-            Lift(name: "Payday Express 6-Pack", liftType: .sixPackExpress, sectorNumber: 1, lengthMeters: 1450, verticalRiseMeters: 390, status: .running, conditionPercent: 92),
-            Lift(name: "Crescent High-Speed Quad", liftType: .expressQuad, sectorNumber: 1, lengthMeters: 1680, verticalRiseMeters: 480, status: .running, conditionPercent: 88),
-            Lift(name: "Town Lift Historic Double", liftType: .fixedDouble, sectorNumber: 1, lengthMeters: 1220, verticalRiseMeters: 290, status: .running, conditionPercent: 85),
-            Lift(name: "Jupiter Peak Tram", liftType: .aerialTram, sectorNumber: 2, lengthMeters: 2150, verticalRiseMeters: 620, status: .running, conditionPercent: 96),
-            Lift(name: "Silverlode Express", liftType: .expressQuad, sectorNumber: 2, lengthMeters: 1540, verticalRiseMeters: 410, status: .running, conditionPercent: 90),
-            Lift(name: "King Con 6-Pack", liftType: .sixPackExpress, sectorNumber: 2, lengthMeters: 1890, verticalRiseMeters: 510, status: .running, conditionPercent: 94)
+            Lift(name: "First Time Quad", liftType: .fixedQuad, sectorNumber: 1, lengthMeters: 650, verticalRiseMeters: 140, status: .running, conditionPercent: 100),
+            Lift(name: "Payday Express", liftType: .expressQuad, sectorNumber: 1, lengthMeters: 1400, verticalRiseMeters: 380, status: .running, conditionPercent: 100),
+            Lift(name: "Bonanza High-Speed 6", liftType: .sixPackExpress, sectorNumber: 1, lengthMeters: 1850, verticalRiseMeters: 490, status: .running, conditionPercent: 100),
+            Lift(name: "Town Lift Triple", liftType: .fixedDouble, sectorNumber: 1, lengthMeters: 1100, verticalRiseMeters: 290, status: .running, conditionPercent: 100)
         ]
         
+        // Starting slopes matching Demo.php
         let defaultSlopes = [
-            Slope(name: "First Time Runway", difficulty: .green, sectorNumber: 1, lengthMeters: 650, verticalDropMeters: 75, groomingPercent: 100, snowmakingEquipped: true, nightSkiingLighted: true, isOpen: true, snowDepthCm: 110, snowQuality: .groomedCorduroy),
-            Slope(name: "Claimjumper Cruiser", difficulty: .blue, sectorNumber: 1, lengthMeters: 1850, verticalDropMeters: 380, groomingPercent: 90, snowmakingEquipped: true, nightSkiingLighted: true, isOpen: true, snowDepthCm: 125, snowQuality: .groomedCorduroy),
-            Slope(name: "Payday Bowl", difficulty: .blue, sectorNumber: 1, lengthMeters: 1420, verticalDropMeters: 340, groomingPercent: 85, snowmakingEquipped: true, nightSkiingLighted: false, isOpen: true, snowDepthCm: 130, snowQuality: .packedPowder),
-            Slope(name: "Silver King Black Diamond", difficulty: .blackDiamond, sectorNumber: 1, lengthMeters: 1200, verticalDropMeters: 420, groomingPercent: 40, snowmakingEquipped: true, nightSkiingLighted: false, isOpen: true, snowDepthCm: 140, snowQuality: .deepPowder),
-            Slope(name: "Jupiter Bowl Powder Chutes", difficulty: .doubleBlack, sectorNumber: 2, lengthMeters: 1980, verticalDropMeters: 610, groomingPercent: 0, snowmakingEquipped: false, nightSkiingLighted: false, isOpen: true, snowDepthCm: 165, snowQuality: .deepPowder),
-            Slope(name: "McConkey's Ridge", difficulty: .blackDiamond, sectorNumber: 2, lengthMeters: 1650, verticalDropMeters: 490, groomingPercent: 30, snowmakingEquipped: false, nightSkiingLighted: false, isOpen: true, snowDepthCm: 150, snowQuality: .deepPowder),
-            Slope(name: "3 Kings Terrain Park", difficulty: .terrainPark, sectorNumber: 1, lengthMeters: 920, verticalDropMeters: 190, groomingPercent: 95, snowmakingEquipped: true, nightSkiingLighted: true, isOpen: true, snowDepthCm: 120, snowQuality: .groomedCorduroy)
+            Slope(name: "First Time Cruiser", difficulty: .green, sectorNumber: 1, lengthMeters: 650, verticalDropMeters: 80, groomingPercent: 100, snowmakingEquipped: true, nightSkiingLighted: true, isOpen: true, snowDepthCm: 142, snowQuality: .groomedCorduroy),
+            Slope(name: "Payday Run", difficulty: .blue, sectorNumber: 1, lengthMeters: 1400, verticalDropMeters: 380, groomingPercent: 90, snowmakingEquipped: true, nightSkiingLighted: true, isOpen: true, snowDepthCm: 142, snowQuality: .groomedCorduroy),
+            Slope(name: "Crescent Ridge", difficulty: .blue, sectorNumber: 1, lengthMeters: 1200, verticalDropMeters: 320, groomingPercent: 85, snowmakingEquipped: true, nightSkiingLighted: false, isOpen: true, snowDepthCm: 142, snowQuality: .packedPowder),
+            Slope(name: "Lost Prospector", difficulty: .green, sectorNumber: 1, lengthMeters: 900, verticalDropMeters: 150, groomingPercent: 90, snowmakingEquipped: true, nightSkiingLighted: false, isOpen: true, snowDepthCm: 142, snowQuality: .groomedCorduroy),
+            Slope(name: "Silver King Chute", difficulty: .blackDiamond, sectorNumber: 1, lengthMeters: 1100, verticalDropMeters: 410, groomingPercent: 40, snowmakingEquipped: false, nightSkiingLighted: false, isOpen: true, snowDepthCm: 142, snowQuality: .deepPowder),
+            Slope(name: "Thaynes Canyon", difficulty: .blackDiamond, sectorNumber: 1, lengthMeters: 1300, verticalDropMeters: 460, groomingPercent: 30, snowmakingEquipped: false, nightSkiingLighted: false, isOpen: true, snowDepthCm: 142, snowQuality: .deepPowder),
+            Slope(name: "3 Kings Park", difficulty: .terrainPark, sectorNumber: 1, lengthMeters: 850, verticalDropMeters: 180, groomingPercent: 95, snowmakingEquipped: true, nightSkiingLighted: true, isOpen: true, snowDepthCm: 142, snowQuality: .groomedCorduroy),
+            Slope(name: "Quit'N Time", difficulty: .blue, sectorNumber: 1, lengthMeters: 750, verticalDropMeters: 190, groomingPercent: 80, snowmakingEquipped: true, nightSkiingLighted: false, isOpen: true, snowDepthCm: 142, snowQuality: .packedPowder)
         ]
         
+        // Staff matching Demo.php
         let defaultStaff = [
-            StaffMember(name: "Hans Gruber", role: .liftOperator, salaryPerDay: 130, skillStars: 4, moralePercent: 88),
-            StaffMember(name: "Sarah Lindgren", role: .skiPatrol, salaryPerDay: 200, skillStars: 5, moralePercent: 94),
-            StaffMember(name: "Marcus Vance", role: .groomer, salaryPerDay: 220, skillStars: 4, moralePercent: 86),
-            StaffMember(name: "Elena Rostova", role: .instructor, salaryPerDay: 170, skillStars: 4, moralePercent: 90),
-            StaffMember(name: "Dave Chen", role: .mechanic, salaryPerDay: 240, skillStars: 5, moralePercent: 84),
-            StaffMember(name: "Chloe Miller", role: .hospitality, salaryPerDay: 120, skillStars: 3, moralePercent: 89)
+            StaffMember(name: "Sarah Lindgren", role: .skiPatrol, salaryPerDay: 150, skillStars: 4, moralePercent: 100),
+            StaffMember(name: "Marc Dubois", role: .groomer, salaryPerDay: 110, skillStars: 4, moralePercent: 100),
+            StaffMember(name: "Otto Huber", role: .mechanic, salaryPerDay: 130, skillStars: 5, moralePercent: 100),
+            StaffMember(name: "Elena Rossi", role: .instructor, salaryPerDay: 95, skillStars: 3, moralePercent: 100)
         ]
         
+        // Buildings matching Demo.php
         let defaultBuildings = [
-            ResortBuilding(name: "Grand Summit Mountain Hotel", buildingType: .grandHotel, upgradeLevel: 2, isOpen: true, sectorNumber: 1),
-            ResortBuilding(name: "Payday Base Lodge & Cafeteria", buildingType: .mountainLodge, upgradeLevel: 3, isOpen: true, sectorNumber: 1),
-            ResortBuilding(name: "The Corner Stone Après-Ski Bar", buildingType: .apresSkiBistro, upgradeLevel: 2, isOpen: true, sectorNumber: 1),
-            ResortBuilding(name: "Park City Demo Rental Center", buildingType: .rentalShop, upgradeLevel: 2, isOpen: true, sectorNumber: 1),
-            ResortBuilding(name: "Base Clinic & First Aid Post", buildingType: .medicalClinic, upgradeLevel: 1, isOpen: true, sectorNumber: 1)
+            ResortBuilding(name: "Legacy Snow Lodge", buildingType: .mountainLodge, upgradeLevel: 1, isOpen: true, sectorNumber: 1),
+            ResortBuilding(name: "Summit Sports Rental", buildingType: .rentalShop, upgradeLevel: 1, isOpen: true, sectorNumber: 1),
+            ResortBuilding(name: "Base Camp Lodge", buildingType: .apresSkiBistro, upgradeLevel: 1, isOpen: true, sectorNumber: 1)
         ]
         
         let initialTransactions = [
-            GameTransaction(title: "Lift Ticket Sales (Game Day 41)", amount: 184500, category: .ticketSales, gameDay: 41),
-            GameTransaction(title: "Lodge & Restaurant Receipts", amount: 14200, category: .buildingRevenue, gameDay: 41),
-            GameTransaction(title: "Staff Payroll Deductions", amount: -1080, category: .staffWages, gameDay: 41),
-            GameTransaction(title: "Lift Fleet Electricity & Maintenance", amount: -2100, category: .liftMaintenance, gameDay: 41),
-            GameTransaction(title: "Snowmaking & Groomer Diesel", amount: -850, category: .snowmakingEnergy, gameDay: 41)
+            GameTransaction(title: "Lift Ticket Sales (Game Day 41)", amount: 32640, category: .ticketSales, gameDay: 41),
+            GameTransaction(title: "Legacy Lodge & Rental Receipts", amount: 4800, category: .buildingRevenue, gameDay: 41),
+            GameTransaction(title: "Staff Payroll Deductions", amount: -485, category: .staffWages, gameDay: 41),
+            GameTransaction(title: "Lift Fleet Electricity & Maintenance", amount: -720, category: .liftMaintenance, gameDay: 41),
+            GameTransaction(title: "PistenBully Groomer Operations", amount: -340, category: .slopeMaintenance, gameDay: 41)
         ]
         
         return Resort(
-            name: "Park City Mountain Base",
-            mapName: "Park City, Utah",
+            name: "Park City Mountain Resort",
+            mapName: "Park City",
             difficulty: .standard,
             seasonNumber: 1,
             gameDay: 42,
-            cash: 485000,
-            genepis: 175,
-            reputationScore: 86,
-            ticketPriceAdult: 89,
-            ticketPriceChild: 49,
-            totalVisitorsToday: 2650,
-            outstandingLoan: 85000,
+            cash: 250000,
+            genepis: 10,
+            reputationScore: 85,
+            ticketPriceAdult: 68,
+            ticketPriceChild: 38,
+            totalVisitorsToday: 480,
+            outstandingLoan: 0,
             lifts: defaultLifts,
             slopes: defaultSlopes,
             staff: defaultStaff,
             buildings: defaultBuildings,
-            weather: MountainWeather(),
+            weather: MountainWeather(
+                condition: .bluebirdPowder,
+                temperatureCelsius: -4.0,
+                newSnowfall24hCm: 15,
+                baseDepthCm: 142,
+                windSpeedKmh: 14,
+                visibilityKm: 15.0,
+                avalancheDangerLevel: 2,
+                isSnowmakingOptimal: true,
+                forecast7Day: MountainWeather.generateDefaultForecast()
+            ),
             transactions: initialTransactions,
-            unlockedSectors: [1, 2]
+            realSegments: bundledSegments,
+            realSectors: bundledSectors,
+            unlockedSectors: [1]
         )
     }
 }
