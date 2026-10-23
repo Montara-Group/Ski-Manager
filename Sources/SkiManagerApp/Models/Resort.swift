@@ -28,10 +28,13 @@ public enum ResortDifficulty: String, Codable, CaseIterable, Identifiable {
 public struct Resort: Identifiable, Codable, Equatable {
     public var id: UUID
     public var name: String
+    public var directorUsername: String
     public var mapName: String
     public var difficulty: ResortDifficulty
     public var seasonNumber: Int
     public var gameDay: Int
+    public var totalSeasonDays: Int
+    public var winterSeasonDays: Int
     public var cash: Int
     public var genepis: Int
     public var reputationScore: Int // 0 to 100
@@ -39,6 +42,14 @@ public struct Resort: Identifiable, Codable, Equatable {
     public var ticketPriceChild: Int
     public var totalVisitorsToday: Int
     public var outstandingLoan: Int
+    
+    // Daily Bonus & Streak
+    public var dailyBonusStreak: Int
+    public var lastBonusClaimDay: Int
+    
+    // Equipment Condition
+    public var groomerConditionPct: Int
+    public var snowmakingGunsCount: Int
     
     // Domain Entities
     public var lifts: [Lift]
@@ -58,10 +69,13 @@ public struct Resort: Identifiable, Codable, Equatable {
     public init(
         id: UUID = UUID(),
         name: String = "Park City Mountain Resort",
+        directorUsername: String = "Director Alex",
         mapName: String = "Park City",
         difficulty: ResortDifficulty = .standard,
         seasonNumber: Int = 1,
         gameDay: Int = 42,
+        totalSeasonDays: Int = 135,
+        winterSeasonDays: Int = 100,
         cash: Int = 250000,
         genepis: Int = 10,
         reputationScore: Int = 85,
@@ -69,6 +83,10 @@ public struct Resort: Identifiable, Codable, Equatable {
         ticketPriceChild: Int = 38,
         totalVisitorsToday: Int = 480,
         outstandingLoan: Int = 0,
+        dailyBonusStreak: Int = 1,
+        lastBonusClaimDay: Int = 0,
+        groomerConditionPct: Int = 95,
+        snowmakingGunsCount: Int = 12,
         lifts: [Lift] = [],
         slopes: [Slope] = [],
         staff: [StaffMember] = [],
@@ -81,10 +99,13 @@ public struct Resort: Identifiable, Codable, Equatable {
     ) {
         self.id = id
         self.name = name
+        self.directorUsername = directorUsername
         self.mapName = mapName
         self.difficulty = difficulty
         self.seasonNumber = seasonNumber
         self.gameDay = gameDay
+        self.totalSeasonDays = totalSeasonDays
+        self.winterSeasonDays = winterSeasonDays
         self.cash = cash
         self.genepis = genepis
         self.reputationScore = reputationScore
@@ -92,6 +113,10 @@ public struct Resort: Identifiable, Codable, Equatable {
         self.ticketPriceChild = ticketPriceChild
         self.totalVisitorsToday = totalVisitorsToday
         self.outstandingLoan = outstandingLoan
+        self.dailyBonusStreak = dailyBonusStreak
+        self.lastBonusClaimDay = lastBonusClaimDay
+        self.groomerConditionPct = groomerConditionPct
+        self.snowmakingGunsCount = snowmakingGunsCount
         self.lifts = lifts
         self.slopes = slopes
         self.staff = staff
@@ -187,6 +212,14 @@ public struct Resort: Identifiable, Codable, Equatable {
         return max(20, min(100, score))
     }
     
+    public var canClaimDailyBonus: Bool {
+        lastBonusClaimDay < gameDay
+    }
+    
+    public var seasonProgressRatio: Double {
+        Double(min(totalSeasonDays, gameDay)) / Double(totalSeasonDays)
+    }
+    
     // MARK: - Template Park City Mountain matching Demo.php
     
     public static func makeParkCityTemplate() -> Resort {
@@ -237,10 +270,13 @@ public struct Resort: Identifiable, Codable, Equatable {
         
         return Resort(
             name: "Park City Mountain Resort",
+            directorUsername: "Director Alex",
             mapName: "Park City",
             difficulty: .standard,
             seasonNumber: 1,
             gameDay: 42,
+            totalSeasonDays: 135,
+            winterSeasonDays: 100,
             cash: 250000,
             genepis: 10,
             reputationScore: 85,
@@ -248,6 +284,10 @@ public struct Resort: Identifiable, Codable, Equatable {
             ticketPriceChild: 38,
             totalVisitorsToday: 480,
             outstandingLoan: 0,
+            dailyBonusStreak: 1,
+            lastBonusClaimDay: 0,
+            groomerConditionPct: 95,
+            snowmakingGunsCount: 12,
             lifts: defaultLifts,
             slopes: defaultSlopes,
             staff: defaultStaff,
