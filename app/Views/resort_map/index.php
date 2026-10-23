@@ -73,13 +73,20 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     cursor: crosshair !important;
 }
 
-/* Admin Floating Top Editor Toolbar */
-.admin-editor-toolbar {
+/* Admin Floating Top Editor Toolbar - centered via flexbox wrapper & margin auto (immune to transform overrides) */
+.admin-editor-toolbar-wrap {
     position: absolute;
     top: 12px;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
     z-index: 850;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+    padding: 0 12px;
+}
+.admin-editor-toolbar {
+    pointer-events: auto;
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     background: rgba(15, 23, 42, 0.95);
@@ -88,7 +95,15 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     box-shadow: 0 14px 34px -5px rgba(0, 0, 0, 0.7), 0 4px 14px rgba(0, 0, 0, 0.45);
     padding: 7px 12px;
     max-width: 96vw;
-    width: max-content;
+    width: fit-content;
+}
+.admin-editor-toolbar .select,
+.admin-editor-toolbar .input,
+#resortSelect,
+#buildDiffFilter,
+#inspectorFilterType {
+    width: auto !important;
+    display: inline-flex !important;
 }
 
 /* Custom Vertex Handle */
@@ -271,7 +286,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     <div id="map" data-image="<?= esc($mapConfig['image']) ?>"></div>
 
     <!-- Initial Loader -->
-    <div id="mapLoader" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);z-index:100;text-align:center">
+    <div id="mapLoader" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;text-align:center;pointer-events:none">
         <span class="loading loading-spinner loading-lg text-primary"></span>
         <p class="text-sm text-base-content/60 mt-2">Loading trail map...</p>
     </div>
@@ -284,6 +299,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
 
     <?php if ($isAdmin): ?>
     <!-- Admin Floating Top Editor Toolbar -->
+    <div class="admin-editor-toolbar-wrap">
     <div id="adminEditorToolbar" class="admin-editor-toolbar">
         <!-- Idle View -->
         <div id="toolIdleView" class="flex items-center gap-2 flex-wrap">
@@ -405,6 +421,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
             </span>
             <span id="snapStatusPill" class="badge badge-xs badge-info gap-1 font-mono" style="display:none"></span>
         </div>
+    </div>
     </div>
     <?php endif; ?>
 

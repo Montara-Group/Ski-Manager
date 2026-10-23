@@ -1328,11 +1328,6 @@ div[class*="hj-"], iframe[id*="hotjar"], div[data-testid*="hotjar"],
     transition: none !important;
 }
 
-:hover {
-    transform: none !important;
-    filter: none !important;
-}
-
 .card:hover, .card:hover *,
 .btn:hover, .btn:active, .btn-primary:hover, .btn-secondary:hover, .btn-accent:hover,
 .stat-pill:hover, .badge:hover {
