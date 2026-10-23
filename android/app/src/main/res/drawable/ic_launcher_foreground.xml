@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Mountain Peaks -->
+    <path
+        android:fillColor="#E2F1FF"
+        android:pathData="M54,26 L84,78 L24,78 Z" />
+    <path
+        android:fillColor="#93C5FD"
+        android:pathData="M54,26 L84,78 L54,78 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,26 L64,43 L54,48 L44,43 Z" />
+    <!-- Secondary Peak -->
+    <path
+        android:fillColor="#60A5FA"
+        android:pathData="M32,48 L56,82 L8,82 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M32,48 L40,60 L32,64 L24,60 Z" />
+    <!-- Ski Slope Path Curve -->
+    <path
+        android:strokeColor="#38BDF8"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M54,48 C50,60 70,68 62,82" />
+    <!-- Gondola Cable & Cabin -->
+    <path
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="1.5"
+        android:pathData="M18,36 L90,66" />
+    <path
+        android:fillColor="#EF4444"
+        android:pathData="M52,50 h8 v7 h-8 z" />
+</vector>
