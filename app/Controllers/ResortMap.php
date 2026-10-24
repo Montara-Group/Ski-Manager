@@ -7,7 +7,7 @@ use App\Models\MapSegmentModel;
 class ResortMap extends BaseController
 {
     private const RESORT_MAPS = [
-        'ParkCity'       => ['name' => 'Park City',       'location' => 'Utah, USA',       'image' => '/img/ParkCity.jpg',       'width' => 600, 'height' => 340],
+        'ParkCity'       => ['name' => 'Park City',       'location' => 'Utah, USA',       'image' => '/img/ParkCity.jpg',       'admin_image' => '/img/ParkCity-Big.jpg', 'width' => 600, 'height' => 340],
         'DeerValley'     => ['name' => 'Deer Valley',     'location' => 'Utah, USA',       'image' => '/img/DeerValley.jpg',     'width' => 600, 'height' => 340],
         'AspenSnowmass'  => ['name' => 'Aspen Snowmass',  'location' => 'Colorado, USA',   'image' => '/img/AspenSnowmass.jpg',  'width' => 600, 'height' => 340],
         'BigSkyCombo'    => ['name' => 'Big Sky',         'location' => 'Montana, USA',    'image' => '/img/BigSkyCombo.jpg',    'width' => 600, 'height' => 340],
@@ -84,6 +84,9 @@ class ResortMap extends BaseController
         $resortMap  = $this->getSelectedMap();
         $mapConfig  = self::RESORT_MAPS[$resortMap] ?? self::RESORT_MAPS['ParkCity'];
         $isAdmin    = $this->isAdmin();
+        if ($isAdmin && !empty($mapConfig['admin_image'])) {
+            $mapConfig['image'] = $mapConfig['admin_image'];
+        }
         $userId     = auth()->id();
         $db         = db_connect();
 
