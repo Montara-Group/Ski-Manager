@@ -96,7 +96,7 @@ $cf = $cashflow ?? [
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: 0.6875rem;
     font-weight: 700;
     padding: 3px 10px;
     border-radius: 999px;
@@ -150,7 +150,7 @@ $cf = $cashflow ?? [
     gap: 0.75rem;
 }
 .dash-kpi-label {
-    font-size: 11px;
+    font-size: 0.6875rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -170,7 +170,7 @@ $cf = $cashflow ?? [
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 1rem;
     flex-shrink: 0;
 }
 .dash-kpi-foot {
@@ -178,7 +178,7 @@ $cf = $cashflow ?? [
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    font-size: 11px;
+    font-size: 0.6875rem;
     color: #94a3b8;
     padding-top: 8px;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
@@ -191,7 +191,7 @@ $cf = $cashflow ?? [
     gap: 10px;
     padding: 10px 14px;
     border-radius: 12px;
-    font-size: 13px;
+    font-size: 0.8125rem;
     font-weight: 600;
     text-decoration: none;
 }
@@ -208,7 +208,7 @@ $cf = $cashflow ?? [
     background: rgba(37, 99, 235, 0.18);
     border: 1px solid rgba(59, 130, 246, 0.45);
     color: #bfdbfe;
-    font-size: 12px;
+    font-size: 0.75rem;
 }
 .edit-mode-active .edit-mode-banner {
     display: flex;
@@ -243,6 +243,7 @@ $cf = $cashflow ?? [
 }
 
 .widget-item {
+    container-type: inline-size;
     background: rgba(15, 23, 42, 0.78);
     border: 1px solid rgba(255, 255, 255, 0.09);
     border-radius: 15px;
@@ -251,6 +252,70 @@ $cf = $cashflow ?? [
     flex-direction: column;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
+/* Defer off-screen rendering for lower dashboard rows while preserving intrinsic height */
+.widget-grid > .widget-item:nth-child(n+5) {
+    content-visibility: auto;
+    contain-intrinsic-size: auto none auto 180px;
+}
+
+/* Size-aware container query layouts for modular widgets */
+.cq-compact { display: block; }
+.cq-expanded { display: none; }
+.cq-large-only { display: none; }
+.cq-stats-grid,
+.cq-overview-grid,
+.cq-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.625rem;
+}
+.cq-season-grid,
+.cq-ach-mini-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.625rem;
+}
+
+/* Media query fallback for older browsers without container queries */
+@media (min-width: 640px) {
+    .widget-medium .cq-compact,
+    .widget-large .cq-compact { display: none; }
+    .widget-medium .cq-expanded,
+    .widget-large .cq-expanded { display: block; }
+    .widget-large .cq-large-only { display: block; }
+    .widget-medium .cq-stats-grid { grid-template-columns: repeat(4, 1fr); }
+    .widget-large .cq-stats-grid { grid-template-columns: repeat(6, 1fr); }
+    .widget-large .cq-overview-grid { grid-template-columns: repeat(5, 1fr); }
+    .widget-medium .cq-season-grid,
+    .widget-large .cq-season-grid { grid-template-columns: repeat(2, 1fr); }
+    .widget-medium .cq-actions-grid { grid-template-columns: repeat(3, 1fr); }
+    .widget-large .cq-actions-grid { grid-template-columns: repeat(6, 1fr); }
+    .widget-medium .cq-ach-mini-grid,
+    .widget-large .cq-ach-mini-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* Overwrite with container queries where supported so S/M/L live resize adapts immediately */
+@supports (container-type: inline-size) {
+    @container (min-width: 360px) {
+        .cq-compact { display: none; }
+        .cq-expanded { display: block; }
+    }
+    @container (min-width: 440px) {
+        .cq-actions-grid { grid-template-columns: repeat(3, 1fr); }
+        .cq-ach-mini-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @container (min-width: 480px) {
+        .cq-stats-grid { grid-template-columns: repeat(4, 1fr); }
+        .cq-season-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @container (min-width: 720px) {
+        .cq-large-only { display: block; }
+        .cq-stats-grid { grid-template-columns: repeat(6, 1fr); }
+        .cq-overview-grid { grid-template-columns: repeat(5, 1fr); }
+        .cq-actions-grid { grid-template-columns: repeat(6, 1fr); }
+    }
+}
+
 .widget-header {
     display: flex;
     align-items: center;
@@ -262,17 +327,18 @@ $cf = $cashflow ?? [
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 13px;
+    font-size: 0.8125rem;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: #e2e8f0;
+    margin: 0;
 }
 .widget-title i {
-    font-size: 13px;
+    font-size: 0.8125rem;
 }
 .widget-link {
-    font-size: 11px;
+    font-size: 0.6875rem;
     font-weight: 700;
     color: #38bdf8;
     text-decoration: none;
@@ -312,7 +378,7 @@ $cf = $cashflow ?? [
     background: rgba(30, 41, 59, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 10px;
-    font-size: 12px;
+    font-size: 0.75rem;
     font-weight: 700;
     color: #f1f5f9;
     text-decoration: none;
@@ -328,7 +394,7 @@ $cf = $cashflow ?? [
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: 0.8125rem;
     flex-shrink: 0;
 }
 
@@ -338,7 +404,7 @@ $cf = $cashflow ?? [
     align-items: center;
     justify-content: space-between;
     padding: 6px 12px;
-    font-size: 11px;
+    font-size: 0.6875rem;
     font-weight: 700;
     cursor: grab;
     user-select: none;
@@ -392,8 +458,8 @@ $cf = $cashflow ?? [
                 <i class="fa-solid fa-gift"></i> Claim Bonus
             </a>
             <?php endif; ?>
-            <button id="editModeBtn" type="button" onclick="toggleEditMode()" class="btn btn-ghost btn-sm border border-white/10 gap-1.5">
-                <i class="fa-solid fa-table-columns"></i> Customize
+            <button id="editModeBtn" type="button" onclick="toggleEditMode()" aria-pressed="false" class="btn btn-ghost btn-sm border border-white/10 gap-1.5">
+                <i class="fa-solid fa-table-columns" aria-hidden="true"></i> Customize
             </button>
         </div>
     </div>
@@ -401,7 +467,7 @@ $cf = $cashflow ?? [
     <!-- Layout Edit Mode Banner -->
     <div class="edit-mode-banner">
         <div class="flex items-center gap-2">
-            <i class="fa-solid fa-wand-magic-sparkles text-info"></i>
+            <i class="fa-solid fa-wand-magic-sparkles text-info" aria-hidden="true"></i>
             <span><b>Customize Dashboard:</b> Drag any widget header to reorder, click <b>S / M / L</b> to change width, or click the eye icon to hide/restore widgets.</span>
         </div>
         <button type="button" onclick="toggleEditMode()" class="btn btn-xs btn-primary font-bold">Done</button>
@@ -515,20 +581,20 @@ $cf = $cashflow ?? [
         <?php $info = $availableWidgets[$w['widget_key']] ?? null; if (!$info) continue; ?>
         <?php $sz = $w['size'] ?? 'large'; ?>
 
-        <div class="widget-item widget-<?= $sz ?>" data-key="<?= $w['widget_key'] ?>" data-size="<?= $sz ?>" id="widget-<?= $w['widget_key'] ?>">
+        <div class="widget-item widget-<?= $sz ?>" data-key="<?= $w['widget_key'] ?>" data-name="<?= esc($info['name']) ?>" data-size="<?= $sz ?>" id="widget-<?= $w['widget_key'] ?>">
             <div class="drag-handle">
                 <div class="flex items-center gap-2 text-base-content/80">
-                    <i class="fa-solid fa-grip-vertical text-info"></i>
+                    <i class="fa-solid fa-grip-vertical text-info" aria-hidden="true"></i>
                     <span><?= esc($info['name']) ?></span>
                 </div>
                 <div class="flex items-center gap-1">
-                    <div class="join">
-                        <button type="button" onclick="resizeWidget('<?= $w['widget_key'] ?>','small')" class="btn btn-xs join-item size-btn <?= $sz === 'small' ? 'btn-primary' : 'btn-ghost' ?>" data-sz="small">S</button>
-                        <button type="button" onclick="resizeWidget('<?= $w['widget_key'] ?>','medium')" class="btn btn-xs join-item size-btn <?= $sz === 'medium' ? 'btn-primary' : 'btn-ghost' ?>" data-sz="medium">M</button>
-                        <button type="button" onclick="resizeWidget('<?= $w['widget_key'] ?>','large')" class="btn btn-xs join-item size-btn <?= $sz === 'large' ? 'btn-primary' : 'btn-ghost' ?>" data-sz="large">L</button>
+                    <div class="join" role="group" aria-label="Resize <?= esc($info['name']) ?> widget">
+                        <button type="button" onclick="resizeWidget('<?= $w['widget_key'] ?>','small')" aria-label="Resize <?= esc($info['name']) ?> widget to small" aria-pressed="<?= $sz === 'small' ? 'true' : 'false' ?>" class="btn btn-xs join-item size-btn <?= $sz === 'small' ? 'btn-primary' : 'btn-ghost' ?>" data-sz="small">S</button>
+                        <button type="button" onclick="resizeWidget('<?= $w['widget_key'] ?>','medium')" aria-label="Resize <?= esc($info['name']) ?> widget to medium" aria-pressed="<?= $sz === 'medium' ? 'true' : 'false' ?>" class="btn btn-xs join-item size-btn <?= $sz === 'medium' ? 'btn-primary' : 'btn-ghost' ?>" data-sz="medium">M</button>
+                        <button type="button" onclick="resizeWidget('<?= $w['widget_key'] ?>','large')" aria-label="Resize <?= esc($info['name']) ?> widget to large" aria-pressed="<?= $sz === 'large' ? 'true' : 'false' ?>" class="btn btn-xs join-item size-btn <?= $sz === 'large' ? 'btn-primary' : 'btn-ghost' ?>" data-sz="large">L</button>
                     </div>
-                    <button type="button" onclick="hideWidget('<?= $w['widget_key'] ?>')" class="btn btn-ghost btn-xs text-error ml-1" title="Hide Widget">
-                        <i class="fa-solid fa-eye-slash"></i>
+                    <button type="button" onclick="hideWidget('<?= $w['widget_key'] ?>')" class="btn btn-ghost btn-xs text-error ml-1" aria-label="Hide <?= esc($info['name']) ?> widget">
+                        <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -538,92 +604,88 @@ $cf = $cashflow ?? [
             <?php // ===== STATS (DAILY CASHFLOW & FINANCIAL HEALTH) ===== ?>
             <?php if ($w['widget_key'] === 'stats') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-chart-pie text-primary"></i> Financial &amp; Revenue Breakdown</div>
-                    <a href="/finances" class="widget-link">Full Ledger <i class="fa-solid fa-chevron-right text-[10px]"></i></a>
+                    <h2 class="widget-title"><i class="fa-solid fa-chart-pie text-primary" aria-hidden="true"></i> Financial &amp; Revenue Breakdown</h2>
+                    <a href="/finances" class="widget-link">Full Ledger <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
                 </div>
-                <?php if ($sz === 'small') : ?>
-                    <div class="space-y-2 my-auto">
-                        <div class="dash-subcard flex justify-between items-center text-xs">
-                            <span class="text-base-content/60">Daily Revenue</span>
-                            <b class="text-success font-mono">+<?= currency($cf['total_income']) ?></b>
-                        </div>
-                        <div class="dash-subcard flex justify-between items-center text-xs">
-                            <span class="text-base-content/60">Daily Expenses</span>
-                            <b class="text-error font-mono">-<?= currency($cf['total_expenses']) ?></b>
-                        </div>
+                <div class="cq-compact space-y-2 my-auto">
+                    <div class="dash-subcard flex justify-between items-center text-xs">
+                        <span class="text-base-content/60">Daily Revenue</span>
+                        <b class="text-success font-mono">+<?= currency($cf['total_income']) ?></b>
                     </div>
-                <?php else : ?>
-                    <div class="grid grid-cols-2 <?= $sz === 'large' ? 'md:grid-cols-6' : 'md:grid-cols-3' ?> gap-2.5">
+                    <div class="dash-subcard flex justify-between items-center text-xs">
+                        <span class="text-base-content/60">Daily Expenses</span>
+                        <b class="text-error font-mono">-<?= currency($cf['total_expenses']) ?></b>
+                    </div>
+                </div>
+                <div class="cq-expanded">
+                    <div class="cq-stats-grid">
                         <div class="dash-subcard">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-ticket text-success mr-1"></i>Ticket Sales</div>
+                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-ticket text-success mr-1" aria-hidden="true"></i>Ticket Sales</div>
                             <div class="text-sm font-extrabold font-mono text-success">+<?= currency($cf['ticket_income']) ?><span class="text-[10px] opacity-60">/d</span></div>
                         </div>
                         <div class="dash-subcard">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-hotel text-info mr-1"></i>Buildings &amp; F&amp;B</div>
+                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-hotel text-info mr-1" aria-hidden="true"></i>Buildings &amp; F&amp;B</div>
                             <div class="text-sm font-extrabold font-mono text-info">+<?= currency($cf['building_income']) ?><span class="text-[10px] opacity-60">/d</span></div>
                         </div>
                         <div class="dash-subcard">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-user-tie text-warning mr-1"></i>Staff Payroll</div>
+                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-user-tie text-warning mr-1" aria-hidden="true"></i>Staff Payroll</div>
                             <div class="text-sm font-extrabold font-mono text-error">-<?= currency($cf['salaries']) ?><span class="text-[10px] opacity-60">/d</span></div>
                         </div>
                         <div class="dash-subcard">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-gears text-warning mr-1"></i>Ops &amp; Marketing</div>
+                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-gears text-warning mr-1" aria-hidden="true"></i>Ops &amp; Marketing</div>
                             <div class="text-sm font-extrabold font-mono text-error">-<?= currency($cf['equipment_cost'] + $cf['marketing_cost']) ?><span class="text-[10px] opacity-60">/d</span></div>
                         </div>
-                        <?php if ($sz === 'large') : ?>
-                        <div class="dash-subcard">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-arrow-trend-up text-success mr-1"></i>All-Time Income</div>
+                        <div class="dash-subcard cq-large-only">
+                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-arrow-trend-up text-success mr-1" aria-hidden="true"></i>All-Time Income</div>
                             <div class="text-sm font-extrabold font-mono text-success"><?= currency($finance['total_income'] ?? 0) ?></div>
                         </div>
-                        <div class="dash-subcard">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-arrow-trend-down text-error mr-1"></i>All-Time Costs</div>
+                        <div class="dash-subcard cq-large-only">
+                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-arrow-trend-down text-error mr-1" aria-hidden="true"></i>All-Time Costs</div>
                             <div class="text-sm font-extrabold font-mono text-error"><?= currency($finance['total_expenses'] ?? 0) ?></div>
                         </div>
-                        <?php endif; ?>
                     </div>
-                <?php endif ?>
+                </div>
             <?php endif ?>
 
             <?php // ===== OVERVIEW (MOUNTAIN INFRASTRUCTURE & TRAIL HEALTH) ===== ?>
             <?php if ($w['widget_key'] === 'overview') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-mountain-sun text-info"></i> Mountain Infrastructure</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-mountain-sun text-info" aria-hidden="true"></i> Mountain Infrastructure</h2>
                     <div class="flex items-center gap-3">
                         <a href="/grooming" class="widget-link">Grooming</a>
-                        <a href="/map" class="widget-link">Trail Map <i class="fa-solid fa-chevron-right text-[10px]"></i></a>
+                        <a href="/map" class="widget-link">Trail Map <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 <?= $sz === 'large' ? 'md:grid-cols-5' : '' ?> gap-2.5">
+                <div class="cq-overview-grid">
                     <a href="/map" class="dash-subcard hover:border-info/40 no-underline">
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-base-content/60">Open Slopes</span>
-                            <i class="fa-solid fa-person-skiing text-success text-xs"></i>
+                            <i class="fa-solid fa-person-skiing text-success text-xs" aria-hidden="true"></i>
                         </div>
                         <div class="text-xl font-extrabold mt-1"><?= $slopeCount ?> <span class="text-xs font-normal text-base-content/40">/ <?= $totalSlopes ?? $slopeCount ?></span></div>
                     </a>
                     <a href="/map" class="dash-subcard hover:border-warning/40 no-underline">
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-base-content/60">Open Lifts</span>
-                            <i class="fa-solid fa-elevator text-warning text-xs"></i>
+                            <i class="fa-solid fa-elevator text-warning text-xs" aria-hidden="true"></i>
                         </div>
                         <div class="text-xl font-extrabold mt-1"><?= $liftCount ?> <span class="text-xs font-normal text-base-content/40">/ <?= $totalLifts ?? $liftCount ?></span></div>
                     </a>
                     <a href="/staff" class="dash-subcard hover:border-primary/40 no-underline">
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-base-content/60">Active Staff</span>
-                            <i class="fa-solid fa-users text-info text-xs"></i>
+                            <i class="fa-solid fa-users text-info text-xs" aria-hidden="true"></i>
                         </div>
                         <div class="text-xl font-extrabold mt-1"><?= $staffCount ?> <span class="text-xs font-normal text-base-content/40">hired</span></div>
                     </a>
                     <a href="/buildings" class="dash-subcard hover:border-primary/40 no-underline">
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-base-content/60">Buildings</span>
-                            <i class="fa-solid fa-building text-primary text-xs"></i>
+                            <i class="fa-solid fa-building text-primary text-xs" aria-hidden="true"></i>
                         </div>
                         <div class="text-xl font-extrabold mt-1"><?= $buildingCount ?> <span class="text-xs font-normal text-base-content/40">built</span></div>
                     </a>
-                    <?php if ($sz === 'large') : ?>
-                    <a href="/grooming" class="dash-subcard hover:border-success/40 no-underline col-span-2 md:col-span-1">
+                    <a href="/grooming" class="dash-subcard hover:border-success/40 no-underline cq-large-only">
                         <div class="flex items-center justify-between mb-1">
                             <span class="text-xs text-base-content/60">Trail Grooming</span>
                             <span class="text-xs font-mono font-bold <?= ($avgSlopeCondition ?? 100) >= 70 ? 'text-success' : 'text-warning' ?>"><?= $avgSlopeCondition ?? 100 ?>%</span>
@@ -633,58 +695,59 @@ $cf = $cashflow ?? [
                             <?= ($ungroomedCount ?? 0) > 0 ? ($ungroomedCount . ' trail(s) need grooming') : 'All trails in good shape' ?>
                         </div>
                     </a>
-                    <?php endif; ?>
                 </div>
             <?php endif ?>
 
             <?php // ===== SEASON ===== ?>
             <?php if ($w['widget_key'] === 'season') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-calendar-check text-info"></i> Season <?= $seasonNum ?> Timeline</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-calendar-check text-info" aria-hidden="true"></i> Season <?= $seasonNum ?> Timeline</h2>
                     <span class="badge badge-info badge-sm font-mono">Day <?= $seasonProgress ?> / <?= $seasonLength ?> (<?= $seasonPct ?>%)</span>
                 </div>
-                <?php if ($sz === 'small') : ?>
+                <div class="cq-compact">
                     <div class="widget-center">
-                        <div class="radial-progress text-primary font-bold" style="--value:<?= $seasonPct ?>;--size:4.25rem;--thickness:5px;" role="progressbar"><?= $seasonPct ?>%</div>
+                        <div class="radial-progress text-primary font-bold" style="--value:<?= $seasonPct ?>;--size:4.25rem;--thickness:5px;" role="progressbar" aria-valuenow="<?= $seasonPct ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Season progress"><?= $seasonPct ?>%</div>
                         <div class="text-xs text-base-content/60 mt-2">Day <?= $seasonProgress ?> of <?= $seasonLength ?></div>
                     </div>
-                <?php else : ?>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                </div>
+                <div class="cq-expanded">
+                    <div class="cq-season-grid">
                         <div class="dash-subcard">
                             <div class="flex justify-between text-xs mb-1.5">
-                                <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-snowflake text-info"></i> Winter Peak Season</span>
+                                <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-snowflake text-info" aria-hidden="true"></i> Winter Peak Season</span>
                                 <span class="font-mono text-base-content/60"><?= min($seasonProgress, 100) ?> / 100 days</span>
                             </div>
                             <progress class="progress progress-info w-full" value="<?= min($seasonProgress, 100) ?>" max="100"></progress>
                         </div>
                         <div class="dash-subcard">
                             <div class="flex justify-between text-xs mb-1.5">
-                                <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-sun text-warning"></i> Off-Season / Summer</span>
+                                <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-sun text-warning" aria-hidden="true"></i> Off-Season / Summer</span>
                                 <span class="font-mono text-base-content/60"><?= max(0, $seasonProgress - 100) ?> / 35 days</span>
                             </div>
                             <progress class="progress progress-warning w-full" value="<?= max(0, $seasonProgress - 100) ?>" max="35"></progress>
                         </div>
                     </div>
-                <?php endif ?>
+                </div>
             <?php endif ?>
 
             <?php // ===== WEATHER ===== ?>
             <?php if ($w['widget_key'] === 'weather_mini' && $weather) : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-cloud-sun-rain text-warning"></i> Alpine Weather &amp; Forecast</div>
-                    <a href="/weather" class="widget-link">Weather Center <i class="fa-solid fa-chevron-right text-[10px]"></i></a>
+                    <h2 class="widget-title"><i class="fa-solid fa-cloud-sun-rain text-warning" aria-hidden="true"></i> Alpine Weather &amp; Forecast</h2>
+                    <a href="/weather" class="widget-link">Weather Center <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
                 </div>
-                <?php if ($sz === 'small') : ?>
+                <div class="cq-compact">
                     <div class="widget-center">
-                        <i class="fa-solid <?= $wIcons[$weather['condition_name']] ?? 'fa-cloud' ?> text-3xl"></i>
+                        <i class="fa-solid <?= $wIcons[$weather['condition_name']] ?? 'fa-cloud' ?> text-3xl" aria-hidden="true"></i>
                         <div class="text-xl font-bold mt-1.5"><?= $weather['temp_formatted'] ?></div>
                         <div class="text-xs text-base-content/60"><?= esc($weather['condition_name']) ?></div>
                     </div>
-                <?php else : ?>
-                    <div class="flex flex-wrap items-center justify-between gap-3 my-auto">
+                </div>
+                <div class="cq-expanded my-auto">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="flex items-center gap-3.5">
-                            <div class="dash-kpi-icon" style="width:46px;height:46px;font-size:22px;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.28)">
-                                <i class="fa-solid <?= $wIcons[$weather['condition_name']] ?? 'fa-cloud' ?>"></i>
+                            <div class="dash-kpi-icon" style="width:46px;height:46px;font-size:1.375rem;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.28)">
+                                <i class="fa-solid <?= $wIcons[$weather['condition_name']] ?? 'fa-cloud' ?>" aria-hidden="true"></i>
                             </div>
                             <div>
                                 <div class="text-xl font-extrabold"><?= $weather['temp_formatted'] ?> <span class="text-xs font-semibold text-base-content/60">· <?= esc($weather['condition_name']) ?></span></div>
@@ -695,71 +758,71 @@ $cf = $cashflow ?? [
                         </div>
                         <?php if (!empty($forecast)) : ?>
                         <div class="flex gap-2">
-                            <?php foreach (array_slice($forecast, 0, $sz === 'large' ? 5 : 3) as $i => $fc) : ?>
-                            <div class="dash-subcard text-center px-2.5 py-1.5 min-w-[54px]">
+                            <?php foreach (array_slice($forecast, 0, 5) as $i => $fc) : ?>
+                            <div class="dash-subcard text-center px-2.5 py-1.5 min-w-[54px] <?= $i >= 3 ? 'cq-large-only' : '' ?>">
                                 <div class="text-[10px] text-base-content/50 font-semibold">+<?= $i + 1 ?>d</div>
-                                <i class="fa-solid <?= $wIcons[$fc['condition']] ?? 'fa-cloud' ?> text-xs my-1"></i>
+                                <i class="fa-solid <?= $wIcons[$fc['condition']] ?? 'fa-cloud' ?> text-xs my-1" aria-hidden="true"></i>
                                 <div class="text-xs font-bold font-mono"><?= temp($fc['temp']) ?></div>
                             </div>
                             <?php endforeach ?>
                         </div>
                         <?php endif ?>
                     </div>
-                <?php endif ?>
+                </div>
             <?php endif ?>
 
             <?php // ===== QUICK ACTIONS (OPERATIONS COMMAND DECK) ===== ?>
             <?php if ($w['widget_key'] === 'actions') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-bolt text-warning"></i> Operations Command Deck</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-bolt text-warning" aria-hidden="true"></i> Operations Command Deck</h2>
                 </div>
-                <div class="grid grid-cols-2 <?= $sz === 'large' ? 'sm:grid-cols-4 md:grid-cols-6' : ($sz === 'medium' ? 'sm:grid-cols-3' : '') ?> gap-2">
+                <div class="cq-actions-grid">
                     <a href="/map" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(56,189,248,0.16);color:#38bdf8"><i class="fa-solid fa-map-location-dot"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(56,189,248,0.16);color:#38bdf8"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i></span>
                         <span>Trail Map</span>
                     </a>
                     <a href="/resort" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(34,197,94,0.16);color:#4ade80"><i class="fa-solid fa-mountain-sun"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(34,197,94,0.16);color:#4ade80"><i class="fa-solid fa-mountain-sun" aria-hidden="true"></i></span>
                         <span>Resort Ops</span>
                     </a>
                     <a href="/finances" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(245,158,11,0.16);color:#fbbf24"><i class="fa-solid fa-coins"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(245,158,11,0.16);color:#fbbf24"><i class="fa-solid fa-coins" aria-hidden="true"></i></span>
                         <span>Finances</span>
                     </a>
                     <a href="/staff" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(99,102,241,0.18);color:#818cf8"><i class="fa-solid fa-users"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(99,102,241,0.18);color:#818cf8"><i class="fa-solid fa-users" aria-hidden="true"></i></span>
                         <span>Staff (<?= $staffCount ?>)</span>
                     </a>
                     <a href="/grooming" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(20,184,166,0.16);color:#2dd4bf"><i class="fa-solid fa-tractor"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(20,184,166,0.16);color:#2dd4bf"><i class="fa-solid fa-tractor" aria-hidden="true"></i></span>
                         <span>Grooming</span>
                     </a>
                     <a href="/snowmaking" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(59,130,246,0.16);color:#60a5fa"><i class="fa-solid fa-snowflake"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(59,130,246,0.16);color:#60a5fa"><i class="fa-solid fa-snowflake" aria-hidden="true"></i></span>
                         <span>Snowmaking</span>
                     </a>
                     <a href="/buildings" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(168,85,247,0.16);color:#c084fc"><i class="fa-solid fa-hotel"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(168,85,247,0.16);color:#c084fc"><i class="fa-solid fa-hotel" aria-hidden="true"></i></span>
                         <span>Buildings</span>
                     </a>
                     <a href="/terrain-parks" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(236,72,153,0.16);color:#f472b6"><i class="fa-solid fa-person-snowboarding"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(236,72,153,0.16);color:#f472b6"><i class="fa-solid fa-person-snowboarding" aria-hidden="true"></i></span>
                         <span>Terrain Parks</span>
                     </a>
                     <a href="/parking" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(148,163,184,0.16);color:#cbd5e1"><i class="fa-solid fa-square-parking"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(148,163,184,0.16);color:#cbd5e1"><i class="fa-solid fa-square-parking" aria-hidden="true"></i></span>
                         <span>Parking</span>
                     </a>
                     <a href="/equipment" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(251,146,60,0.16);color:#fb923c"><i class="fa-solid fa-toolbox"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(251,146,60,0.16);color:#fb923c"><i class="fa-solid fa-toolbox" aria-hidden="true"></i></span>
                         <span>Equipment</span>
                     </a>
                     <a href="/marketing" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(244,63,94,0.16);color:#fb7185"><i class="fa-solid fa-bullhorn"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(244,63,94,0.16);color:#fb7185"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i></span>
                         <span>Marketing</span>
                     </a>
                     <a href="/vote" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(56,189,248,0.16);color:#38bdf8"><i class="fa-solid fa-check-to-slot"></i></span>
+                        <span class="dash-action-icon" style="background:rgba(56,189,248,0.16);color:#38bdf8"><i class="fa-solid fa-check-to-slot" aria-hidden="true"></i></span>
                         <span>Resort Vote</span>
                     </a>
                 </div>
@@ -768,13 +831,13 @@ $cf = $cashflow ?? [
             <?php // ===== ACHIEVEMENT ALERTS (MILESTONE REWARDS SUMMARY) ===== ?>
             <?php if ($w['widget_key'] === 'achievements_mini') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-trophy text-warning"></i> Milestone Rewards</div>
-                    <a href="/achievements" class="widget-link">Rewards Page <i class="fa-solid fa-chevron-right text-[10px]"></i></a>
+                    <h2 class="widget-title"><i class="fa-solid fa-trophy text-warning" aria-hidden="true"></i> Milestone Rewards</h2>
+                    <a href="/achievements" class="widget-link">Rewards Page <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
                 </div>
                 <?php if ($unclaimedAchievements > 0) : ?>
                     <div class="dash-subcard flex items-center justify-between gap-3 my-auto" style="border-color:rgba(245,158,11,0.4);background:rgba(245,158,11,0.1)">
                         <div class="flex items-center gap-3">
-                            <i class="fa-solid fa-award text-warning text-2xl"></i>
+                            <i class="fa-solid fa-award text-warning text-2xl" aria-hidden="true"></i>
                             <div>
                                 <div class="text-sm font-extrabold"><?= $unclaimedAchievements ?> Unclaimed Reward<?= $unclaimedAchievements > 1 ? 's' : '' ?></div>
                                 <div class="text-xs text-base-content/60"><?= $completedAchievements ?? 0 ?> total milestones unlocked</div>
@@ -783,16 +846,16 @@ $cf = $cashflow ?? [
                         <a href="/achievements" class="btn btn-warning btn-sm font-bold">Claim Now</a>
                     </div>
                 <?php else : ?>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 my-auto">
+                    <div class="cq-ach-mini-grid my-auto">
                         <div class="dash-subcard flex items-center gap-3">
-                            <i class="fa-solid fa-medal text-warning text-xl"></i>
+                            <i class="fa-solid fa-medal text-warning text-xl" aria-hidden="true"></i>
                             <div>
                                 <div class="text-lg font-extrabold"><?= $completedAchievements ?? 0 ?></div>
                                 <div class="text-[11px] text-base-content/50">Completed Milestones</div>
                             </div>
                         </div>
                         <div class="dash-subcard flex items-center gap-3">
-                            <i class="fa-solid fa-hourglass-half text-info text-xl"></i>
+                            <i class="fa-solid fa-hourglass-half text-info text-xl" aria-hidden="true"></i>
                             <div>
                                 <div class="text-lg font-extrabold"><?= count($inProgressAchievements) ?></div>
                                 <div class="text-[11px] text-base-content/50">Active Next Goals</div>
@@ -812,8 +875,8 @@ $cf = $cashflow ?? [
             <?php // ===== ACHIEVEMENTS (NEXT GOALS PROGRESS) ===== ?>
             <?php if ($w['widget_key'] === 'achievements' || $w['widget_key'] === 'getting_started') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-award text-warning"></i> Next Achievement Goals</div>
-                    <a href="/achievements" class="widget-link">View All <i class="fa-solid fa-chevron-right text-[10px]"></i></a>
+                    <h2 class="widget-title"><i class="fa-solid fa-award text-warning" aria-hidden="true"></i> Next Achievement Goals</h2>
+                    <a href="/achievements" class="widget-link">View All <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
                 </div>
                 <?php if (empty($inProgressAchievements)) : ?>
                     <div class="widget-center text-sm text-base-content/40">All achievements completed!</div>
@@ -822,7 +885,7 @@ $cf = $cashflow ?? [
                         <?php foreach (array_slice($inProgressAchievements, 0, 4) as $ach) : ?>
                         <?php $pct = $ach['target'] > 0 ? min(100, (int) round($ach['progress'] / $ach['target'] * 100)) : 0; ?>
                         <div class="dash-subcard py-2 px-3 flex items-center gap-3">
-                            <i class="<?= esc($ach['icon'] ?: 'fa-solid fa-star') ?> text-warning text-sm w-4 text-center"></i>
+                            <i class="<?= esc($ach['icon'] ?: 'fa-solid fa-star') ?> text-warning text-sm w-4 text-center" aria-hidden="true"></i>
                             <div class="flex-1 min-w-0">
                                 <div class="flex justify-between items-center text-xs mb-1">
                                     <span class="font-bold truncate"><?= esc($ach['name']) ?></span>
@@ -839,8 +902,8 @@ $cf = $cashflow ?? [
             <?php // ===== ACTIVITY (LIVE OPERATIONS LOG) ===== ?>
             <?php if ($w['widget_key'] === 'activity') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-clock-rotate-left text-info"></i> Recent Resort Activity</div>
-                    <a href="/activity" class="widget-link">Full Log <i class="fa-solid fa-chevron-right text-[10px]"></i></a>
+                    <h2 class="widget-title"><i class="fa-solid fa-clock-rotate-left text-info" aria-hidden="true"></i> Recent Resort Activity</h2>
+                    <a href="/activity" class="widget-link">Full Log <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
                 </div>
                 <?php if (empty($recentActivity)) : ?>
                     <div class="widget-center text-sm text-base-content/40">No recent activity logged</div>
@@ -848,7 +911,7 @@ $cf = $cashflow ?? [
                     <div id="activityFeedList" class="space-y-1.5 flex-1 overflow-y-auto">
                         <?php foreach (array_slice($recentActivity, 0, 6) as $log) : ?>
                         <div class="dash-subcard py-1.5 px-2.5 flex items-center gap-2.5 text-xs">
-                            <i class="<?= esc($log['icon'] ?? 'fa-solid fa-circle-dot') ?> text-info w-4 text-center"></i>
+                            <i class="<?= esc($log['icon'] ?? 'fa-solid fa-circle-dot') ?> text-info w-4 text-center" aria-hidden="true"></i>
                             <span class="flex-1 truncate font-medium"><?= esc($log['message']) ?></span>
                             <span class="badge badge-ghost badge-xs font-mono">D<?= esc($log['game_day'] ?? $gameDay) ?></span>
                         </div>
@@ -860,7 +923,7 @@ $cf = $cashflow ?? [
             <?php // ===== PARKING ===== ?>
             <?php if ($w['widget_key'] === 'parking_mini') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-square-parking text-info"></i> Parking Capacity</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-square-parking text-info" aria-hidden="true"></i> Parking Capacity</h2>
                     <a href="/parking" class="widget-link">Manage</a>
                 </div>
                 <div class="grid grid-cols-3 gap-2 text-center my-auto">
@@ -874,7 +937,7 @@ $cf = $cashflow ?? [
             <?php // ===== TERRAIN PARKS ===== ?>
             <?php if ($w['widget_key'] === 'terrain_parks_mini') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-person-snowboarding text-warning"></i> Terrain Parks</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-person-snowboarding text-warning" aria-hidden="true"></i> Terrain Parks</h2>
                     <a href="/terrain-parks" class="widget-link">Manage</a>
                 </div>
                 <div class="grid grid-cols-3 gap-2 text-center my-auto">
@@ -887,7 +950,7 @@ $cf = $cashflow ?? [
             <?php // ===== FINANCES MINI ===== ?>
             <?php if ($w['widget_key'] === 'finances_mini' && $finance) : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-coins text-warning"></i> All-Time Finances</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-coins text-warning" aria-hidden="true"></i> All-Time Finances</h2>
                     <a href="/finances" class="widget-link">Details</a>
                 </div>
                 <div class="grid grid-cols-3 gap-2 text-center my-auto">
@@ -900,7 +963,7 @@ $cf = $cashflow ?? [
             <?php // ===== STAFF MINI ===== ?>
             <?php if ($w['widget_key'] === 'staff_mini') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-users text-info"></i> Staff &amp; Morale</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-users text-info" aria-hidden="true"></i> Staff &amp; Morale</h2>
                     <a href="/staff" class="widget-link">Manage</a>
                 </div>
                 <?php if (empty($staffAll)) : ?>
@@ -928,7 +991,7 @@ $cf = $cashflow ?? [
             <?php // ===== EQUIPMENT MINI ===== ?>
             <?php if ($w['widget_key'] === 'equipment_mini') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-toolbox text-warning"></i> Equipment</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-toolbox text-warning" aria-hidden="true"></i> Equipment</h2>
                     <a href="/equipment" class="widget-link">Fleet</a>
                 </div>
                 <div class="widget-center">
@@ -940,7 +1003,7 @@ $cf = $cashflow ?? [
             <?php // ===== INSURANCE MINI ===== ?>
             <?php if ($w['widget_key'] === 'insurance_mini') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-shield-halved text-success"></i> Insurance</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-shield-halved text-success" aria-hidden="true"></i> Insurance</h2>
                     <a href="/insurance" class="widget-link">Policies</a>
                 </div>
                 <div class="grid grid-cols-2 gap-2 text-center my-auto">
@@ -952,11 +1015,11 @@ $cf = $cashflow ?? [
             <?php // ===== LOANS MINI ===== ?>
             <?php if ($w['widget_key'] === 'loans_mini') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-landmark text-primary"></i> Bank Loans</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-landmark text-primary" aria-hidden="true"></i> Bank Loans</h2>
                     <a href="/bank" class="widget-link">Bank</a>
                 </div>
                 <?php if (empty($loans)) : ?>
-                    <div class="widget-center text-xs text-success font-semibold"><i class="fa-solid fa-circle-check mb-1 text-base"></i>Debt-Free</div>
+                    <div class="widget-center text-xs text-success font-semibold"><i class="fa-solid fa-circle-check mb-1 text-base" aria-hidden="true"></i>Debt-Free</div>
                 <?php else : ?>
                     <div class="widget-center">
                         <div class="text-lg font-extrabold text-error font-mono"><?= currency(array_sum(array_column($loans, 'remaining'))) ?></div>
@@ -968,7 +1031,7 @@ $cf = $cashflow ?? [
             <?php // ===== MARKETING MINI ===== ?>
             <?php if ($w['widget_key'] === 'marketing_mini') : ?>
                 <div class="widget-header">
-                    <div class="widget-title"><i class="fa-solid fa-bullhorn text-secondary"></i> Marketing</div>
+                    <h2 class="widget-title"><i class="fa-solid fa-bullhorn text-secondary" aria-hidden="true"></i> Marketing</h2>
                     <a href="/marketing" class="widget-link">Campaigns</a>
                 </div>
                 <?php if (empty($marketing)) : ?>
@@ -987,15 +1050,15 @@ $cf = $cashflow ?? [
     </div>
 
     <!-- Hidden Widgets Drawer (Shown in Customize Mode) -->
-    <div id="hiddenWidgets" class="hidden mt-6 p-4 rounded-xl bg-base-100/80 border border-white/10">
-        <h3 class="text-xs font-bold uppercase tracking-wider text-base-content/60 mb-3">
-            <i class="fa-solid fa-eye-slash mr-1"></i> Hidden Widgets — Click to Add to Dashboard
-        </h3>
+    <div id="hiddenWidgets" class="hidden mt-6 p-4 rounded-xl bg-base-100/80 border border-white/10" inert>
+        <h2 class="text-xs font-bold uppercase tracking-wider text-base-content/60 mb-3">
+            <i class="fa-solid fa-eye-slash mr-1" aria-hidden="true"></i> Hidden Widgets — Click to Add to Dashboard
+        </h2>
         <div class="flex flex-wrap gap-2" id="hiddenWidgetList">
         <?php foreach ($widgets as $w) : ?>
             <?php if ($w['visible']) continue; $info = $availableWidgets[$w['widget_key']] ?? null; if (!$info) continue; ?>
             <button type="button" onclick="showWidget('<?= $w['widget_key'] ?>')" class="btn btn-outline btn-sm gap-1.5 hidden-widget-btn" data-key="<?= $w['widget_key'] ?>">
-                <i class="<?= $info['icon'] ?> text-xs"></i> <?= esc($info['name']) ?> <i class="fa-solid fa-plus text-xs text-success"></i>
+                <i class="<?= $info['icon'] ?> text-xs" aria-hidden="true"></i> <?= esc($info['name']) ?> <i class="fa-solid fa-plus text-xs text-success" aria-hidden="true"></i>
             </button>
         <?php endforeach ?>
         </div>
@@ -1016,9 +1079,11 @@ function toggleEditMode() {
     container.classList.toggle('edit-mode', editMode);
     dashRoot.classList.toggle('edit-mode-active', editMode);
     hiddenSection.classList.toggle('hidden', !editMode);
+    hiddenSection.toggleAttribute('inert', !editMode);
+    editBtn.setAttribute('aria-pressed', editMode ? 'true' : 'false');
     editBtn.innerHTML = editMode
-        ? '<i class="fa-solid fa-check"></i> Done'
-        : '<i class="fa-solid fa-table-columns"></i> Customize';
+        ? '<i class="fa-solid fa-check" aria-hidden="true"></i> Done'
+        : '<i class="fa-solid fa-table-columns" aria-hidden="true"></i> Customize';
     editBtn.classList.toggle('btn-primary', editMode);
     editBtn.classList.toggle('btn-ghost', !editMode);
     container.querySelectorAll('.widget-item').forEach(el => el.setAttribute('draggable', editMode ? 'true' : 'false'));
@@ -1043,6 +1108,7 @@ function ajaxPost(url, data) {
 
 function hideWidget(key) {
     const el = document.getElementById('widget-' + key);
+    const widgetName = (el && el.dataset.name) ? el.dataset.name : key.replace(/_/g, ' ');
     if (el) {
         el.style.opacity = '0';
         setTimeout(() => el.remove(), 180);
@@ -1053,7 +1119,7 @@ function hideWidget(key) {
     btn.type = 'button';
     btn.className = 'btn btn-outline btn-sm gap-1.5 hidden-widget-btn';
     btn.dataset.key = key;
-    btn.innerHTML = '<i class="fa-solid fa-plus text-xs text-success"></i> ' + key.replace(/_/g, ' ');
+    btn.innerHTML = '<i class="fa-solid fa-plus text-xs text-success" aria-hidden="true"></i> ' + widgetName;
     btn.onclick = () => showWidget(key);
     list.appendChild(btn);
 }
@@ -1072,8 +1138,10 @@ function resizeWidget(key, size) {
         el.classList.add('widget-' + size);
         el.dataset.size = size;
         el.querySelectorAll('.size-btn').forEach(b => {
-            b.classList.toggle('btn-primary', b.dataset.sz === size);
-            b.classList.toggle('btn-ghost', b.dataset.sz !== size);
+            const active = b.dataset.sz === size;
+            b.classList.toggle('btn-primary', active);
+            b.classList.toggle('btn-ghost', !active);
+            b.setAttribute('aria-pressed', active ? 'true' : 'false');
         });
     }
     ajaxPost('/dashboard/resize-widget', { widget_key: key, size: size });
@@ -1112,8 +1180,12 @@ container.addEventListener('drop', e => {
     const t = e.target.closest('.widget-item');
     if (t && t !== dragEl) {
         const items = [...container.querySelectorAll('.widget-item')];
-        if (items.indexOf(dragEl) < items.indexOf(t)) container.insertBefore(dragEl, t.nextSibling);
-        else container.insertBefore(dragEl, t);
+        const refNode = items.indexOf(dragEl) < items.indexOf(t) ? t.nextSibling : t;
+        if ('moveBefore' in Element.prototype) {
+            container.moveBefore(dragEl, refNode);
+        } else {
+            container.insertBefore(dragEl, refNode);
+        }
     }
 });
 
@@ -1136,7 +1208,7 @@ if (sessionStorage.getItem('editMode')) {
         return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
     function refresh() {
-        fetch("/dashboard/activity", { headers: { "X-Requested-With": "XMLHttpRequest" } })
+        fetch("/dashboard/activity", { priority: "low", headers: { "X-Requested-With": "XMLHttpRequest" } })
         .then(function(r) { return r.json(); })
         .then(function(logs) {
             if (!Array.isArray(logs) || !logs.length) return;
@@ -1144,7 +1216,7 @@ if (sessionStorage.getItem('editMode')) {
             logs.slice(0, 6).forEach(function(log) {
                 var div = document.createElement("div");
                 div.className = "dash-subcard py-1.5 px-2.5 flex items-center gap-2.5 text-xs";
-                div.innerHTML = '<i class="' + esc(log.icon || 'fa-solid fa-circle-dot') + ' text-info w-4 text-center"></i>' +
+                div.innerHTML = '<i class="' + esc(log.icon || 'fa-solid fa-circle-dot') + ' text-info w-4 text-center" aria-hidden="true"></i>' +
                     '<span class="flex-1 truncate font-medium">' + esc(log.message) + '</span>' +
                     '<span class="badge badge-ghost badge-xs font-mono">D' + esc(log.game_day || '') + '</span>';
                 feedList.appendChild(div);
