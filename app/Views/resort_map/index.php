@@ -15,6 +15,8 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
 <?= $this->section('content') ?>
 
 <link rel="stylesheet" href="/css/leaflet.css" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="preload" href="<?= esc(str_replace('.jpg', '_med.jpg', $mapConfig['image'])) ?>" as="image" fetchpriority="high">
 
 <style>
@@ -26,35 +28,19 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     z-index: 0;
     user-select: none;
 }
+:root { --sign: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; }
+/* Legend styled like the key on a printed trail map */
 .map-legend {
-    position: absolute;
-    bottom: 14px;
-    left: 14px;
-    z-index: 800;
-    background: rgba(15, 23, 42, 0.92);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 11px;
-    color: #e2e8f0;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    backdrop-filter: blur(8px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    position: absolute; bottom: 14px; left: 14px; z-index: 800;
+    background: #f7f5f0; color: #1d232b; border: 1px solid rgba(0,0,0,0.18); border-radius: 6px;
+    padding: 9px 12px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
-.map-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 500;
-}
-.map-legend-item span.legend-swatch {
-    width: 22px;
-    height: 4px;
-    border-radius: 2px;
-    display: inline-block;
-}
+.map-legend-title { font-family: var(--sign); font-size: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 1px; }
+.map-legend-item { display: flex; align-items: center; gap: 8px; }
+.map-legend-item .legend-sign { width: 26px; display: inline-flex; justify-content: center; }
+.map-legend-item span.legend-swatch { width: 20px; height: 4px; border-radius: 2px; display: inline-block; }
+.map-legend .tsign.black { box-shadow: none; }
 .build-fab {
     position: fixed;
     bottom: 24px;
@@ -96,8 +82,8 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     -webkit-backdrop-filter: blur(16px);
     background: rgba(15, 23, 42, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.16);
-    border-radius: 14px;
-    box-shadow: 0 14px 34px -5px rgba(0, 0, 0, 0.7), 0 4px 14px rgba(0, 0, 0, 0.45);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
     padding: 7px 12px;
     max-width: 96vw;
     width: fit-content;
@@ -216,358 +202,126 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     background: #1e293b !important;
 }
 
-/* Side Drawers - Floating Glassmorphic Panel inside Map Viewport */
+/* Side drawers: solid panel, no glass or glow */
 .map-side-drawer {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    bottom: 12px;
-    width: 390px;
-    max-width: calc(100vw - 24px);
-    background: rgba(15, 23, 42, 0.96);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 16px;
-    z-index: 950;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05);
-    overflow: hidden;
-    color: #f1f5f9;
+    position: absolute; top: 12px; right: 12px; bottom: 12px;
+    width: 380px; max-width: calc(100vw - 24px);
+    background: #151b23; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+    z-index: 950; display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.45); color: #e6e9ee;
 }
-
 .drawer-header {
-    padding: 14px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.4) 100%);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-shrink: 0;
+    padding: 14px 14px 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-shrink: 0;
 }
-
-.drawer-header-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: rgba(56, 189, 248, 0.15);
-    border: 1px solid rgba(56, 189, 248, 0.35);
-    color: #38bdf8;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    flex-shrink: 0;
-}
-
-.drawer-cash-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    color: #4ade80;
-    background: rgba(34, 197, 94, 0.14);
-    border: 1px solid rgba(34, 197, 94, 0.3);
-    padding: 1px 8px;
-    border-radius: 6px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-weight: 700;
-    font-size: 11px;
-}
-
+.drawer-header h2 { font-family: var(--sign); font-size: 22px !important; font-weight: 600 !important; line-height: 1.1 !important; color: #fff !important; }
+.drawer-header-icon { display: none; }
+.drawer-cash-pill { color: #e6e9ee; font-weight: 600; font-size: 12px; font-variant-numeric: tabular-nums; }
 .drawer-close-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #cbd5e1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
+    width: 30px; height: 30px; border-radius: 6px; background: transparent; border: 0; color: #9aa4b2;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
 }
-.drawer-close-btn:hover {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.45);
-    color: #fca5a5;
-}
+.drawer-close-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
 
-/* Segmented Tabs inside Build Drawer */
+/* Tabs: underline, not a glowing pill */
 .drawer-segmented-tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-    background: #090d16;
-    padding: 4px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    margin-bottom: 12px;
+    display: grid; grid-template-columns: 1fr 1fr;
+    margin: -14px -14px 14px; padding: 0 14px; border-bottom: 1px solid rgba(255,255,255,0.08);
 }
 .drawer-seg-tab {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 7px;
-    padding: 8px 10px;
-    border-radius: 9px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #94a3b8;
-    background: transparent;
-    border: 1px solid transparent;
-    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 11px 8px 10px; margin-bottom: -1px; font-size: 13px; font-weight: 600; color: #9aa4b2;
+    background: none; border: 0; border-bottom: 2px solid transparent; cursor: pointer;
 }
-.drawer-seg-tab:hover {
-    color: #e2e8f0;
-    background: rgba(255, 255, 255, 0.04);
-}
-.drawer-seg-tab.is-active {
-    background: #2563eb;
-    color: #ffffff;
-    border-color: rgba(147, 197, 253, 0.35);
-    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
-}
-.drawer-seg-tab .tab-count-pill {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 1px 6px;
-    border-radius: 999px;
-    background: rgba(0, 0, 0, 0.28);
-    color: inherit;
-    font-family: ui-monospace, SFMono-Regular, monospace;
-}
+.drawer-seg-tab:hover { color: #e6e9ee; }
+.drawer-seg-tab.is-active { color: #fff; border-bottom-color: var(--color-primary); }
+.drawer-seg-tab .tab-count-pill { font-size: 11px; font-weight: 500; color: #7d8794; font-variant-numeric: tabular-nums; }
 
-/* Filter & Search Bar inside Drawer */
-.drawer-search-wrap {
-    position: relative;
-    flex: 1;
-}
-.drawer-search-wrap i {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #64748b;
-    font-size: 12px;
-    pointer-events: none;
-}
+/* Search & filters */
+.drawer-search-wrap { position: relative; flex: 1; }
+.drawer-search-wrap i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #6b7685; font-size: 12px; pointer-events: none; }
 .drawer-search-input {
-    width: 100%;
-    height: 34px;
-    padding: 0 10px 0 30px;
-    background: #0b111e;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 9px;
-    color: #f1f5f9;
-    font-size: 12px;
-    outline: none;
+    width: 100%; height: 34px; padding: 0 10px 0 30px; background: #0f141a;
+    border: 1px solid rgba(255,255,255,0.12); border-radius: 6px; color: #f1f3f5; font-size: 13px; outline: none;
 }
-.drawer-search-input:focus {
-    border-color: #38bdf8;
-    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
-}
+.drawer-search-input:focus, .drawer-select:focus { border-color: var(--color-primary); }
 .drawer-select {
-    height: 34px;
-    padding: 0 26px 0 10px;
-    background: #0b111e;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 9px;
-    color: #e2e8f0;
-    font-size: 11px;
-    font-weight: 600;
-    outline: none;
-    cursor: pointer;
-}
-.drawer-select:focus {
-    border-color: #38bdf8;
+    height: 34px; padding: 0 26px 0 10px; background: #0f141a; border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 6px; color: #e6e9ee; font-size: 12px; outline: none; cursor: pointer;
 }
 
-/* Run & Lift Item Cards in Build List */
+/* Run & lift rows */
 .build-item-card {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    width: 100%;
-    padding: 10px 12px;
-    background: rgba(30, 41, 59, 0.55);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    text-align: left;
-    cursor: pointer;
-    margin-bottom: 7px;
+    display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px 8px; margin: 0;
+    background: none; border: 0; border-top: 1px solid rgba(255,255,255,0.06); border-radius: 0;
+    text-align: left; cursor: pointer; color: inherit;
 }
-.build-item-card:hover {
-    background: rgba(30, 41, 59, 0.95);
-    border-color: rgba(56, 189, 248, 0.45);
-}
-.build-item-card.is-selected {
-    background: rgba(37, 99, 235, 0.2);
-    border-color: #38bdf8;
-    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35), 0 6px 16px rgba(0, 0, 0, 0.4);
-}
-.build-item-emblem {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-weight: 900;
-}
-.build-item-info {
-    flex: 1;
-    min-width: 0;
-}
-.build-item-title-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 3px;
-}
-.build-item-name {
-    font-size: 13px;
-    font-weight: 700;
-    color: #f8fafc;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.build-diff-pill {
-    font-size: 9px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    padding: 1px 6px;
-    border-radius: 5px;
-    flex-shrink: 0;
-}
-.build-item-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    color: #94a3b8;
-    font-family: ui-monospace, SFMono-Regular, monospace;
-}
-.build-item-price-col {
-    text-align: right;
-    flex-shrink: 0;
-}
-.build-item-price {
-    font-size: 12px;
-    font-weight: 800;
-    font-family: ui-monospace, SFMono-Regular, monospace;
-}
-.build-item-cta {
-    font-size: 10px;
-    color: #38bdf8;
-    font-weight: 600;
-    margin-top: 1px;
-}
+.build-item-card:hover { background: rgba(255,255,255,0.04); }
+.build-item-card.is-selected { background: color-mix(in oklab, var(--color-primary) 16%, transparent); box-shadow: inset 3px 0 0 var(--color-primary); }
+.build-item-emblem { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.build-item-info { flex: 1; min-width: 0; }
+.build-item-title-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.build-item-name { font-size: 13.5px; font-weight: 600; color: #f1f3f5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.build-diff-pill { font-size: 11px; font-weight: 500; color: #8b95a3; flex-shrink: 0; }
+.build-item-meta { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #8b95a3; font-variant-numeric: tabular-nums; }
+.build-item-price-col { text-align: right; flex-shrink: 0; }
+.build-item-price { font-family: var(--sign); font-size: 17px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.build-item-cta { font-size: 11px; color: #8b95a3; margin-top: 1px; }
 
-/* Selected Segment Configuration Blueprint Card */
+/* Trail signs, as printed on real trail maps */
+.tsign { display: inline-block; width: 12px; height: 12px; flex-shrink: 0; }
+.tsign.green { border-radius: 50%; background: #23a55a; }
+.tsign.blue { background: #2f6fd6; }
+.tsign.black { width: 10px; height: 10px; background: #0b0d10; transform: rotate(45deg); margin: 0 1px; box-shadow: 0 0 0 1.5px #cfd4da; }
+.tsign-pair { display: inline-flex; gap: 3px; }
+
+/* Selected segment */
 .blueprint-card {
-    background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
-    border: 1.5px solid rgba(56, 189, 248, 0.5);
-    border-radius: 14px;
-    padding: 14px;
-    margin-bottom: 14px;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(56, 189, 248, 0.15);
+    background: #1b222c; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+    padding: 14px; margin-bottom: 14px;
 }
 .blueprint-stat-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-    background: rgba(9, 13, 22, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 10px;
-    padding: 8px 10px;
-    margin-bottom: 12px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    padding: 10px 0; margin-bottom: 12px;
+    border-top: 1px solid rgba(255,255,255,0.08); border-bottom: 1px solid rgba(255,255,255,0.08);
 }
-.blueprint-stat-cell {
-    display: flex;
-    flex-direction: column;
-}
-.blueprint-stat-label {
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #64748b;
-    font-weight: 700;
-}
-.blueprint-stat-val {
-    font-size: 12px;
-    font-weight: 700;
-    color: #e2e8f0;
-    font-family: ui-monospace, SFMono-Regular, monospace;
-    margin-top: 1px;
-}
+.blueprint-stat-cell { display: flex; flex-direction: column; }
+.blueprint-stat-label { font-size: 11px; color: #8b95a3; }
+.blueprint-stat-val { font-size: 13px; font-weight: 600; color: #f1f3f5; font-variant-numeric: tabular-nums; margin-top: 1px; }
 
-/* Radio Option Cards inside Blueprint */
 .build-option-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 11px;
-    background: rgba(15, 23, 42, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 9px;
-    cursor: pointer;
-    font-size: 12px;
-    color: #cbd5e1;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 11px; background: transparent; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px; cursor: pointer; font-size: 12.5px; color: #cfd4da;
 }
-.build-option-card:hover {
-    border-color: rgba(255, 255, 255, 0.25);
-    background: rgba(30, 41, 59, 0.8);
-}
-.build-option-card.is-checked {
-    background: rgba(56, 189, 248, 0.15);
-    border-color: #38bdf8;
-    color: #ffffff;
-    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.3);
-}
+.build-option-card:hover { border-color: rgba(255,255,255,0.25); }
+.build-option-card.is-checked { background: color-mix(in oklab, var(--color-primary) 14%, transparent); border-color: var(--color-primary); color: #fff; }
+.build-option-card.is-checked .fa-circle-dot { color: var(--color-primary) !important; }
 .seat-pill-btn {
-    flex: 1;
-    text-align: center;
-    padding: 7px 6px;
-    background: rgba(15, 23, 42, 0.75);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 700;
-    color: #94a3b8;
-    cursor: pointer;
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    flex: 1; text-align: center; padding: 7px 6px; background: transparent;
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+    font-size: 12.5px; font-weight: 600; color: #9aa4b2; cursor: pointer; font-variant-numeric: tabular-nums;
 }
-.seat-pill-btn:hover {
-    border-color: rgba(255, 255, 255, 0.25);
-    color: #f1f5f9;
-}
-.seat-pill-btn.is-checked {
-    background: rgba(245, 158, 11, 0.18);
-    border-color: #f59e0b;
-    color: #fbbf24;
-    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3);
-}
+.seat-pill-btn:hover { border-color: rgba(255,255,255,0.25); color: #f1f3f5; }
+.seat-pill-btn.is-checked { background: color-mix(in oklab, var(--color-primary) 14%, transparent); border-color: var(--color-primary); color: #fff; }
+
+/* Top bar */
+.map-title { font-family: var(--sign); font-size: 24px; font-weight: 700; line-height: 1.05; margin: 0; }
+.map-title span { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; font-weight: 500; margin-left: 6px; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
+.map-counts { display: flex; gap: 12px; margin-top: 2px; font-size: 12px; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.map-counts b { color: var(--color-base-content); font-weight: 600; font-variant-numeric: tabular-nums; }
 </style>
 
 <!-- Top Header Bar -->
-<div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-base-300 bg-base-100/95">
+<div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 border-b border-base-300 bg-base-100">
     <div class="flex items-center gap-2.5">
-        <a href="/resort" class="btn btn-ghost btn-sm btn-circle" title="Back to Resort"><i class="fa-solid fa-arrow-left"></i></a>
+        <a href="/resort" class="btn btn-ghost btn-sm btn-square" title="Back to resort"><i class="fa-solid fa-arrow-left"></i></a>
         <div>
-            <div class="flex items-center gap-2">
-                <h1 class="text-base sm:text-lg font-bold leading-tight">Trail Map</h1>
-                <span class="badge badge-primary badge-sm font-semibold"><?= esc($mapConfig['name']) ?></span>
-            </div>
-            <div class="flex items-center gap-3 text-xs text-base-content/60 mt-0.5">
-                <span class="flex items-center gap-1"><i class="fa-solid fa-person-skiing text-success"></i> <b id="slopeCountEl"><?= $slopeCount ?></b> Slopes</span>
-                <span class="flex items-center gap-1"><i class="fa-solid fa-elevator text-warning"></i> <b id="liftCountEl"><?= $liftCount ?></b> Lifts</span>
-                <span class="flex items-center gap-1"><i class="fa-solid fa-route text-info"></i> <b id="segmentCountEl"><?= $segmentCount ?></b> Total</span>
+            <h1 class="map-title"><?= esc($mapConfig['name']) ?><span>Trail map</span></h1>
+            <div class="map-counts">
+                <span><b id="slopeCountEl"><?= $slopeCount ?></b> slopes</span>
+                <span><b id="liftCountEl"><?= $liftCount ?></b> lifts</span>
+                <span><b id="segmentCountEl"><?= $segmentCount ?></b> segments</span>
             </div>
         </div>
     </div>
@@ -576,8 +330,8 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     <div class="flex items-center gap-1.5 flex-wrap">
         <div class="join bg-base-200/80 p-0.5 rounded-lg border border-base-300 hidden md:flex">
             <button type="button" class="btn btn-xs join-item map-filter-btn btn-primary" data-filter="all">All</button>
-            <button type="button" class="btn btn-xs join-item map-filter-btn btn-ghost" data-filter="lift"><i class="fa-solid fa-elevator text-warning mr-1"></i>Lifts</button>
-            <button type="button" class="btn btn-xs join-item map-filter-btn btn-ghost" data-filter="slope"><i class="fa-solid fa-person-skiing text-success mr-1"></i>Slopes</button>
+            <button type="button" class="btn btn-xs join-item map-filter-btn btn-ghost" data-filter="lift">Lifts</button>
+            <button type="button" class="btn btn-xs join-item map-filter-btn btn-ghost" data-filter="slope">Slopes</button>
             <button type="button" class="btn btn-xs join-item map-filter-btn btn-ghost" data-filter="built">Built</button>
             <?php if ($isAdmin): ?>
             <button type="button" class="btn btn-xs join-item map-filter-btn btn-ghost" data-filter="unassigned" title="Segments with Sector 0">Unassigned</button>
@@ -595,7 +349,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         <?php endif; ?>
 
         <button type="button" id="headerBuildBtn" class="btn btn-primary btn-sm gap-1.5 shadow-sm">
-            <i class="fa-solid fa-hammer"></i> Build Runs
+            <i class="fa-solid fa-hammer"></i> Build
         </button>
 
         <?php if ($isAdmin): ?>
@@ -761,13 +515,13 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
 
     <!-- Map Legend -->
     <div class="map-legend" id="mapLegend">
-        <div class="text-[10px] font-bold uppercase tracking-wider text-base-content/50 mb-0.5">Legend</div>
-        <div class="map-legend-item"><span class="legend-swatch" style="background:#f59e0b"></span> Lift</div>
-        <div class="map-legend-item"><span class="legend-swatch" style="background:#22c55e"></span> Green (Easy)</div>
-        <div class="map-legend-item"><span class="legend-swatch" style="background:#3b82f6"></span> Blue (Intermediate)</div>
-        <div class="map-legend-item"><span class="legend-swatch" style="background:#1e293b;border:1px solid #94a3b8"></span> Black (Advanced)</div>
-        <div class="map-legend-item"><span class="legend-swatch" style="background:#dc2626"></span> Double Black</div>
-        <div class="map-legend-item"><span class="legend-swatch" style="background:#a855f7"></span> Terrain Park / Available</div>
+        <div class="map-legend-title">Trail key</div>
+        <div class="map-legend-item"><span class="legend-sign"><i class="tsign green"></i></span><span class="legend-swatch" style="background:#22c55e"></span>Easiest</div>
+        <div class="map-legend-item"><span class="legend-sign"><i class="tsign blue"></i></span><span class="legend-swatch" style="background:#3b82f6"></span>More difficult</div>
+        <div class="map-legend-item"><span class="legend-sign"><i class="tsign black"></i></span><span class="legend-swatch" style="background:#1e293b"></span>Most difficult</div>
+        <div class="map-legend-item"><span class="legend-sign"><span class="tsign-pair"><i class="tsign black"></i><i class="tsign black"></i></span></span><span class="legend-swatch" style="background:#dc2626"></span>Experts only</div>
+        <div class="map-legend-item"><span class="legend-sign"><i class="fa-solid fa-elevator" style="font-size:11px;color:#b9770e"></i></span><span class="legend-swatch" style="background:#f59e0b"></span>Lift</div>
+        <div class="map-legend-item"><span class="legend-sign"></span><span class="legend-swatch" style="background:#a855f7"></span>Available to build</div>
     </div>
 
     <!-- Player Build Drawer (Docked Floating Panel inside Map Viewport) -->
@@ -778,9 +532,9 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                     <i class="fa-solid fa-hammer"></i>
                 </div>
                 <div class="min-w-0">
-                    <h2 style="font-size:15px;font-weight:800;color:#f8fafc;line-height:1.2">Build Infrastructure</h2>
+                    <h2 style="font-size:15px;font-weight:800;color:#f8fafc;line-height:1.2">Build</h2>
                     <div class="flex items-center gap-1.5 mt-1">
-                        <span style="font-size:11px;color:#94a3b8">Budget:</span>
+                        <span style="font-size:12px;color:#8b95a3">Cash</span>
                         <span class="drawer-cash-pill" id="drawerCashBalance">$<?= number_format($userCashVal) ?></span>
                     </div>
                 </div>
@@ -795,12 +549,12 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
             <div class="drawer-segmented-tabs">
                 <button type="button" class="build-tab drawer-seg-tab is-active" data-tab="lift">
                     <i class="fa-solid fa-elevator" style="color:#fbbf24"></i>
-                    <span>Build Lifts</span>
+                    <span>Lifts</span>
                     <span class="tab-count-pill" id="tabCountLift">0</span>
                 </button>
                 <button type="button" class="build-tab drawer-seg-tab" data-tab="slope">
                     <i class="fa-solid fa-person-skiing" style="color:#4ade80"></i>
-                    <span>Build Slopes</span>
+                    <span>Slopes</span>
                     <span class="tab-count-pill" id="tabCountSlope">0</span>
                 </button>
             </div>
@@ -811,7 +565,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                     <div class="flex items-start justify-between gap-2 mb-2.5">
                         <div class="min-w-0">
                             <div class="flex items-center gap-1.5 mb-1">
-                                <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#38bdf8">Selected Blueprint</span>
+                                <span style="font-size:12px;font-weight:600;color:#38bdf8">Selected</span>
                                 <span id="selSegBadge" class="build-diff-pill"></span>
                             </div>
                             <p style="font-size:15px;font-weight:800;color:#ffffff" class="truncate" id="selSegName">-</p>
@@ -844,7 +598,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                     <!-- Lift Configuration -->
                     <div id="liftOptions">
                         <div class="flex items-center justify-between mb-1.5">
-                            <span style="font-size:11px;font-weight:700;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.04em">Lift System</span>
+                            <span style="font-size:11px;font-weight:700;color:#cbd5e1;">Lift System</span>
                             <span style="font-size:10px;color:#64748b">Hourly Capacity</span>
                         </div>
                         <div class="flex flex-col gap-1.5 mb-3" id="liftTypeGrid">
@@ -857,7 +611,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                                         <div style="font-size:10px;color:#64748b">$80 / m base rate</div>
                                     </div>
                                 </div>
-                                <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fbbf24">1,000/hr</span>
+                                <span style="font-family:var(--sign);font-size:14px;font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;color:#fbbf24">1,000/hr</span>
                             </label>
                             <label class="build-option-card is-checked" data-lift-card="chair_fixed">
                                 <input type="radio" name="liftType" value="chair_fixed" class="hidden" checked>
@@ -868,7 +622,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                                         <div style="font-size:10px;color:#64748b">$150 / m base rate</div>
                                     </div>
                                 </div>
-                                <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fbbf24">2,400/hr</span>
+                                <span style="font-family:var(--sign);font-size:14px;font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;color:#fbbf24">2,400/hr</span>
                             </label>
                             <label class="build-option-card" data-lift-card="chair_detach">
                                 <input type="radio" name="liftType" value="chair_detach" class="hidden">
@@ -879,7 +633,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                                         <div style="font-size:10px;color:#64748b">$250 / m base rate</div>
                                     </div>
                                 </div>
-                                <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fbbf24">3,400/hr</span>
+                                <span style="font-family:var(--sign);font-size:14px;font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;color:#fbbf24">3,400/hr</span>
                             </label>
                             <label class="build-option-card" data-lift-card="gondola">
                                 <input type="radio" name="liftType" value="gondola" class="hidden">
@@ -890,7 +644,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                                         <div style="font-size:10px;color:#64748b">$400 / m base rate</div>
                                     </div>
                                 </div>
-                                <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fbbf24">3,500/hr</span>
+                                <span style="font-family:var(--sign);font-size:14px;font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;color:#fbbf24">3,500/hr</span>
                             </label>
                             <label class="build-option-card" data-lift-card="cable_car">
                                 <input type="radio" name="liftType" value="cable_car" class="hidden">
@@ -901,17 +655,17 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                                         <div style="font-size:10px;color:#64748b">$600 / m base rate</div>
                                     </div>
                                 </div>
-                                <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fbbf24">4,000/hr</span>
+                                <span style="font-family:var(--sign);font-size:14px;font-variant-numeric:tabular-nums;font-size:11px;font-weight:700;color:#fbbf24">4,000/hr</span>
                             </label>
                         </div>
 
-                        <p style="font-size:11px;font-weight:700;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Carrier Size (Seats / Cabin)</p>
+                        <p style="font-size:11px;font-weight:700;color:#cbd5e1;margin-bottom:6px">Carrier Size (Seats / Cabin)</p>
                         <div class="flex gap-1.5 mb-3" id="seatGrid"></div>
                     </div>
 
                     <!-- Slope Configuration -->
                     <div id="slopeOptions">
-                        <p style="font-size:11px;font-weight:700;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Trail Discipline</p>
+                        <p style="font-size:11px;font-weight:700;color:#cbd5e1;margin-bottom:6px">Trail Discipline</p>
                         <div class="grid grid-cols-2 gap-1.5 mb-3" id="slopeTypeGrid">
                             <label class="build-option-card is-checked" data-slope-card="downhill">
                                 <input type="radio" name="slopeType" value="downhill" class="hidden" checked>
@@ -944,10 +698,10 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between pt-3" style="border-top:1px solid rgba(255,255,255,0.1)">
+                    <div class="flex items-center justify-between pt-3" style="border-top:1px solid rgba(255,255,255,0.08)">
                         <div>
-                            <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;font-weight:700">Construction Cost</p>
-                            <p style="font-size:18px;font-weight:800;font-family:monospace;line-height:1.2" id="selSegCost">-</p>
+                            <p style="font-size:10px;color:#94a3b8;font-weight:700">Construction Cost</p>
+                            <p style="font-size:24px;font-weight:600;font-family:var(--sign);font-variant-numeric:tabular-nums;line-height:1.2" id="selSegCost">-</p>
                             <p style="font-size:10px;color:#64748b;font-family:monospace" id="selSegAfterCash"></p>
                         </div>
                         <button type="button" id="btnBuild" class="btn btn-success btn-sm gap-1.5 font-bold shadow-lg px-4" style="height:36px">
@@ -961,7 +715,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
             <div class="flex flex-col gap-2 mb-3">
                 <div class="drawer-search-wrap">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" id="buildSearchInput" class="drawer-search-input" placeholder="Search run or lift by name...">
+                    <input type="text" id="buildSearchInput" class="drawer-search-input" placeholder="Search by name">
                 </div>
                 <div class="flex items-center gap-1.5">
                     <select id="buildDiffFilter" class="drawer-select flex-1" style="display:none">
@@ -995,8 +749,8 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                     <i class="fa-solid fa-compass-drafting"></i>
                 </div>
                 <div class="min-w-0">
-                    <h2 style="font-size:15px;font-weight:800;color:#f8fafc;line-height:1.2">Map Inspector</h2>
-                    <p style="font-size:11px;color:#94a3b8;margin-top:2px">Manage segments & mountain sectors</p>
+                    <h2 style="font-size:15px;font-weight:800;color:#f8fafc;line-height:1.2">Map inspector</h2>
+                    <p style="font-size:12px;color:#8b95a3;margin-top:3px">Segments and sectors</p>
                 </div>
             </div>
             <button type="button" id="closeInspectorBtn" class="drawer-close-btn" title="Close Inspector">
@@ -1008,10 +762,10 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
             <!-- Sectors Management -->
             <div>
                 <div class="flex items-center justify-between mb-2">
-                    <p style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em">Mountain Sectors</p>
+                    <p style="font-size:11px;font-weight:800;color:#94a3b8;">Mountain Sectors</p>
                     <div class="flex gap-1">
                         <button type="button" id="autoAssign" class="btn btn-xs btn-outline btn-info gap-1" title="Auto-assign segments inside sector boundaries">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Assign
+                            <i class="fa-solid fa-object-group"></i> Auto-assign
                         </button>
                         <button type="button" id="newSector" class="btn btn-xs btn-primary gap-1">
                             <i class="fa-solid fa-plus"></i> Add Sector
@@ -1037,7 +791,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
             <!-- Segments Directory -->
             <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:14px">
                 <div class="flex items-center justify-between mb-2.5">
-                    <p style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em">All Segments (<span id="inspectorSegCount"><?= count($segments) ?></span>)</p>
+                    <p style="font-size:11px;font-weight:800;color:#94a3b8;">All Segments (<span id="inspectorSegCount"><?= count($segments) ?></span>)</p>
                     <div class="flex gap-1">
                         <button type="button" class="btn btn-xs btn-warning gap-1 font-bold" id="inspectorNewLiftBtn"><i class="fa-solid fa-plus"></i> Lift</button>
                         <button type="button" class="btn btn-xs btn-success gap-1 font-bold" id="inspectorNewSlopeBtn"><i class="fa-solid fa-plus"></i> Slope</button>
@@ -1461,36 +1215,20 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
 
     function buildEmblemHtml(seg) {
         if (seg.type === 'lift') {
-            return '<div class="build-item-emblem" style="background:rgba(245,158,11,0.16);border:1px solid rgba(245,158,11,0.4);color:#fbbf24;font-size:14px"><i class="fa-solid fa-elevator"></i></div>';
+            return '<div class="build-item-emblem" title="Lift"><i class="fa-solid fa-elevator" style="color:#f0a830;font-size:14px"></i></div>';
         }
         var d = seg.difficulty || 'blue';
-        if (d === 'green') {
-            return '<div class="build-item-emblem" style="background:rgba(34,197,94,0.16);border:1px solid rgba(34,197,94,0.4);color:#4ade80;font-size:16px" title="Green Circle (Easy)">●</div>';
-        }
-        if (d === 'black') {
-            return '<div class="build-item-emblem" style="background:#090d16;border:1.5px solid #94a3b8;color:#f8fafc;font-size:16px" title="Black Diamond (Advanced)">◆</div>';
-        }
-        if (d === 'double_black') {
-            return '<div class="build-item-emblem" style="background:rgba(220,38,38,0.18);border:1px solid rgba(248,113,113,0.5);color:#f87171;font-size:13px;letter-spacing:-2px" title="Double Black Diamond (Expert)">◆◆</div>';
-        }
-        return '<div class="build-item-emblem" style="background:rgba(59,130,246,0.16);border:1px solid rgba(59,130,246,0.45);color:#60a5fa;font-size:14px" title="Blue Square (Intermediate)">■</div>';
+        if (d === 'green') return '<div class="build-item-emblem" title="Easiest"><i class="tsign green"></i></div>';
+        if (d === 'black') return '<div class="build-item-emblem" title="Most difficult"><i class="tsign black"></i></div>';
+        if (d === 'double_black') return '<div class="build-item-emblem" title="Experts only"><span class="tsign-pair"><i class="tsign black"></i><i class="tsign black"></i></span></div>';
+        return '<div class="build-item-emblem" title="More difficult"><i class="tsign blue"></i></div>';
     }
 
     function buildDiffPillHtml(seg) {
-        if (seg.type === 'lift') {
-            return '<span class="build-diff-pill" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.35)">LIFT</span>';
-        }
+        if (seg.type === 'lift') return '<span class="build-diff-pill">Lift</span>';
         var d = seg.difficulty || 'blue';
-        if (d === 'green') {
-            return '<span class="build-diff-pill" style="background:rgba(34,197,94,0.2);color:#4ade80;border:1px solid rgba(34,197,94,0.35)">GREEN</span>';
-        }
-        if (d === 'black') {
-            return '<span class="build-diff-pill" style="background:#090d16;color:#f1f5f9;border:1px solid #94a3b8">BLACK</span>';
-        }
-        if (d === 'double_black') {
-            return '<span class="build-diff-pill" style="background:rgba(220,38,38,0.22);color:#fca5a5;border:1px solid rgba(248,113,113,0.45)">DBL BLACK</span>';
-        }
-        return '<span class="build-diff-pill" style="background:rgba(59,130,246,0.22);color:#93c5fd;border:1px solid rgba(59,130,246,0.4)">BLUE</span>';
+        var names = { green: 'Green', blue: 'Blue', black: 'Black', double_black: 'Double black' };
+        return '<span class="build-diff-pill">' + (names[d] || 'Blue') + '</span>';
     }
 
     function openDrawer(tab) {
@@ -1651,8 +1389,8 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
 
         list.innerHTML =
             '<div class="flex items-center justify-between mb-2 px-0.5">' +
-                '<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8">Available ' + (type === 'lift' ? 'Lifts' : 'Slopes') + ' (' + avail.length + ')</span>' +
-                '<span style="font-size:10px;color:#64748b"><i class="fa-solid fa-hand-pointer mr-1"></i>Click card or purple line</span>' +
+                '<span style="font-size:12px;font-weight:600;color:#cfd4da">' + avail.length + ' available</span>' +
+                '<span style="font-size:11px;color:#7d8794">Pick one here or click a purple line</span>' +
             '</div>';
 
         avail.forEach(function(seg) {
@@ -1665,7 +1403,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
             var canAfford = USER_CASH >= baseCost;
             var lenVal = Math.round(seg.length_meters || 0).toLocaleString();
             var days = (seg.length_meters || 0) < 200 ? 1 : ((seg.length_meters || 0) < 500 ? 2 : 3);
-            var secTag = (seg.sector && Number(seg.sector) > 0) ? ('<span>• ' + escHtml(getSectorName(seg.sector)) + '</span>') : '';
+            var secTag = (seg.sector && Number(seg.sector) > 0) ? ('<span>· ' + escHtml(getSectorName(seg.sector)) + '</span>') : '';
 
             btn.innerHTML =
                 buildEmblemHtml(seg) +
@@ -1675,17 +1413,17 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                         buildDiffPillHtml(seg) +
                     '</div>' +
                     '<div class="build-item-meta">' +
-                        '<span><i class="fa-solid fa-ruler-horizontal" style="font-size:9px;margin-right:3px;opacity:0.7"></i>' + lenVal + ' ' + DIST_UNIT + '</span>' +
-                        '<span>• ' + days + 'd</span>' +
+                        '<span>' + lenVal + ' ' + DIST_UNIT + '</span>' +
+                        '<span>· ' + days + (days === 1 ? ' day' : ' days') + '</span>' +
                         secTag +
                     '</div>' +
                 '</div>' +
                 '<div class="build-item-price-col">' +
-                    '<div class="build-item-price" style="color:' + (canAfford ? '#4ade80' : '#f87171') + '">' +
+                    '<div class="build-item-price" style="color:' + (canAfford ? '#f1f3f5' : '#f87171') + '">' +
                         (seg.type === 'lift' ? '<span style="font-size:9px;color:#94a3b8;font-weight:600;margin-right:2px">from</span>' : '') +
                         '$' + baseCost.toLocaleString() +
                     '</div>' +
-                    '<div class="build-item-cta">' + (isSel ? '✓ Selected' : 'Configure ›') + '</div>' +
+                    '<div class="build-item-cta">' + (isSel ? 'Selected' : 'Configure') + '</div>' +
                 '</div>';
 
             btn.addEventListener('mouseenter', function() {
@@ -1737,17 +1475,11 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         document.getElementById('selSegName').textContent = seg.name || 'Unnamed';
         var badgeEl = document.getElementById('selSegBadge');
         if (badgeEl) {
-            var c = segColor(seg);
-            if (seg.difficulty === 'black') {
-                badgeEl.style.background = '#090d16';
-                badgeEl.style.color = '#f8fafc';
-                badgeEl.style.border = '1px solid #94a3b8';
-            } else {
-                badgeEl.style.background = c;
-                badgeEl.style.color = '#fff';
-                badgeEl.style.border = 'none';
-            }
-            badgeEl.textContent = seg.type === 'lift' ? 'LIFT' : (seg.difficulty ? seg.difficulty.replace('_', ' ') : seg.type);
+            badgeEl.removeAttribute('style');
+            badgeEl.style.display = 'inline-flex';
+            badgeEl.style.alignItems = 'center';
+            badgeEl.style.gap = '6px';
+            badgeEl.innerHTML = buildEmblemHtml(seg).replace('class="build-item-emblem"', 'style="display:inline-flex"') + buildDiffPillHtml(seg);
         }
         document.getElementById('selSegLength').textContent = Math.round(seg.length_meters || 0).toLocaleString() + ' ' + DIST_UNIT;
         var days = (seg.length_meters || 0) < 200 ? 1 : ((seg.length_meters || 0) < 500 ? 2 : 3);
