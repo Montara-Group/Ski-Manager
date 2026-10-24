@@ -32,126 +32,185 @@
             ['/admin/errors', 'fa-bug', 'Errors'],
         ],
     ];
+    $__kpis = [
+        ['fa-users', 'Players', number_format($totalUsers), '+' . $newUsers7d . ' this week' . ($bannedUsers ? ' · ' . $bannedUsers . ' banned' : '')],
+        ['fa-signal', 'Active 24h', number_format($onlineRecent), $__activePct . '% of players'],
+        ['fa-sack-dollar', 'Total cash', currency($totalCash), currency($__avgCash) . ' avg per player'],
+        ['fa-file-invoice-dollar', 'Active loans', number_format($totalLoans), 'across all players'],
+        ['fa-user-group', 'Staff', number_format($totalStaff), 'currently employed'],
+        ['fa-hotel', 'Buildings', number_format($totalBuildings), 'lodges, hotels, restaurants'],
+        ['fa-person-skiing', 'Slopes & lifts', number_format($totalItems), 'built by players'],
+        ['fa-square-parking', 'Parking & parks', number_format($totalParking + $totalParks), $totalParking . ' lots · ' . $totalParks . ' terrain parks'],
+    ];
 ?>
-<div class="max-w-6xl mx-auto p-4 lg:p-8 pb-12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Same visual language as /dashboard */
+.adm { --sign: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; max-width: 1240px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+@media (min-width: 1024px) { .adm { padding: 1.75rem 2rem 3rem; } }
+.adm .muted { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.adm .num { font-variant-numeric: tabular-nums; }
+
+.adm-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.adm-head h1 { font-family: var(--sign); font-size: 2.25rem; font-weight: 700; line-height: 1; margin: 0; }
+.adm-tag { font-family: var(--sign); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 1px 8px 0; border-radius: 3px; line-height: 1.5; }
+.adm-tag.staging { background: var(--color-warning); color: var(--color-warning-content); }
+.adm-tag.prod { background: var(--color-error); color: var(--color-error-content); }
+.adm-tag.maint { color: var(--color-error); box-shadow: inset 0 0 0 1px var(--color-error); }
+.adm-season { width: 100%; max-width: 280px; }
+.adm-season .bar { height: 4px; border-radius: 2px; background: var(--color-base-300); overflow: hidden; margin-top: 0.4rem; }
+.adm-season .bar > span { display: block; height: 100%; background: var(--color-primary); }
+
+.panel { background: var(--color-base-100); border: 1px solid var(--color-base-300); border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); min-width: 0; }
+.panel-body { padding: 0.9rem 1.25rem 1.1rem; }
+.panel-header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding: 0.8rem 1.25rem 0.7rem; border-bottom: 1px solid var(--color-base-300); }
+.panel-title { font-family: var(--sign); font-size: 1.1875rem; font-weight: 600; line-height: 1.2; margin: 0; }
+.panel-title .aside { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 0.75rem; font-weight: 400; margin-left: 0.5em; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
+.panel-link { font-size: 0.75rem; font-weight: 500; white-space: nowrap; text-decoration: none; color: var(--color-primary); }
+.panel-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Toolbar: section links on the left, game controls on the right */
+.adm-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1.5rem; padding: 0.6rem 0.9rem; margin-bottom: 1.25rem; }
+.adm-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.25rem; }
+.adm-nav-group { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem; }
+.adm-nav-group > span { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-right: 0.35rem; color: color-mix(in oklab, var(--color-base-content) 45%, transparent); }
+.adm-nav a { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.3rem 0.5rem; border-radius: 6px; font-size: 0.8125rem; font-weight: 500; text-decoration: none; color: inherit; }
+.adm-nav a:hover { background: var(--color-base-200); color: var(--color-primary); }
+.adm-nav a i { opacity: 0.55; font-size: 0.75rem; }
+.adm-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.tick-status { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8125rem; margin-right: 0.25rem; }
+.adm .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+/* Headline numbers: one joined strip, like the dashboard */
+.kpis { display: grid; grid-template-columns: repeat(2, 1fr); margin-bottom: 1.25rem; }
+@media (min-width: 1024px) { .kpis { grid-template-columns: repeat(4, 1fr); } }
+.kpi { padding: 0.95rem 1.25rem 1.05rem; min-width: 0; }
+.kpi:nth-child(even) { border-left: 1px solid var(--color-base-300); }
+.kpi:nth-child(n+3) { border-top: 1px solid var(--color-base-300); }
+@media (min-width: 1024px) {
+    .kpi:nth-child(-n+4) { border-top: 0; }
+    .kpi:not(:nth-child(4n+1)) { border-left: 1px solid var(--color-base-300); }
+}
+.kpi-label { font-size: 0.75rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; color: color-mix(in oklab, var(--color-base-content) 62%, transparent); }
+.kpi-value { font-family: var(--sign); font-size: 2.125rem; font-weight: 600; line-height: 1.1; margin-top: 0.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .kpi { padding: 0.8rem 0.9rem 0.9rem; } .kpi-value { font-size: 1.625rem; } }
+.kpi-sub { font-size: 0.75rem; margin-top: 0.3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: color-mix(in oklab, var(--color-base-content) 62%, transparent); }
+
+.adm-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
+@media (min-width: 1024px) { .adm-grid.main { grid-template-columns: 2fr 1fr; } .adm-grid.tools { grid-template-columns: repeat(3, 1fr); } }
+
+.adm [data-filter].on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-primary-content); }
+.players th { white-space: nowrap; }
+.players th[data-sort] { cursor: pointer; user-select: none; }
+.players th[data-sort]:hover { color: var(--color-primary); }
+.players th[aria-sort="ascending"]::after { content: ' ▲'; font-size: 0.6rem; }
+.players th[aria-sort="descending"]::after { content: ' ▼'; font-size: 0.6rem; }
+.players tbody tr.player-row:hover { background: var(--color-base-200); }
+
+.feed-item { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.55rem 1.25rem; font-size: 0.8125rem; }
+.feed-item + .feed-item { border-top: 1px solid var(--color-base-300); }
+.feed-item > i { width: 1rem; text-align: center; margin-top: 0.15rem; opacity: 0.5; }
+
+.field-label { display: block; font-size: 0.75rem; margin-bottom: 0.2rem; color: color-mix(in oklab, var(--color-base-content) 62%, transparent); }
+.adm .row { display: flex; justify-content: space-between; gap: 1rem; font-size: 0.8125rem; padding: 0.2rem 0; }
+.meter { height: 4px; border-radius: 2px; background: var(--color-base-300); overflow: hidden; margin-top: 0.35rem; }
+.meter > span { display: block; height: 100%; }
+</style>
+
+<div class="adm">
 
     <!-- Header -->
-    <div class="flex flex-wrap items-end justify-between gap-4 mb-5">
+    <div class="adm-head">
         <div>
-            <div class="flex items-center gap-2 mb-1">
-                <h1 class="text-2xl font-bold"><i class="fa-solid fa-shield-halved mr-2 text-error"></i>Admin</h1>
-                <?php if ($isStaging) : ?>
-                    <span class="badge badge-warning font-semibold">Staging</span>
-                <?php else : ?>
-                    <span class="badge badge-error font-semibold">Production</span>
-                <?php endif ?>
-                <?php if ($__maintenance) : ?><span class="badge badge-error badge-outline gap-1"><i class="fa-solid fa-wrench text-[10px]"></i>Maintenance</span><?php endif ?>
+            <div class="flex flex-wrap items-center gap-2">
+                <h1>Admin</h1>
+                <span class="adm-tag <?= $isStaging ? 'staging' : 'prod' ?>"><?= $isStaging ? 'Staging' : 'Production' ?></span>
+                <?php if ($__maintenance) : ?><span class="adm-tag maint">Maintenance</span><?php endif ?>
             </div>
-            <div class="text-xs text-base-content/50">Season started <?= esc($season['start_date'] ?? 'N/A') ?> · Server time <?= date('g:ia') ?> (<?= esc(date_default_timezone_get()) ?>)</div>
+            <div class="text-xs muted mt-1.5">Season started <?= esc($season['start_date'] ?? 'N/A') ?> · Server time <?= date('g:ia') ?> (<?= esc(date_default_timezone_get()) ?>)</div>
         </div>
-        <div class="w-full sm:w-64">
-            <div class="flex justify-between text-xs mb-1"><span class="font-semibold">Day <?= $gameDay ?> of <?= $__seasonLen ?></span><?php if ($gameDay > $__seasonLen) : ?><a href="/admin/seasons" class="link link-hover text-warning font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i><?= $gameDay - $__seasonLen ?> days past season end</a><?php else : ?><span class="text-base-content/50"><?= $__seasonPct ?>%</span><?php endif ?></div>
-            <progress class="progress <?= $gameDay > $__seasonLen ? 'progress-warning' : 'progress-primary' ?> w-full" value="<?= $__seasonPct ?>" max="100"></progress>
+        <div class="adm-season">
+            <div class="flex justify-between text-xs">
+                <span class="font-semibold num">Day <?= $gameDay ?> of <?= $__seasonLen ?></span>
+                <span class="muted num"><?= $gameDay >= $__seasonLen ? 'final day' : ($__seasonLen - $gameDay) . ' days left' ?></span>
+            </div>
+            <div class="bar"><span style="width: <?= $__seasonPct ?>%"></span></div>
         </div>
     </div>
 
     <?php if (session('success')) : ?><div role="alert" class="alert alert-success mb-4"><i class="fa-solid fa-circle-check"></i><span><?= esc(session('success')) ?></span></div><?php endif ?>
     <?php if (session('error')) : ?><div role="alert" class="alert alert-error mb-4"><i class="fa-solid fa-circle-exclamation"></i><span><?= esc(session('error')) ?></span></div><?php endif ?>
 
-    <!-- Navigation -->
-    <nav class="card bg-base-100 shadow-sm mb-4" aria-label="Admin sections"><div class="card-body p-3">
-        <div class="flex flex-wrap gap-x-6 gap-y-3">
+    <!-- Sections + controls -->
+    <div class="panel adm-toolbar">
+        <nav class="adm-nav" aria-label="Admin sections">
             <?php foreach ($__navGroups as $__group => $__links) : ?>
-                <div>
-                    <div class="text-[10px] uppercase tracking-wide text-base-content/40 font-semibold mb-1"><?= $__group ?></div>
-                    <div class="flex flex-wrap gap-1">
-                        <?php foreach ($__links as $__l) : ?>
-                            <a href="<?= $__l[0] ?>" class="btn btn-ghost btn-sm gap-1.5"><i class="fa-solid <?= $__l[1] ?> text-base-content/50"></i><?= $__l[2] ?><?php if (!empty($__l[3])) : ?><span class="badge badge-error badge-xs"><?= (int) $__l[3] ?></span><?php endif ?></a>
-                        <?php endforeach ?>
-                    </div>
+                <div class="adm-nav-group">
+                    <span><?= $__group ?></span>
+                    <?php foreach ($__links as $__l) : ?>
+                        <a href="<?= $__l[0] ?>"><i class="fa-solid <?= $__l[1] ?>" aria-hidden="true"></i><?= $__l[2] ?><?php if (!empty($__l[3])) : ?><span class="badge badge-error badge-xs"><?= (int) $__l[3] ?></span><?php endif ?></a>
+                    <?php endforeach ?>
                 </div>
             <?php endforeach ?>
-        </div>
-    </div></nav>
-
-    <!-- Game controls -->
-    <div class="card bg-base-100 shadow-sm mb-6 <?= $__maintenance ? 'ring-2 ring-error' : '' ?>"><div class="card-body p-3">
-        <div class="flex flex-wrap items-center gap-3">
-            <div class="flex items-center gap-2 text-sm mr-auto">
-                <span class="inline-block w-2 h-2 rounded-full <?= $__tickStale ? 'bg-error' : 'bg-success' ?>"></span>
-                <span class="text-base-content/60">Last tick:</span>
-                <?php if ($lastTick) : ?>
-                    <span class="font-semibold <?= $__tickStale ? 'text-error' : '' ?>" title="<?= esc($lastTick['created_at']) ?>"><?= timeAgo($lastTick['created_at']) ?></span>
-                    <span class="text-xs text-base-content/40">(wrote day <?= (int) $lastTick['game_day'] ?>)</span>
-                <?php else : ?>
-                    <span class="font-semibold text-error">never</span>
-                <?php endif ?>
-            </div>
+        </nav>
+        <div class="adm-controls">
+            <span class="tick-status" title="<?= $lastTick ? esc($lastTick['created_at']) : '' ?>">
+                <span class="dot <?= $__tickStale ? 'bg-error' : 'bg-success' ?>"></span>
+                <span class="muted">Last tick</span>
+                <b class="<?= $__tickStale ? 'text-error' : '' ?>"><?= $lastTick ? timeAgo($lastTick['created_at']) : 'never' ?></b>
+            </span>
             <form action="/admin/maintenance" method="post" onsubmit="return confirm('<?= $__maintenance ? 'Turn maintenance OFF and reopen the site to players?' : 'Turn maintenance ON? Players will see a 503 page.' ?>')"><?= csrf_field() ?>
-                <button class="btn btn-sm <?= $__maintenance ? 'btn-error' : 'btn-outline' ?> gap-1"><i class="fa-solid fa-wrench"></i>Maintenance: <?= $__maintenance ? 'ON' : 'off' ?></button>
+                <button class="btn btn-xs <?= $__maintenance ? 'btn-error' : 'btn-ghost' ?> gap-1"><i class="fa-solid fa-wrench"></i>Maintenance <?= $__maintenance ? 'on' : 'off' ?></button>
             </form>
             <form action="/admin/toggle-env" method="post"><?= csrf_field() ?>
-                <button class="btn btn-sm <?= ENVIRONMENT === 'development' ? 'btn-warning' : 'btn-outline' ?> gap-1" <?= $__envWritable ? '' : 'disabled' ?> title="<?= $__envWritable ? 'Toggle CI_ENVIRONMENT between development and production' : '.env is read-only on the server (edit it directly or chmod 664 .env)' ?>">
-                    <i class="fa-solid fa-code"></i><?= ENVIRONMENT === 'development' ? 'DEV mode' : 'PROD mode' ?>
-                    <?php if (!$__envWritable) : ?><i class="fa-solid fa-lock text-[10px] opacity-70"></i><?php endif ?>
+                <button class="btn btn-xs <?= ENVIRONMENT === 'development' ? 'btn-warning' : 'btn-ghost' ?> gap-1" <?= $__envWritable ? '' : 'disabled' ?> title="<?= $__envWritable ? 'Toggle CI_ENVIRONMENT between development and production' : '.env is read-only on the server (edit it directly or chmod 664 .env)' ?>">
+                    <i class="fa-solid fa-code"></i><?= ENVIRONMENT === 'development' ? 'Dev mode' : 'Prod mode' ?><?php if (!$__envWritable) : ?> <i class="fa-solid fa-lock text-[10px] opacity-70"></i><?php endif ?>
                 </button>
             </form>
             <form action="/admin/trigger-tick" method="post" onsubmit="return confirm('Run the game tick on <?= $isStaging ? 'STAGING' : 'PRODUCTION' ?> now? This advances every player by a day.')"><?= csrf_field() ?>
-                <button class="btn btn-error btn-sm gap-1"><i class="fa-solid fa-play"></i>Run tick</button>
+                <button class="btn btn-xs btn-primary gap-1"><i class="fa-solid fa-play"></i>Run tick</button>
             </form>
         </div>
-    </div></div>
-
-    <!-- KPIs -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <?php
-            $__kpis = [
-                ['fa-users', 'Players', number_format($totalUsers), '+' . $newUsers7d . ' this week' . ($bannedUsers ? ' · ' . $bannedUsers . ' banned' : ''), ''],
-                ['fa-signal', 'Active 24h', number_format($onlineRecent), $__activePct . '% of players', 'text-success'],
-                ['fa-coins', 'Total cash', currency($totalCash), currency($__avgCash) . ' avg per player', 'text-success'],
-                ['fa-file-invoice-dollar', 'Active loans', number_format($totalLoans), '', 'text-warning'],
-                ['fa-user-group', 'Staff', number_format($totalStaff), '', ''],
-                ['fa-hotel', 'Buildings', number_format($totalBuildings), '', ''],
-                ['fa-person-skiing', 'Slopes & lifts', number_format($totalItems), '', ''],
-                ['fa-square-parking', 'Parking & parks', number_format($totalParking + $totalParks), $totalParking . ' lots · ' . $totalParks . ' parks', ''],
-            ];
-        ?>
-        <?php foreach ($__kpis as [$__icon, $__label, $__value, $__sub, $__color]) : ?>
-            <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 gap-0.5">
-                <div class="text-xs text-base-content/50"><i class="fa-solid <?= $__icon ?> fa-fw mr-1"></i><?= $__label ?></div>
-                <div class="text-xl sm:text-2xl font-bold whitespace-nowrap <?= $__color ?>"><?= $__value ?></div>
-                <?php if ($__sub) : ?><div class="text-[11px] text-base-content/40"><?= esc($__sub) ?></div><?php endif ?>
-            </div></div>
-        <?php endforeach ?>
     </div>
 
+    <!-- Headline numbers -->
+    <section class="panel kpis" aria-label="Key numbers">
+        <?php foreach ($__kpis as [$__icon, $__label, $__value, $__sub]) : ?>
+            <div class="kpi">
+                <div class="kpi-label"><i class="fa-solid <?= $__icon ?> opacity-60" aria-hidden="true"></i><?= $__label ?></div>
+                <div class="kpi-value"><?= $__value ?></div>
+                <div class="kpi-sub"><?= esc($__sub) ?></div>
+            </div>
+        <?php endforeach ?>
+    </section>
+
     <!-- Players + activity -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div class="lg:col-span-2 min-w-0">
-            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-                <h2 class="text-lg font-bold"><i class="fa-solid fa-users mr-1"></i>Players <span class="text-xs font-normal text-base-content/50">newest <?= count($users) ?> of <?= number_format($totalUsers) ?></span></h2>
+    <div class="adm-grid main">
+        <section class="panel flex flex-col">
+            <div class="panel-header flex-wrap">
+                <h2 class="panel-title">Players <span class="aside">newest <?= count($users) ?> of <?= number_format($totalUsers) ?></span></h2>
                 <div class="flex items-center gap-2">
                     <div class="join" role="group" aria-label="Filter players">
-                        <button type="button" class="btn btn-xs join-item btn-active" data-filter="all">All</button>
+                        <button type="button" class="btn btn-xs join-item on" data-filter="all">All</button>
                         <button type="button" class="btn btn-xs join-item" data-filter="online">Online</button>
                         <button type="button" class="btn btn-xs join-item" data-filter="banned">Banned</button>
                     </div>
-                    <search>
-                        <input type="search" id="playerSearch" placeholder="Name or ID…" aria-label="Search players" class="input input-bordered input-xs w-36">
-                    </search>
+                    <search><input type="search" id="playerSearch" placeholder="Name or ID…" aria-label="Search players" class="input input-xs w-32"></search>
                 </div>
             </div>
-            <div class="card bg-base-100 shadow-sm"><div class="card-body p-0"><div class="overflow-auto max-h-[600px]">
-                <table class="table table-sm table-pin-rows" id="playerTable">
-                    <thead class="bg-base-100 z-10"><tr>
-                        <th data-sort="num" class="cursor-pointer select-none">ID</th>
-                        <th data-sort="text" class="cursor-pointer select-none">Username</th>
-                        <th data-sort="num" class="cursor-pointer select-none text-right">Cash</th>
-                        <th data-sort="num" class="cursor-pointer select-none text-right" title="Staff">Staff</th>
-                        <th data-sort="num" class="cursor-pointer select-none text-right" title="Buildings">Bldg</th>
-                        <th data-sort="num" class="cursor-pointer select-none text-right" title="Slopes and lifts">Items</th>
-                        <th data-sort="num" class="cursor-pointer select-none">Joined</th>
-                        <th data-sort="num" class="cursor-pointer select-none">Last active</th>
+            <div class="overflow-auto max-h-[560px]">
+                <table class="table table-sm table-pin-rows players" id="playerTable">
+                    <thead><tr>
+                        <th data-sort="num">ID</th>
+                        <th data-sort="text">Player</th>
+                        <th data-sort="num" class="text-right">Cash</th>
+                        <th data-sort="num" class="text-right">Staff</th>
+                        <th data-sort="num" class="text-right" title="Buildings">Bldg</th>
+                        <th data-sort="num" class="text-right" title="Slopes and lifts">Items</th>
+                        <th data-sort="num">Joined</th>
+                        <th data-sort="num">Last active</th>
                         <th><span class="sr-only">Actions</span></th>
                     </tr></thead>
                     <tbody>
@@ -161,20 +220,19 @@
                             $__lastTs = !empty($u['last_active']) ? strtotime($u['last_active']) : 0;
                             $__online = $__lastTs > strtotime('-15 minutes');
                         ?>
-                        <tr class="player-row hover:bg-base-200 <?= $__banned ? 'opacity-50' : '' ?>" data-online="<?= $__online ? 1 : 0 ?>" data-banned="<?= $__banned ? 1 : 0 ?>">
-                            <td data-v="<?= (int) $u['id'] ?>" class="text-base-content/50"><?= (int) $u['id'] ?></td>
-                            <td data-v="<?= esc(strtolower($u['username'] ?? '')) ?>" class="font-semibold whitespace-nowrap">
+                        <tr class="player-row <?= $__banned ? 'opacity-50' : '' ?>" data-online="<?= $__online ? 1 : 0 ?>" data-banned="<?= $__banned ? 1 : 0 ?>">
+                            <td data-v="<?= (int) $u['id'] ?>" class="muted num"><?= (int) $u['id'] ?></td>
+                            <td data-v="<?= esc(strtolower($u['username'] ?? '')) ?>" class="font-medium whitespace-nowrap">
                                 <a href="/admin/user/<?= (int) $u['id'] ?>" class="link link-hover"><?= esc($u['username']) ?></a>
                                 <?php if ($__banned) : ?><span class="badge badge-error badge-xs ml-1">Banned</span><?php endif ?>
                             </td>
-                            <td data-v="<?= $u['cash'] ?>" class="font-mono text-xs text-right whitespace-nowrap <?= $u['cash'] < 0 ? 'text-error' : '' ?>"><?= currency($u['cash']) ?></td>
-                            <td data-v="<?= $u['staff_count'] ?>" class="text-right"><?= $u['staff_count'] ?></td>
-                            <td data-v="<?= $u['building_count'] ?>" class="text-right"><?= $u['building_count'] ?></td>
-                            <td data-v="<?= $u['item_count'] ?>" class="text-right"><?= $u['item_count'] ?></td>
-                            <td data-v="<?= strtotime($u['created_at']) ?>" class="text-xs text-base-content/50 whitespace-nowrap" title="<?= esc($u['created_at']) ?>"><?= date('M j', strtotime($u['created_at'])) ?></td>
-                            <td data-v="<?= $__lastTs ?>" class="text-xs whitespace-nowrap <?= $__lastTs > strtotime('-1 hour') ? 'text-success font-semibold' : 'text-base-content/50' ?>" title="<?= $u['last_activity'] ? esc($u['last_activity']['message']) : '' ?>">
-                                <?php if ($__online) : ?><span class="inline-block w-2 h-2 rounded-full bg-success mr-1" title="Online now"></span><?php endif ?>
-                                <?= $__lastTs ? timeAgo($u['last_active']) : 'Never' ?>
+                            <td data-v="<?= $u['cash'] ?>" class="num text-right whitespace-nowrap <?= $u['cash'] < 0 ? 'text-error' : '' ?>"><?= currency($u['cash']) ?></td>
+                            <td data-v="<?= $u['staff_count'] ?>" class="num text-right"><?= $u['staff_count'] ?></td>
+                            <td data-v="<?= $u['building_count'] ?>" class="num text-right"><?= $u['building_count'] ?></td>
+                            <td data-v="<?= $u['item_count'] ?>" class="num text-right"><?= $u['item_count'] ?></td>
+                            <td data-v="<?= strtotime($u['created_at']) ?>" class="text-xs muted whitespace-nowrap" title="<?= esc($u['created_at']) ?>"><?= date('M j', strtotime($u['created_at'])) ?></td>
+                            <td data-v="<?= $__lastTs ?>" class="text-xs whitespace-nowrap <?= $__lastTs > strtotime('-1 hour') ? 'text-success font-semibold' : 'muted' ?>" title="<?= $u['last_activity'] ? esc($u['last_activity']['message']) : '' ?>">
+                                <?php if ($__online) : ?><span class="dot bg-success mr-1" title="Online now"></span><?php endif ?><?= $__lastTs ? timeAgo($u['last_active']) : 'Never' ?>
                             </td>
                             <td>
                                 <div class="flex gap-0.5 justify-end">
@@ -191,129 +249,105 @@
                             </td>
                         </tr>
                     <?php endforeach ?>
-                    <tr id="noResults" class="hidden"><td colspan="9" class="text-center text-base-content/40 py-6">No players match.</td></tr>
+                    <tr id="noResults" class="hidden"><td colspan="9" class="text-center muted py-6">No players match.</td></tr>
                     </tbody>
                 </table>
-            </div></div></div>
-        </div>
-
-        <div class="min-w-0">
-            <div class="flex items-center justify-between mb-3">
-                <h2 class="text-lg font-bold"><i class="fa-solid fa-clock-rotate-left mr-1"></i>Activity</h2>
-                <a href="/admin/activity" class="link link-hover text-xs text-base-content/50">View all</a>
             </div>
-            <div class="card bg-base-100 shadow-sm"><div class="card-body p-0">
-                <div class="divide-y divide-base-300 max-h-[600px] overflow-y-auto">
-                <?php if (empty($recentLogs)) : ?>
-                    <div class="p-6 text-center text-xs text-base-content/40">No activity yet.</div>
-                <?php endif ?>
+        </section>
+
+        <section class="panel flex flex-col">
+            <div class="panel-header">
+                <h2 class="panel-title">Activity</h2>
+                <a href="/admin/activity" class="panel-link">View all</a>
+            </div>
+            <div class="overflow-y-auto max-h-[560px] py-1">
+                <?php if (empty($recentLogs)) : ?><div class="p-6 text-center text-sm muted">No activity yet.</div><?php endif ?>
                 <?php foreach ($recentLogs as $log) : ?>
-                    <div class="flex items-start gap-2 p-2 text-xs">
-                        <i class="<?= esc($log['icon'], 'attr') ?> text-base-content/50 w-4 text-center mt-0.5"></i>
+                    <div class="feed-item">
+                        <i class="<?= esc($log['icon'], 'attr') ?>" aria-hidden="true"></i>
                         <div class="flex-1 min-w-0">
                             <div class="truncate" title="<?= esc($log['message']) ?>"><span class="font-semibold text-primary"><?= esc($log['username']) ?></span> <?= esc($log['message']) ?></div>
-                            <div class="text-[10px] text-base-content/40">Day <?= (int) $log['game_day'] ?> · <?= timeAgo($log['created_at']) ?></div>
+                            <div class="text-[11px] muted">Day <?= (int) $log['game_day'] ?> · <?= timeAgo($log['created_at']) ?></div>
                         </div>
                     </div>
                 <?php endforeach ?>
-                </div>
-            </div></div>
-        </div>
+            </div>
+        </section>
     </div>
 
     <!-- Tools -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
-            <h2 class="font-bold text-sm mb-1"><i class="fa-solid fa-cloud-sun mr-1 text-info"></i>Weather</h2>
-            <?php if ($weather) : ?>
-                <?php
-                    $__cond = $weather['condition_name'] ?? '';
-                    $__wicon = match(true) {
-                        stripos($__cond, 'blizzard') !== false => 'fa-wind text-info',
-                        stripos($__cond, 'snow') !== false => 'fa-snowflake text-info',
-                        stripos($__cond, 'rain') !== false => 'fa-cloud-rain text-info',
-                        stripos($__cond, 'fog') !== false => 'fa-smog text-base-content/50',
-                        stripos($__cond, 'cloud') !== false => 'fa-cloud text-base-content/50',
-                        stripos($__cond, 'sun') !== false => 'fa-sun text-warning',
-                        default => 'fa-cloud-sun text-warning',
-                    };
-                ?>
-                <div class="flex items-center gap-3 rounded-box bg-base-200 p-3 mb-3">
-                    <i class="fa-solid <?= $__wicon ?> text-2xl"></i>
-                    <div class="flex-1">
-                        <div class="font-semibold text-sm"><?= esc($__cond) ?></div>
-                        <div class="text-[11px] text-base-content/50">Now · <?= temp($weather['temp']) ?> · <?= speed($weather['wind']) ?> · <?= snow($weather['snow_base']) ?> base</div>
-                    </div>
-                </div>
-            <?php endif ?>
-            <form action="/admin/set-weather" method="post"><?= csrf_field() ?>
-                <div class="grid grid-cols-2 gap-2 mb-3">
-                    <div class="col-span-2"><label class="label text-xs py-0" for="wCond">Condition</label>
-                    <select name="condition" id="wCond" class="select select-bordered select-xs w-full">
+    <div class="adm-grid tools">
+        <section class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Weather</h2>
+                <?php if ($weather) : ?><span class="text-xs muted whitespace-nowrap"><i class="fa-solid <?= weatherIcon($weather['condition_name'] ?? '') ?> mr-1"></i><?= esc($weather['condition_name'] ?? '') ?> · <?= temp($weather['temp']) ?></span><?php endif ?>
+            </div>
+            <form action="/admin/set-weather" method="post" class="panel-body"><?= csrf_field() ?>
+                <div class="grid grid-cols-2 gap-x-3 gap-y-2.5 mb-3">
+                    <div class="col-span-2"><label class="field-label" for="wCond">Condition</label>
+                    <select name="condition" id="wCond" class="select select-sm w-full">
                         <?php foreach (['Sunny', 'Partly Cloudy', 'Cloudy', 'Light Snow', 'Heavy Snow', 'Blizzard', 'Freezing Rain'] as $__c) : ?>
                             <option value="<?= $__c ?>" <?= ($weather['condition_name'] ?? 'Light Snow') === $__c ? 'selected' : '' ?>><?= $__c ?></option>
                         <?php endforeach ?>
                     </select></div>
-                    <div><label class="label text-xs py-0" for="wTemp">Temp (°C)</label>
-                    <input type="number" name="temp" id="wTemp" value="<?= (int) ($weather['temp'] ?? -5) ?>" class="input input-bordered input-xs w-full" min="-30" max="30"></div>
-                    <div><label class="label text-xs py-0" for="wWind">Wind (km/h)</label>
-                    <input type="number" name="wind" id="wWind" value="<?= (int) ($weather['wind'] ?? 15) ?>" class="input input-bordered input-xs w-full" min="0" max="120"></div>
-                    <div><label class="label text-xs py-0" for="wSnow">Snowfall (cm)</label>
-                    <input type="number" name="snowfall" id="wSnow" value="<?= (int) ($weather['snowfall'] ?? 0) ?>" class="input input-bordered input-xs w-full" min="0" max="50"></div>
-                    <div><label class="label text-xs py-0" for="wBase">Snow base (cm)</label>
-                    <input type="number" name="snow_base" id="wBase" value="<?= (int) ($weather['snow_base'] ?? 50) ?>" class="input input-bordered input-xs w-full" min="0" max="300"></div>
+                    <div><label class="field-label" for="wTemp">Temp (°C)</label><input type="number" name="temp" id="wTemp" value="<?= (int) ($weather['temp'] ?? -5) ?>" class="input input-sm w-full" min="-30" max="30"></div>
+                    <div><label class="field-label" for="wWind">Wind (km/h)</label><input type="number" name="wind" id="wWind" value="<?= (int) ($weather['wind'] ?? 15) ?>" class="input input-sm w-full" min="0" max="120"></div>
+                    <div><label class="field-label" for="wSnow">Snowfall (cm)</label><input type="number" name="snowfall" id="wSnow" value="<?= (int) ($weather['snowfall'] ?? 0) ?>" class="input input-sm w-full" min="0" max="50"></div>
+                    <div><label class="field-label" for="wBase">Snow base (cm)</label><input type="number" name="snow_base" id="wBase" value="<?= (int) ($weather['snow_base'] ?? 50) ?>" class="input input-sm w-full" min="0" max="300"></div>
                 </div>
-                <button class="btn btn-info btn-sm w-full gap-1"><i class="fa-solid fa-cloud-sun"></i>Apply weather</button>
+                <button class="btn btn-sm btn-primary w-full">Apply weather</button>
             </form>
-        </div></div>
+        </section>
 
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
-            <h2 class="font-bold text-sm mb-3"><i class="fa-solid fa-bolt mr-1 text-warning"></i>Bulk actions <span class="badge badge-warning badge-xs">All players</span></h2>
-            <div class="space-y-3">
+        <section class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Bulk actions</h2>
+                <span class="text-xs text-warning whitespace-nowrap">all <?= (int) $totalUsers ?> players</span>
+            </div>
+            <div class="panel-body space-y-3">
                 <form action="/admin/add-cash-all" method="post" onsubmit="return confirm('Give ' + Number(this.amount.value).toLocaleString() + ' cash to ALL <?= (int) $totalUsers ?> players? This affects the economy and leaderboard.')"><?= csrf_field() ?>
-                    <label class="label text-xs py-0" for="cashAll"><span><i class="fa-solid fa-coins text-success mr-1"></i>Give cash to everyone</span></label>
+                    <label class="field-label" for="cashAll">Give cash to everyone</label>
                     <div class="join w-full">
-                        <input type="number" name="amount" id="cashAll" value="10000" min="1" max="10000000" class="input input-bordered input-xs join-item flex-1" placeholder="Amount">
-                        <button class="btn btn-success btn-xs join-item gap-1"><i class="fa-solid fa-paper-plane"></i>Give</button>
+                        <input type="number" name="amount" id="cashAll" value="10000" min="1" max="10000000" class="input input-sm join-item flex-1 min-w-0">
+                        <button class="btn btn-sm join-item">Give</button>
                     </div>
                 </form>
                 <form action="/admin/add-genepis-all" method="post" onsubmit="return confirm('Give ' + Number(this.amount.value).toLocaleString() + ' Genepis to ALL <?= (int) $totalUsers ?> players?')"><?= csrf_field() ?>
-                    <label class="label text-xs py-0" for="genAll"><span><i class="fa-solid fa-seedling text-info mr-1"></i>Give Genepis to everyone</span></label>
+                    <label class="field-label" for="genAll">Give Genepis to everyone</label>
                     <div class="join w-full">
-                        <input type="number" name="amount" id="genAll" value="100" min="1" max="100000" class="input input-bordered input-xs join-item flex-1" placeholder="Amount">
-                        <button class="btn btn-info btn-xs join-item gap-1"><i class="fa-solid fa-paper-plane"></i>Give</button>
+                        <input type="number" name="amount" id="genAll" value="100" min="1" max="100000" class="input input-sm join-item flex-1 min-w-0">
+                        <button class="btn btn-sm join-item">Give</button>
                     </div>
                 </form>
-                <div class="divider my-1 text-[10px] text-base-content/40">Single player</div>
-                <form action="/admin/grant-achievement" method="post" onsubmit="return confirm('Grant achievement #' + this.achievement_id.value + ' to user #' + this.user_id.value + '?')"><?= csrf_field() ?>
-                    <label class="label text-xs py-0"><span><i class="fa-solid fa-trophy text-warning mr-1"></i>Grant achievement</span></label>
+                <form action="/admin/grant-achievement" method="post" class="pt-3 border-t border-base-300" onsubmit="return confirm('Grant achievement #' + this.achievement_id.value + ' to user #' + this.user_id.value + '?')"><?= csrf_field() ?>
+                    <label class="field-label">Grant achievement to one player</label>
                     <div class="join w-full">
-                        <input type="number" name="user_id" min="1" class="input input-bordered input-xs join-item flex-1 min-w-0" placeholder="User ID" aria-label="User ID" required>
-                        <input type="number" name="achievement_id" min="1" class="input input-bordered input-xs join-item flex-1 min-w-0" placeholder="Ach. ID" aria-label="Achievement ID" required>
-                        <button class="btn btn-warning btn-xs join-item gap-1"><i class="fa-solid fa-check"></i>Grant</button>
+                        <input type="number" name="user_id" min="1" class="input input-sm join-item flex-1 min-w-0" placeholder="User ID" aria-label="User ID" required>
+                        <input type="number" name="achievement_id" min="1" class="input input-sm join-item flex-1 min-w-0" placeholder="Achievement ID" aria-label="Achievement ID" required>
+                        <button class="btn btn-sm join-item">Grant</button>
                     </div>
                 </form>
             </div>
-        </div></div>
+        </section>
 
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
-            <h2 class="font-bold text-sm mb-3"><i class="fa-solid fa-server mr-1 text-primary"></i>Server health</h2>
-            <div class="mb-3">
-                <div class="flex justify-between text-xs mb-1"><span class="text-base-content/50"><i class="fa-solid fa-hard-drive mr-1"></i>Disk</span><span class="font-mono"><?= $__gb($server['diskUsed']) ?> / <?= $__gb($server['diskTotal']) ?></span></div>
-                <progress class="progress <?= $server['diskPct'] > 85 ? 'progress-error' : ($server['diskPct'] > 70 ? 'progress-warning' : 'progress-success') ?> w-full" value="<?= $server['diskPct'] ?>" max="100"></progress>
+        <section class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Server</h2>
+                <a href="/admin/errors" class="panel-link">Error log</a>
             </div>
-            <div class="mb-3">
-                <div class="flex justify-between text-xs mb-1"><span class="text-base-content/50"><i class="fa-solid fa-gauge-high mr-1"></i>Load (1/5/15m)</span><span class="font-mono <?= $server['load'][0] > $server['cores'] ? 'text-error' : '' ?>"><?= implode(' / ', array_map(fn($l) => number_format($l, 2), $server['load'])) ?></span></div>
-                <div class="text-[10px] text-base-content/40"><?= $server['cores'] ?> CPU core<?= $server['cores'] === 1 ? '' : 's' ?></div>
+            <div class="panel-body">
+                <div class="mb-3">
+                    <div class="row"><span class="muted">Disk</span><span class="num"><?= $__gb($server['diskUsed']) ?> / <?= $__gb($server['diskTotal']) ?></span></div>
+                    <div class="meter"><span class="<?= $server['diskPct'] > 85 ? 'bg-error' : ($server['diskPct'] > 70 ? 'bg-warning' : 'bg-success') ?>" style="width: <?= $server['diskPct'] ?>%"></span></div>
+                </div>
+                <div class="row"><span class="muted">Load (1/5/15m)</span><span class="num <?= $server['load'][0] > $server['cores'] ? 'text-error' : '' ?>"><?= implode(' / ', array_map(fn($l) => number_format($l, 2), $server['load'])) ?></span></div>
+                <div class="row"><span class="muted">CPU cores</span><span class="num"><?= $server['cores'] ?></span></div>
+                <div class="row"><span class="muted">PHP / CI4</span><span class="num"><?= PHP_VERSION ?> / <?= \CodeIgniter\CodeIgniter::CI_VERSION ?></span></div>
+                <div class="row"><span class="muted">Memory (peak / limit)</span><span class="num"><?= $server['memPeak'] ?>M / <?= esc($server['memLimit']) ?></span></div>
+                <div class="row"><span class="muted">MySQL</span><span class="num"><?= esc($server['dbVersion']) ?></span></div>
+                <div class="row"><span class="muted">Database size</span><span class="num"><?= $server['dbSize'] ?> MB</span></div>
             </div>
-            <div class="space-y-1 text-xs border-t border-base-300 pt-2">
-                <div class="flex justify-between"><span class="text-base-content/50">PHP / CI4</span><span class="font-mono"><?= PHP_VERSION ?> / <?= \CodeIgniter\CodeIgniter::CI_VERSION ?></span></div>
-                <div class="flex justify-between"><span class="text-base-content/50">Memory (peak/limit)</span><span class="font-mono"><?= $server['memPeak'] ?>M / <?= esc($server['memLimit']) ?></span></div>
-                <div class="flex justify-between"><span class="text-base-content/50">Database</span><span class="font-mono">MySQL <?= esc($server['dbVersion']) ?></span></div>
-                <div class="flex justify-between"><span class="text-base-content/50">DB size</span><span class="font-mono"><?= $server['dbSize'] ?> MB</span></div>
-            </div>
-            <a href="/admin/errors" class="btn btn-outline btn-xs w-full mt-3 gap-1"><i class="fa-solid fa-bug"></i>View error log</a>
-        </div></div>
+        </section>
     </div>
 </div>
 <script>
@@ -343,23 +377,22 @@
     document.querySelectorAll('[data-filter]').forEach(function (btn) {
         btn.addEventListener('click', function () {
             filter = btn.dataset.filter;
-            document.querySelectorAll('[data-filter]').forEach(function (b) { b.classList.toggle('btn-active', b === btn); });
+            document.querySelectorAll('[data-filter]').forEach(function (b) { b.classList.toggle('on', b === btn); });
             apply();
         });
     });
 
     table.querySelectorAll('th[data-sort]').forEach(function (th, col) {
         th.addEventListener('click', function () {
-            var dir = th.dataset.dir === 'asc' ? 'desc' : 'asc';
-            table.querySelectorAll('th[data-sort]').forEach(function (h) { delete h.dataset.dir; h.removeAttribute('aria-sort'); });
-            th.dataset.dir = dir;
-            th.setAttribute('aria-sort', dir === 'asc' ? 'ascending' : 'descending');
+            var dir = th.getAttribute('aria-sort') === 'ascending' ? 'descending' : 'ascending';
+            table.querySelectorAll('th[data-sort]').forEach(function (h) { h.removeAttribute('aria-sort'); });
+            th.setAttribute('aria-sort', dir);
             var numeric = th.dataset.sort === 'num';
             var rows = Array.from(tbody.querySelectorAll('tr.player-row'));
             rows.sort(function (a, b) {
                 var x = a.cells[col].dataset.v, y = b.cells[col].dataset.v;
                 var cmp = numeric ? (parseFloat(x) || 0) - (parseFloat(y) || 0) : x.localeCompare(y);
-                return dir === 'asc' ? cmp : -cmp;
+                return dir === 'ascending' ? cmp : -cmp;
             });
             rows.forEach(function (r) { tbody.insertBefore(r, empty); });
         });
