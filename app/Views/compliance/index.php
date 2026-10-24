@@ -93,11 +93,11 @@
                 <div class="text-xs text-base-content/50 mb-2"><?= esc($r['description'] ?? '') ?></div>
                 <div class="text-xs text-base-content/50">Cost: <?= currency($r['compliance_cost'] ?? 0) ?>/day</div>
                 <?php if (!$isCompliant) : ?>
-                <form action="/government/comply/<?= $r['id'] ?>" method="post" class="mt-2"><?= csrf_field() ?>
+                <form action="/government/toggle/<?= $r['id'] ?>" method="post" class="mt-2"><?= csrf_field() ?>
                     <button class="btn btn-xs btn-success w-full gap-1"><i class="fa-solid fa-check"></i> Comply (<?= currency($r['compliance_cost'] ?? 0) ?>/day)</button>
                 </form>
                 <?php else : ?>
-                <form action="/government/revoke/<?= $r['id'] ?>" method="post" class="mt-2"><?= csrf_field() ?>
+                <form action="/government/toggle/<?= $r['id'] ?>" method="post" class="mt-2"><?= csrf_field() ?>
                     <button class="btn btn-xs btn-ghost w-full gap-1">Stop Compliance</button>
                 </form>
                 <?php endif ?>

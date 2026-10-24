@@ -21,7 +21,7 @@
 
 <?php
     $__wCond   = $weather ? ($weather['condition_name'] ?? $weather['condition'] ?? '') : '';
-    $__wFresh  = $weather ? (float) ($weather['snowfall'] ?? $weather['snow_fall'] ?? 0) : 0;
+    $__wFresh  = $weather ? (int) ($weather['snowfall'] ?? 0) : 0;
     $__seasons = [
         1 => ['title' => 'Park City base', 'text' => 'Beginner and intermediate terrain. Build the first lifts, set up ski patrol and keep the books balanced.', 'items' => ['Green and blue runs', 'Snowmaking and grooming', 'Staying solvent']],
         2 => ['title' => 'Advanced peaks', 'text' => 'Steep bowls and high ridges open up. Your cash and everything you built carries over.', 'items' => ['Black and double-black terrain', 'Express gondolas', 'Storm operations']],

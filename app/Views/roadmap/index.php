@@ -772,6 +772,10 @@ function validateSuggestForm(form) {
     return true;
 }
 
+// CSRF token for admin AJAX actions (status change, delete)
+const roadmapCsrfHeader = '<?= config('Security')->headerName ?>';
+const roadmapCsrfHash = '<?= csrf_hash() ?>';
+
 // Admin Status Update via AJAX
 async function updateItemStatus(itemId, newStatus) {
     try {
@@ -783,7 +787,8 @@ async function updateItemStatus(itemId, newStatus) {
             method: 'POST',
             body: formData,
             headers: {
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                [roadmapCsrfHeader]: roadmapCsrfHash
             }
         });
         const data = await res.json();
@@ -804,7 +809,8 @@ async function deleteItemAjax(itemId) {
         const res = await fetch('/roadmap/delete/' + itemId, {
             method: 'POST',
             headers: {
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                [roadmapCsrfHeader]: roadmapCsrfHash
             }
         });
         const data = await res.json();

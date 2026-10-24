@@ -148,7 +148,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
             <h2 class="font-bold text-sm mb-3"><i class="fa-solid fa-cloud-sun mr-1 text-info"></i>Set Weather</h2>
-            <form action="/admin/weather" method="post"><?= csrf_field() ?>
+            <form action="/admin/set-weather" method="post"><?= csrf_field() ?>
                 <div class="grid grid-cols-2 gap-2 mb-3">
                     <div><label class="label text-xs py-0">Condition</label>
                     <select name="condition" class="select select-bordered select-xs w-full">
