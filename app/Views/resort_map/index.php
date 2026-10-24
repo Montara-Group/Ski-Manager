@@ -203,6 +203,13 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
 }
 
 /* Side drawers: solid panel, no glass or glow */
+/* The tutorial card is fixed bottom-right with a higher z-index than the drawer, so on
+   laptop-height screens it sat on top of the Construct button and swallowed the click. */
+body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !important; }
+@media (max-width: 820px) { body.map-drawer-open #tutorialWidgetContainer { display: none !important; } }
+/* Keep cost + Construct visible without scrolling the drawer */
+.build-footer { position: sticky; bottom: -14px; margin: 0 -14px -14px; padding: 12px 14px 14px; background: #151b23; z-index: 2; }
+#btnBuild:disabled { opacity: 0.45; cursor: not-allowed; }
 .map-side-drawer {
     position: absolute; top: 12px; right: 12px; bottom: 12px;
     width: 380px; max-width: calc(100vw - 24px);
@@ -698,7 +705,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between pt-3" style="border-top:1px solid rgba(255,255,255,0.08)">
+                    <div class="build-footer flex items-center justify-between pt-3" style="border-top:1px solid rgba(255,255,255,0.08)">
                         <div>
                             <p style="font-size:10px;color:#94a3b8;font-weight:700">Construction Cost</p>
                             <p style="font-size:24px;font-weight:600;font-family:var(--sign);font-variant-numeric:tabular-nums;line-height:1.2" id="selSegCost">-</p>
@@ -1190,6 +1197,8 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         if (wrap) {
             wrap.classList.toggle('has-open-drawer', !!isOpen);
         }
+        // Lets the layout move the tutorial card out from over the drawer
+        document.body.classList.toggle('map-drawer-open', !!isOpen);
     }
 
     function updateTabCounts() {
@@ -1554,6 +1563,11 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                 afterEl.style.color = '#f87171';
             }
         }
+        var buildBtn = document.getElementById('btnBuild');
+        if (buildBtn) {
+            buildBtn.disabled = !canAfford;
+            buildBtn.title = canAfford ? '' : 'Not enough cash for this option';
+        }
     }
 
     function updateSeats() {
@@ -1622,6 +1636,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                 if (typeof loadTutorial === 'function') loadTutorial();
             } else {
                 showToast((res && res.error) ? res.error : 'Construction failed', 'error');
+                updateCost();
             }
         });
     }
