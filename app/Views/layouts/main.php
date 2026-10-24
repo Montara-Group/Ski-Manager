@@ -52,6 +52,9 @@
     <?php endif ?>
     <link rel="stylesheet" href="/css/style.css?v=<?= @filemtime(FCPATH . "css/style.css") ?>" fetchpriority="high">
     <script defer src="https://js.sentry-cdn.com/67d62e71889bb1702e60a6c3130aff40.min.js" crossorigin="anonymous"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="preconnect" href="https://kit.fontawesome.com" crossorigin>
     <link rel="preconnect" href="https://ka-f.fontawesome.com" crossorigin>
     <script async src="https://kit.fontawesome.com/e8108d3d5f.js" crossorigin="anonymous"></script>
@@ -110,6 +113,35 @@ dialog::backdrop {
     content-visibility: auto;
     contain-intrinsic-size: auto 200px;
 }
+
+/* Shared identity: condensed trail-sign type */
+:root { --sign: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; }
+
+/* Navbar */
+.site-nav { min-height: 3.5rem; padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.brand { display: inline-flex; align-items: center; gap: 0.55rem; padding: 0 0.5rem; color: inherit; text-decoration: none; }
+.brand-mark { width: 30px; height: 30px; flex-shrink: 0; }
+.brand-name { font-family: var(--sign); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.01em; line-height: 1; }
+.site-nav .menu-horizontal > li > a,
+.site-nav .menu-horizontal > li > details > summary { font-weight: 500; border-radius: 6px; }
+.site-nav .menu-horizontal > li > a.active { background: transparent; color: var(--color-base-content); box-shadow: inset 0 -2px 0 var(--color-primary); border-radius: 0; }
+
+/* Resort stats bar under the navbar */
+.stats-bar { gap: 0 !important; }
+.stats-bar .stat-pill {
+    border: 0; border-radius: 0; background: none; padding: 0.1rem 0.85rem; gap: 0.4rem;
+    color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
+    border-left: 1px solid var(--color-base-300); font-size: 0.75rem;
+}
+.stats-bar .stat-pill:first-child { border-left: 0; padding-left: 0; }
+.stats-bar .stat-pill:not([href="/resort-analysis"]) i { color: color-mix(in oklab, var(--color-base-content) 50%, transparent) !important; }
+.stats-bar .stat-pill .font-mono { font-family: inherit; font-variant-numeric: tabular-nums; }
+.stats-bar .stat-pill:hover { color: var(--color-base-content); }
+
+/* Footer */
+.site-footer h6 { font-size: 0.8125rem; font-weight: 600; color: var(--color-base-content); margin-bottom: 0.75rem; }
+.site-footer ul a { color: color-mix(in oklab, var(--color-base-content) 62%, transparent); }
+.site-footer ul a:hover { color: var(--color-base-content); }
 
 @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
@@ -277,7 +309,7 @@ a.link:hover{opacity:0.8}
         </div>
     </div>
     <?php endif ?>
-    <nav aria-label="Main navigation"><div class="navbar bg-base-100 shadow-md" style="z-index:9999; position:sticky; top:0">
+    <nav aria-label="Main navigation"><div class="navbar site-nav bg-base-100 border-b border-base-300" style="z-index:9999; position:sticky; top:0">
         <div class="navbar-start">
             <div class="dropdown">
                 <div tabindex="0" role="button" class="btn btn-ghost lg:hidden" aria-label="Open menu"><i class="fa-solid fa-bars text-lg" aria-hidden="true"></i></div>
@@ -290,23 +322,23 @@ a.link:hover{opacity:0.8}
                     <?php if ($__isAdmin) : ?><li class="menu-title text-xs mt-1">Admin</li><li><a href="/admin"><i class="fa-solid fa-shield-halved fa-fw mr-2 text-error"></i>Admin Panel</a></li><?php endif ?>
                 </ul>
             </div>
-            <a href="/" class="btn btn-ghost text-xl font-bold"><i class="fa-solid fa-person-skiing mr-2"></i>Ski Manager</a>
+            <a href="/" class="brand" aria-label="Ski Manager home"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="6" fill="#1d232b"/><path d="M3 25 L12 11 L16 17 L20 9 L29 25 Z" fill="#f7f5f0"/><path d="M12 11 L14.6 15 L12.6 14 L10.4 15.6 Z M20 9 L23 14.5 L20.8 13.4 L18.4 15 Z" fill="#1d232b" opacity=".35"/><path d="M20 9 L19 25" stroke="#2f6fd6" stroke-width="1.6" stroke-linecap="round"/></svg><span class="brand-name">Ski Manager</span></a>
         </div>
         <div class="navbar-center hidden lg:flex">
             <ul class="menu menu-horizontal px-1 gap-1">
-                <li><a href="/" class="<?= $__currentPath === '/' ? 'active' : '' ?>"><i class="fa-solid fa-house mr-1"></i>Home</a></li>
-                <li><a href="/dashboard" class="<?= $__currentPath === '/dashboard' ? 'active' : '' ?>"><i class="fa-solid fa-gauge-high mr-1"></i>Dashboard</a></li>
+                <li><a href="/" class="<?= $__currentPath === '/' ? 'active' : '' ?>">Home</a></li>
+                <li><a href="/dashboard" class="<?= $__currentPath === '/dashboard' ? 'active' : '' ?>">Dashboard</a></li>
                 <?php foreach ($__nav as $__secName => $__sec) : ?>
                 <li>
                     <details>
-                        <summary><i class="fa-solid <?= esc($__sec['icon'], 'attr') ?> mr-1"></i><?= esc($__secName) ?></summary>
-                        <ul class="bg-base-100 rounded-box shadow w-56 z-50">
+                        <summary><?= esc($__secName) ?></summary>
+                        <ul class="bg-base-100 rounded-box shadow-lg border border-base-300 w-56 z-50">
                             <?php foreach ($__sec['items'] as $__it) : echo $__navItem($__it); endforeach ?>
                         </ul>
                     </details>
                 </li>
                 <?php endforeach ?>
-                <?php if ($__isAdmin) : ?><li><a href="/admin" class="text-error"><i class="fa-solid fa-shield-halved mr-1"></i>Admin</a></li><?php endif ?>
+                <?php if ($__isAdmin) : ?><li><a href="/admin" class="text-error">Admin</a></li><?php endif ?>
             </ul>
         </div>
         <div class="navbar-end gap-2">
@@ -343,7 +375,7 @@ a.link:hover{opacity:0.8}
                     <div tabindex="0" class="dropdown-content card bg-base-100 shadow-2xl z-50 w-80 mt-2 border border-base-200/50">
                         <div class="card-body p-3">
                             <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-base-100">
-                                <span class="font-bold text-xs uppercase tracking-wider text-base-content/50">Notifications</span>
+                                <span class="font-semibold text-sm">Notifications</span>
                                 <?php if ($__notifCount > 0) : ?>
                                     <a href="/notifications/read-all" class="link link-primary text-xs no-underline ">Mark all read</a>
                                 <?php endif ?>
@@ -391,8 +423,8 @@ a.link:hover{opacity:0.8}
                 </div>
                 <div class="dropdown dropdown-end"><div tabindex="0" role="button" class="btn btn-ghost btn-sm"><i class="fa-solid fa-user-circle mr-1"></i><?= auth()->user()->username ?></div><ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box shadow w-48 z-50 mt-2"><li><a href="/dashboard"><i class="fa-solid fa-gauge-high mr-1"></i>Dashboard</a></li><li><a href="/settings"><i class="fa-solid fa-gear mr-1"></i>Settings</a></li><li><a href="/logout" class="text-error"><i class="fa-solid fa-right-from-bracket mr-1"></i>Logout</a></li></ul></div>
             <?php else : ?>
-                <a href="/login" class="btn btn-ghost btn-sm"><i class="fa-solid fa-right-to-bracket mr-1"></i>Log in</a>
-                <a href="/register" class="btn btn-primary btn-sm"><i class="fa-solid fa-user-plus mr-1"></i>Play Free</a>
+                <a href="/login" class="btn btn-ghost btn-sm">Log in</a>
+                <a href="/register" class="btn btn-primary btn-sm">Play free</a>
             <?php endif ?>
         </div>
     </div>
@@ -507,13 +539,13 @@ a.link:hover{opacity:0.8}
     <div id="liveAppAlertToastStack" class="toast toast-bottom toast-end z-[9999] space-y-2 pointer-events-none max-w-sm w-full"></div>
 
     <!-- Footer -->
-    <footer class="bg-base-200 border-t border-base-300" role="contentinfo" aria-label="Site footer">
+    <footer class="site-footer bg-base-100 border-t border-base-300" role="contentinfo" aria-label="Site footer">
         <div class="max-w-6xl mx-auto px-4 pt-10 pb-6">
             <div class="grid grid-cols-2 md:grid-cols-5 gap-8">
                 <!-- Brand -->
                 <div class="col-span-2 md:col-span-1">
-                    <a href="/" class="flex items-center gap-2 text-lg font-bold mb-3"><i class="fa-solid fa-person-skiing text-primary"></i>Ski Manager</a>
-                    <p class="text-xs text-base-content/50 mb-4">The most detailed free ski resort management game. Build, manage, and dominate the slopes.</p>
+                    <a href="/" class="brand mb-3" style="padding:0"><svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="6" fill="#1d232b"/><path d="M3 25 L12 11 L16 17 L20 9 L29 25 Z" fill="#f7f5f0"/><path d="M12 11 L14.6 15 L12.6 14 L10.4 15.6 Z M20 9 L23 14.5 L20.8 13.4 L18.4 15 Z" fill="#1d232b" opacity=".35"/><path d="M20 9 L19 25" stroke="#2f6fd6" stroke-width="1.6" stroke-linecap="round"/></svg><span class="brand-name">Ski Manager</span></a>
+                    <p class="text-sm text-base-content/60 mb-4">A free ski resort management game. Build lifts and runs on real mountains and try to keep the place profitable.</p>
                     <div class="flex gap-3">
                         <a href="https://discord.gg/u3GzGt8K6a" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm btn-circle" title="Discord"><i class="fa-brands fa-discord text-lg"></i></a>
                         <a href="https://github.com/MontaraGroup/Ski-Manager" target="_blank" rel="noopener noreferrer" class="btn btn-ghost btn-sm btn-circle" title="GitHub"><i class="fa-brands fa-github text-lg"></i></a>
@@ -521,42 +553,42 @@ a.link:hover{opacity:0.8}
                 </div>
                 <!-- Game -->
                 <div>
-                    <h6 class="text-xs font-semibold uppercase tracking-wider text-base-content/40 mb-3">Game</h6>
+                    <h6 class="">Game</h6>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/register" class="link link-hover text-base-content/60">Play Now</a></li>
-                        <li><a href="/leaderboard" class="link link-hover text-base-content/60">Leaderboard</a></li>
-                        <li><a href="/updates" class="link link-hover text-base-content/60">Updates</a></li>
-                        <li><a href="/roadmap" class="link link-hover text-base-content/60">Roadmap</a></li>
-                        <li><a href="https://wiki.ski-manager.net" target="_blank" rel="noopener noreferrer" class="link link-hover text-base-content/60">Wiki</a></li>
-                        <li><a href="/genepis" class="link link-hover text-base-content/60">Genepis</a></li>
+                        <li><a href="/register">Play Now</a></li>
+                        <li><a href="/leaderboard">Leaderboard</a></li>
+                        <li><a href="/updates">Updates</a></li>
+                        <li><a href="/roadmap">Roadmap</a></li>
+                        <li><a href="https://wiki.ski-manager.net" target="_blank" rel="noopener noreferrer">Wiki</a></li>
+                        <li><a href="/genepis">Genepis</a></li>
                     </ul>
                 </div>
                 <!-- Resources -->
                 <div>
-                    <h6 class="text-xs font-semibold uppercase tracking-wider text-base-content/40 mb-3">Resources</h6>
+                    <h6 class="">Resources</h6>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/faq" class="link link-hover text-base-content/60">FAQ</a></li>
-                        <li><a href="/contact" class="link link-hover text-base-content/60">Contact</a></li>
-                        <li><a href="/bugs" class="link link-hover text-base-content/60">Report a Bug</a></li>
-                        <li><a href="/about" class="link link-hover text-base-content/60">About</a></li>
+                        <li><a href="/faq">FAQ</a></li>
+                        <li><a href="/contact">Contact</a></li>
+                        <li><a href="/bugs">Report a Bug</a></li>
+                        <li><a href="/about">About</a></li>
                     </ul>
                 </div>
                 <!-- Legal -->
                 <div>
-                    <h6 class="text-xs font-semibold uppercase tracking-wider text-base-content/40 mb-3">Legal</h6>
+                    <h6 class="">Legal</h6>
                     <ul class="space-y-2 text-sm">
-                        <li><a href="/terms" class="link link-hover text-base-content/60">Terms</a></li>
-                        <li><a href="/privacy" class="link link-hover text-base-content/60">Privacy</a></li>
-                        <li><a href="/cookies" class="link link-hover text-base-content/60">Cookies</a></li>
-                        <li><a href="/disclaimer" class="link link-hover text-base-content/60">Disclaimer</a></li>
-                        <li><a href="/sitemap" class="link link-hover text-base-content/60">Sitemap</a></li>
+                        <li><a href="/terms">Terms</a></li>
+                        <li><a href="/privacy">Privacy</a></li>
+                        <li><a href="/cookies">Cookies</a></li>
+                        <li><a href="/disclaimer">Disclaimer</a></li>
+                        <li><a href="/sitemap">Sitemap</a></li>
                     </ul>
                 </div>
             </div>
         </div>
         <div class="border-t border-base-300">
-            <div class="flex flex-col md:flex-row items-center justify-between px-4 py-3 max-w-6xl mx-auto text-xs text-base-content/40">
-                <p>&copy; <?= date('Y') ?> Ski Manager. Built with <i class="fa-solid fa-heart text-error text-[10px]"></i> for ski lovers.</p>
+            <div class="flex flex-col md:flex-row items-center justify-between px-4 py-3 max-w-6xl mx-auto text-xs text-base-content/50">
+                <p>&copy; <?= date('Y') ?> Ski Manager · Free to play in your browser</p>
                 <p class="mt-1 md:mt-0">Maps by <a href="https://skimap.com" target="_blank" rel="noopener noreferrer" class="link link-hover">Mapsynergy</a> &middot; v1.1</p>
             </div>
         </div>

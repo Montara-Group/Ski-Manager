@@ -19,570 +19,277 @@
     $daysRemaining = max(0, $seasonLen - $seasonDay);
 ?>
 
-<!-- Minimalist Announcement Banner -->
-<div class="bg-base-200/80 border-b border-base-300 py-2.5 px-4 text-xs font-medium">
-    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-        <div class="flex items-center gap-2 text-base-content/80 flex-wrap">
-            <span class="inline-block w-2 h-2 rounded-full bg-success"></span>
-            <span class="font-semibold text-base-content">Season <?= getSeasonNumber() ?> Active</span>
-            <span class="text-base-content/40">&bull;</span>
-            <span>Day <?= getSeasonDay() ?> of <?= getSeasonLength() ?> (Park City Mountain)</span>
-            <?php if ($daysRemaining <= 14): ?>
-                <span class="text-base-content/40">&bull;</span>
-                <span class="badge badge-warning badge-xs font-bold gap-1"><i class="fa-solid fa-clock text-[9px]"></i> Final Push: <?= $daysRemaining ?> Days Left</span>
-                <span class="text-base-content/40">&bull;</span>
-                <span class="text-primary font-bold">Season 2 Expansion Arrives Oct 19</span>
-            <?php endif; ?>
-        </div>
-        <div>
-            <?php if (!auth()->loggedIn()) : ?>
-            <a href="/register" class="link link-hover text-primary font-semibold flex items-center gap-1">
-                Join Season <?= getSeasonNumber() ?> <i class="fa-solid fa-arrow-right text-[10px]"></i>
-            </a>
-            <?php else : ?>
-            <a href="/dashboard" class="link link-hover text-primary font-semibold flex items-center gap-1">
-                Go to Dashboard <i class="fa-solid fa-arrow-right text-[10px]"></i>
-            </a>
-            <?php endif ?>
-        </div>
-    </div>
-</div>
+<?php
+    $__wCond   = $weather ? ($weather['condition_name'] ?? $weather['condition'] ?? '') : '';
+    $__wFresh  = $weather ? (float) ($weather['snowfall'] ?? $weather['snow_fall'] ?? 0) : 0;
+    $__seasons = [
+        1 => ['title' => 'Park City base', 'text' => 'Beginner and intermediate terrain. Build the first lifts, set up ski patrol and keep the books balanced.', 'items' => ['Green and blue runs', 'Snowmaking and grooming', 'Staying solvent']],
+        2 => ['title' => 'Advanced peaks', 'text' => 'Steep bowls and high ridges open up. Your cash and everything you built carries over.', 'items' => ['Black and double-black terrain', 'Express gondolas', 'Storm operations']],
+        3 => ['title' => 'Beyond Park City', 'text' => 'Backcountry, terrain parks and tournaments between resorts, with players voting on the next mountain.', 'items' => ['Backcountry and parks', 'Player-chosen resorts', 'Inter-resort tournaments']],
+    ];
+?>
+<style>
+.home-hero { position: relative; isolation: isolate; overflow: hidden; color: #fff; background: #141b24; }
+.home-hero::before {
+    content: ''; position: absolute; inset: 0; z-index: -2;
+    background-image: url('/img/ParkCity_med.jpg'), url('/img/ParkCity_low.jpg');
+    background-size: cover; background-position: center 35%; opacity: 0.75;
+}
+.home-hero::after {
+    content: ''; position: absolute; inset: 0; z-index: -1;
+    background: linear-gradient(90deg, rgba(10,14,20,0.92) 0%, rgba(10,14,20,0.78) 45%, rgba(10,14,20,0.35) 100%);
+}
+@media (max-width: 1023px) { .home-hero::after { background: rgba(10,14,20,0.82); } }
+.home-hero h1 { font-family: var(--sign); font-weight: 700; font-size: clamp(2.75rem, 6vw, 4.5rem); line-height: 0.98; letter-spacing: 0.005em; margin: 0; }
+.home-hero h1 span { color: #7fb4ff; }
+.home-hero .lede { font-size: 1.0625rem; line-height: 1.6; color: rgba(255,255,255,0.82); max-width: 34rem; }
+.home-hero .facts { display: flex; flex-wrap: wrap; gap: 0.35rem 1.25rem; font-size: 0.8125rem; color: rgba(255,255,255,0.7); }
+.home-hero .facts b { color: #fff; font-weight: 600; }
+.home-hero .ghost { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
+.home-hero .ghost:hover { background: rgba(255,255,255,0.22); color: #fff; }
 
-<!-- Hero Section -->
-<section class="py-16 md:py-24 bg-base-100 border-b border-base-300">
-    <div class="max-w-6xl mx-auto px-4">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            
-            <div class="lg:col-span-7 space-y-6">
-                <!-- Status Tag -->
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-base-200 border border-base-300 text-xs font-mono text-base-content/80">
-                    <i class="fa-solid fa-mountain text-primary"></i>
-                    <span>Season <?= getSeasonNumber() ?></span>
-                    <span class="text-base-content/30">|</span>
-                    <span>Day <?= getSeasonDay() ?></span>
+/* Snow report board */
+.report { background: #f7f5f0; color: #1d232b; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); overflow: hidden; }
+.report-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0.85rem 1.1rem 0.7rem; background: #1d232b; color: #f7f5f0; }
+.report-head h2 { font-family: var(--sign); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1; margin: 0; }
+.report-head span { font-size: 0.75rem; opacity: 0.7; }
+.report-big { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid rgba(0,0,0,0.1); }
+.report-big > div { padding: 0.9rem 1.1rem; }
+.report-big > div + div { border-left: 1px solid rgba(0,0,0,0.1); }
+.report-label { font-size: 0.75rem; color: #5b6470; }
+.report-num { font-family: var(--sign); font-size: 2.5rem; font-weight: 600; line-height: 1; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
+.report-num small { font-size: 1rem; font-weight: 500; color: #5b6470; margin-left: 4px; }
+.report-rows > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 1.1rem; font-size: 0.875rem; border-top: 1px solid rgba(0,0,0,0.08); }
+.report-rows > div:first-child { border-top: 0; }
+.report-rows dt { color: #5b6470; }
+.report-rows dd { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.home-section { padding: 4.5rem 0; }
+.home-section h2.sign { font-family: var(--sign); font-size: 2.25rem; font-weight: 700; line-height: 1.05; margin: 0; }
+.home-kicker { font-size: 0.8125rem; font-weight: 600; color: var(--color-primary); margin-bottom: 0.35rem; }
+.pillar h3 { font-family: var(--sign); font-size: 1.5rem; font-weight: 600; line-height: 1.1; margin: 0.75rem 0 0.5rem; }
+.pillar p { font-size: 0.9375rem; line-height: 1.6; color: color-mix(in oklab, var(--color-base-content) 75%, transparent); }
+.pillar-mark { display: flex; align-items: center; gap: 0.4rem; height: 1.25rem; }
+.tsign { display: inline-block; width: 14px; height: 14px; }
+.tsign.green { border-radius: 50%; background: #23a55a; }
+.tsign.blue { background: #2f6fd6; }
+.tsign.black { width: 12px; height: 12px; background: var(--color-base-content); transform: rotate(45deg); margin: 0 2px; }
+
+.resort-list { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.9375rem; }
+.resort-list li { display: flex; align-items: center; gap: 0.45rem; }
+.resort-list li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: color-mix(in oklab, var(--color-base-content) 35%, transparent); }
+.map-frame { display: block; border-radius: 8px; overflow: hidden; border: 1px solid var(--color-base-300); box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
+.map-frame img { display: block; width: 100%; height: auto; transition: transform .4s ease; }
+.map-frame:hover img { transform: scale(1.02); }
+
+/* Season timeline drawn like a lift line */
+.seasons { position: relative; display: grid; grid-template-columns: 1fr; gap: 2rem; }
+@media (min-width: 768px) {
+    .seasons { grid-template-columns: repeat(3, 1fr); gap: 2.5rem; }
+    .seasons::before { content: ''; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: var(--color-base-300); }
+}
+.season { position: relative; }
+.season-dot { position: relative; width: 16px; height: 16px; border-radius: 50%; background: var(--color-base-100); border: 2px solid var(--color-base-300); margin-bottom: 1rem; }
+.season.is-done .season-dot { background: var(--color-base-content); border-color: var(--color-base-content); opacity: 0.45; }
+.season.is-now .season-dot { background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-primary) 22%, transparent); }
+.season-tag { font-size: 0.75rem; font-weight: 600; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
+.season.is-now .season-tag { color: var(--color-primary); }
+.season h3 { font-family: var(--sign); font-size: 1.625rem; font-weight: 600; line-height: 1.1; margin: 0.15rem 0 0.45rem; }
+.season p { font-size: 0.9rem; line-height: 1.55; color: color-mix(in oklab, var(--color-base-content) 72%, transparent); }
+.season ul { margin-top: 0.75rem; font-size: 0.875rem; }
+.season li { padding: 0.3rem 0; border-top: 1px solid var(--color-base-300); }
+
+.feature-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem 2rem; }
+@media (min-width: 1024px) { .feature-list { grid-template-columns: repeat(4, 1fr); } }
+.feature-list div { font-size: 0.875rem; color: color-mix(in oklab, var(--color-base-content) 68%, transparent); }
+.feature-list b { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9375rem; color: var(--color-base-content); font-weight: 600; margin-bottom: 0.15rem; }
+.feature-list b i { color: var(--color-primary); font-size: 0.875rem; width: 1rem; text-align: center; }
+
+/* Utilities not in the compiled Tailwind build */
+.align-middle { vertical-align: middle; }
+.gap-10 { gap: 2.5rem; }
+.mb-12 { margin-bottom: 3rem; }
+.py-14 { padding-top: 3.5rem; padding-bottom: 3.5rem; }
+@media (min-width: 768px) { .md\:py-20 { padding-top: 5rem; padding-bottom: 5rem; } }
+.text-base-content\/55 { color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
+.text-base-content\/75 { color: color-mix(in oklab, var(--color-base-content) 75%, transparent); }
+.underline-offset-4 { text-underline-offset: 4px; }
+
+.home-cta { background: #1d232b; color: #f7f5f0; }
+.home-cta h2 { font-family: var(--sign); font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 700; line-height: 1.05; margin: 0; }
+</style>
+
+<!-- Hero -->
+<section class="home-hero">
+    <div class="max-w-6xl mx-auto px-4 py-14 md:py-20 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+        <div class="lg:col-span-7 space-y-6">
+            <div class="text-sm" style="color:rgba(255,255,255,0.75)">
+                <span class="inline-block w-2 h-2 rounded-full bg-success mr-1.5 align-middle"></span>Season <?= $currentSeasonNum ?> is on · day <?= $seasonDay ?> of <?= $seasonLen ?>
+            </div>
+            <h1>Design slopes.<br>Spin chairlifts.<br><span>Rule the mountain.</span></h1>
+            <p class="lede">Start with an empty mountain and up to <?= currency(1000000) ?> in capital. Build lifts, lay out runs, hire staff, make snow and keep the resort profitable.</p>
+            <div class="flex flex-wrap items-center gap-3">
+                <?php if (!auth()->loggedIn()) : ?>
+                <a href="/register" class="btn btn-primary px-6">Play free</a>
+                <a href="/demo" class="btn ghost">Try the demo mountain</a>
+                <a href="/login" class="text-sm underline underline-offset-4 ml-1" style="color:rgba(255,255,255,0.8)">Sign in</a>
+                <?php else : ?>
+                <a href="/dashboard" class="btn btn-primary px-6">Go to your resort</a>
+                <a href="/map" class="btn ghost">Open trail map</a>
+                <?php endif ?>
+            </div>
+            <div class="facts">
+                <span><?= $playersLabel ?></span>
+                <span>Plays in your browser</span>
+                <span>Nothing to download</span>
+            </div>
+        </div>
+
+        <div class="lg:col-span-5">
+            <div class="report">
+                <div class="report-head">
+                    <h2>Snow report</h2>
+                    <span>Park City · today</span>
                 </div>
-
-                <h1 class="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight text-base-content leading-[1.08] uppercase">
-                    Design Slopes.<br>
-                    Spin Chairlifts.<br>
-                    <span class="text-primary">Rule The Mountain.</span>
-                </h1>
-
-                <p class="text-base sm:text-lg text-base-content/70 max-w-xl leading-relaxed font-normal">
-                    Start with an empty mountain and up to <?= currency(1000000) ?> in capital. Construct chairlifts, layout custom slopes, hire staff, engineer snowmaking networks, and keep your resort profitable.
-                </p>
-
-                <div class="flex flex-wrap items-center gap-3 pt-2">
-                    <?php if (!auth()->loggedIn()) : ?>
-                    <a href="/register" class="btn btn-primary rounded-xl font-semibold px-6 shadow-sm gap-2">
-                        <i class="fa-solid fa-play text-xs"></i> Play Free
-                    </a>
-                    <a href="/demo" class="btn btn-secondary rounded-xl font-semibold px-5 shadow-sm gap-2">
-                        <i class="fa-solid fa-compass text-xs"></i> Try Demo Mountain
-                    </a>
-                    <a href="/login" class="btn btn-outline rounded-xl font-semibold border-base-300 gap-2">
-                        <i class="fa-solid fa-right-to-bracket text-xs"></i> Sign In
-                    </a>
-                    <?php else : ?>
-                    <a href="/dashboard" class="btn btn-primary rounded-xl font-semibold px-6 shadow-sm gap-2">
-                        <i class="fa-solid fa-gauge-high text-xs"></i> Open Resort Dashboard
-                    </a>
+                <div class="report-big">
+                    <div>
+                        <div class="report-label">Summit</div>
+                        <div class="report-num"><?= $weather ? esc($weather['temp_formatted']) : '–' ?></div>
+                        <div class="text-xs mt-1" style="color:#5b6470"><?= esc($__wCond ?: '—') ?></div>
+                    </div>
+                    <div>
+                        <div class="report-label">Base depth</div>
+                        <div class="report-num"><?= isset($weather['snow_base']) ? snow($weather['snow_base']) : '–' ?></div>
+                        <div class="text-xs mt-1" style="color:#5b6470"><?= $__wFresh > 0 ? snow($__wFresh) . ' new snow' : 'No new snow' ?></div>
+                    </div>
+                </div>
+                <dl class="report-rows">
+                    <div><dt>Season</dt><dd><?= $currentSeasonNum ?>, day <?= $seasonDay ?> of <?= $seasonLen ?></dd></div>
+                    <div><dt>Runs built by players</dt><dd><?= number_format($totalSlopes) ?></dd></div>
+                    <?php if ($topPlayer) : ?>
+                    <div><dt>Richest resort</dt><dd><?= esc($topPlayer['username']) ?> · <?= currency((int) $topPlayer['cash']) ?></dd></div>
                     <?php endif ?>
-                </div>
-
-                <!-- Minimal Meta Badges -->
-                <div class="flex flex-wrap items-center gap-y-2 gap-x-6 pt-4 text-xs text-base-content/60 font-medium">
-                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-users text-base-content/40"></i> <?= $playersLabel ?></span>
-                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-success"></i> Instant Browser Play</span>
-                    <span class="flex items-center gap-1.5"><i class="fa-solid fa-check text-success"></i> No Downloads</span>
-                </div>
+                </dl>
             </div>
-
-            <!-- Resort Director Accreditation Pass & Mountain Operations Board -->
-            <div class="lg:col-span-5">
-                <div class="relative bg-base-100 rounded-3xl border-2 border-base-300 shadow-md p-6 space-y-4">
-                    <!-- Lanyard Slot Cutout -->
-                    <div class="flex justify-center -mt-2 mb-1">
-                        <div class="w-16 h-2.5 bg-base-300 rounded-full border border-base-content/20 shadow-inner"></div>
-                    </div>
-
-                    <!-- Accreditation Authority Header -->
-                    <div class="bg-neutral text-neutral-content px-4 py-2.5 rounded-xl flex items-center justify-between shadow-sm">
-                        <div class="flex items-center gap-2.5">
-                            <i class="fa-solid fa-id-badge text-warning text-sm"></i>
-                            <div>
-                                <div class="text-[9px] uppercase tracking-widest font-mono text-neutral-content/70 leading-none">Resort Operations Pass</div>
-                                <div class="text-xs font-bold font-mono tracking-tight leading-tight">ACCREDITED DIRECTOR &bull; CLASS A</div>
-                            </div>
-                        </div>
-                        <span class="badge badge-success badge-sm font-mono text-[10px] font-bold">ACTIVE S<?= getSeasonNumber() ?></span>
-                    </div>
-
-                    <!-- Credential Holder Identity -->
-                    <div class="flex items-center gap-3.5 py-1">
-                        <div class="w-12 h-12 rounded-xl bg-base-200 border border-base-300 flex items-center justify-center shrink-0 relative overflow-hidden">
-                            <?php if (auth()->loggedIn()) : ?>
-                                <div class="w-full h-full bg-primary/10 text-primary flex items-center justify-center font-black text-lg">
-                                    <?= strtoupper(substr(auth()->user()->username, 0, 2)) ?>
-                                </div>
-                            <?php else : ?>
-                                <div class="w-full h-full bg-base-200 text-base-content/40 flex items-center justify-center text-lg">
-                                    <i class="fa-solid fa-user-tie"></i>
-                                </div>
-                            <?php endif ?>
-                            <span class="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-success rounded-full ring-2 ring-base-100"></span>
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <div class="text-[10px] font-mono text-base-content/50 uppercase tracking-wider">Credential Holder</div>
-                            <div class="font-black text-base text-base-content truncate tracking-tight">
-                                <?= auth()->loggedIn() ? esc(auth()->user()->username) : 'GUEST CANDIDATE' ?>
-                            </div>
-                            <div class="text-xs text-base-content/70 font-medium truncate">
-                                <?= auth()->loggedIn() ? 'Chief Operating Officer &bull; Park City Sector' : 'Awaiting Resort Commission &bull; Sector 1' ?>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Mountain Operations Telemetry Board -->
-                    <div class="border-y border-base-200 divide-y divide-base-200 text-xs">
-                        <!-- Summit Weather -->
-                        <div class="py-2.5 flex items-center justify-between">
-                            <span class="text-base-content/60 font-medium flex items-center gap-2">
-                                <i class="fa-solid fa-mountain-sun text-primary w-4 text-center"></i> Mountain Summit
-                            </span>
-                            <span class="font-mono font-semibold text-base-content">
-                                <?= $weather ? $weather['temp_formatted'] . ' &bull; ' . esc($weather['condition']) : '24°F &bull; Clear' ?>
-                            </span>
-                        </div>
-
-                        <!-- Snowpack Base -->
-                        <div class="py-2.5 flex items-center justify-between">
-                            <span class="text-base-content/60 font-medium flex items-center gap-2">
-                                <i class="fa-solid fa-snowflake text-info w-4 text-center"></i> Snowpack Depth
-                            </span>
-                            <span class="font-mono font-semibold text-base-content">
-                                <?= isset($weather['snow_base']) ? (int)$weather['snow_base'] . '" Base' : 'Compacted Base' ?>
-                                <?php if (isset($weather['snow_fall']) && $weather['snow_fall'] > 0) : ?>
-                                    <span class="text-success text-[11px] font-normal">(+<?= (int)$weather['snow_fall'] ?>" fresh)</span>
-                                <?php endif ?>
-                            </span>
-                        </div>
-
-                        <!-- Operational Term -->
-                        <div class="py-2.5 flex items-center justify-between">
-                            <span class="text-base-content/60 font-medium flex items-center gap-2">
-                                <i class="fa-solid fa-calendar-days text-secondary w-4 text-center"></i> Operational Term
-                            </span>
-                            <span class="font-mono font-semibold text-base-content">
-                                Day <?= getSeasonDay() ?> of <?= getSeasonLength() ?> (S<?= getSeasonNumber() ?>)
-                            </span>
-                        </div>
-
-                        <!-- Slope Network -->
-                        <div class="py-2.5 flex items-center justify-between">
-                            <span class="text-base-content/60 font-medium flex items-center gap-2">
-                                <i class="fa-solid fa-person-skiing text-accent w-4 text-center"></i> Slope Network
-                            </span>
-                            <span class="font-mono font-semibold text-base-content">
-                                <?= number_format($totalSlopes) ?> Active Runs
-                            </span>
-                        </div>
-
-                        <!-- Leading Mountain Empire -->
-                        <?php if ($topPlayer) : ?>
-                        <div class="py-2.5 flex items-center justify-between">
-                            <span class="text-base-content/60 font-medium flex items-center gap-2">
-                                <i class="fa-solid fa-trophy text-warning w-4 text-center"></i> Leading Operator
-                            </span>
-                            <span class="font-mono font-semibold text-base-content truncate max-w-[180px] text-right">
-                                <?= esc($topPlayer['username']) ?> <span class="text-base-content/50 font-normal">(<?= currency((int) $topPlayer['cash']) ?>)</span>
-                            </span>
-                        </div>
-                        <?php endif ?>
-                    </div>
-
-                    <!-- Barcode & Security Strip -->
-                    <div class="pt-1 flex items-end justify-between gap-3">
-                        <div class="space-y-1">
-                            <div class="font-mono text-[9px] text-base-content/40 tracking-wider">SECURE RFID &bull; OP-ID</div>
-                            <div class="h-6 flex items-center gap-[3px] text-base-content/70">
-                                <span class="w-[2px] h-full bg-current"></span>
-                                <span class="w-[3px] h-full bg-current"></span>
-                                <span class="w-[1px] h-full bg-current"></span>
-                                <span class="w-[4px] h-full bg-current"></span>
-                                <span class="w-[1px] h-full bg-current"></span>
-                                <span class="w-[2px] h-full bg-current"></span>
-                                <span class="w-[3px] h-full bg-current"></span>
-                                <span class="w-[1px] h-full bg-current"></span>
-                                <span class="w-[2px] h-full bg-current"></span>
-                                <span class="w-[4px] h-full bg-current"></span>
-                                <span class="w-[1px] h-full bg-current"></span>
-                                <span class="w-[3px] h-full bg-current"></span>
-                                <span class="w-[2px] h-full bg-current"></span>
-                                <span class="w-[1px] h-full bg-current"></span>
-                                <span class="w-[3px] h-full bg-current"></span>
-                                <span class="w-[2px] h-full bg-current"></span>
-                            </div>
-                            <div class="font-mono text-[9px] text-base-content/40 tracking-widest">
-                                SM-2024-<?= strtoupper(substr(md5('director_pass_' . getSeasonNumber()), 0, 8)) ?>
-                            </div>
-                        </div>
-                        <div>
-                            <?php if (!auth()->loggedIn()) : ?>
-                            <a href="/register" class="btn btn-sm btn-primary rounded-lg font-mono text-xs gap-1.5 shadow-sm">
-                                Claim Pass <i class="fa-solid fa-arrow-right text-[10px]"></i>
-                            </a>
-                            <?php else : ?>
-                            <a href="/dashboard" class="btn btn-sm btn-primary rounded-lg font-mono text-xs gap-1.5 shadow-sm">
-                                Command Post <i class="fa-solid fa-arrow-right text-[10px]"></i>
-                            </a>
-                            <?php endif ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </div>
 </section>
 
-<!-- Core Pillars -->
-<section class="py-16 bg-base-200/40 border-b border-base-300">
+<!-- What you manage -->
+<section class="home-section bg-base-100 border-b border-base-300">
     <div class="max-w-6xl mx-auto px-4">
-        <div class="mb-10">
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">Key Management Pillars</h2>
-            <p class="text-sm text-base-content/60 mt-1">Balancing infrastructure, income, and alpine weather systems.</p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Pillar 1: Trail Architecture & Lift Networks -->
-            <div class="p-6 bg-base-100 rounded-2xl border border-base-300 shadow-sm space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-base-200">
-                    <div class="flex items-center gap-1.5" title="Piste Difficulty Standards">
-                        <span class="w-3.5 h-3.5 rounded-full bg-emerald-500 inline-block" title="Green Circle - Beginner"></span>
-                        <span class="w-3.5 h-3.5 rounded-sm bg-blue-600 inline-block" title="Blue Square - Intermediate"></span>
-                        <span class="w-3.5 h-3.5 rotate-45 bg-neutral inline-block" title="Black Diamond - Advanced"></span>
-                    </div>
-                    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-base-content/50">Topography & Lifts</span>
-                </div>
-                <div>
-                    <h3 class="font-bold text-base text-base-content">Slope & Lift Architecture</h3>
-                    <p class="text-sm text-base-content/70 leading-relaxed font-normal mt-2">
-                        Plot fall lines across authentic alpine terrain, grade slope difficulty, and configure high-capacity chairlifts and gondolas to prevent queue bottlenecks. Over <span class="font-semibold text-base-content"><?= number_format($totalSlopes) ?></span> runs mapped mountain-wide.
-                    </p>
-                </div>
-                <div class="pt-2 flex items-center gap-2 text-xs font-mono text-base-content/60">
-                    <i class="fa-solid fa-bezier-curve text-primary"></i>
-                    <span>Real-world contour mapping</span>
-                </div>
+        <div class="home-kicker">What you're running</div>
+        <h2 class="sign mb-10">Three things keep a resort open.</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+            <div class="pillar">
+                <div class="pillar-mark" aria-hidden="true"><i class="tsign green"></i><i class="tsign blue"></i><i class="tsign black"></i></div>
+                <h3>Runs and lifts</h3>
+                <p>Draw runs along the real fall lines of the mountain, grade them from green to double black, and choose lifts that keep the lines short. Players have built <b class="text-base-content"><?= number_format($totalSlopes) ?></b> runs so far.</p>
             </div>
-
-            <!-- Pillar 2: Commercial Operations & Yield Management -->
-            <div class="p-6 bg-base-100 rounded-2xl border border-base-300 shadow-sm space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-base-200">
-                    <div class="flex items-center gap-1.5 text-warning font-mono text-xs font-bold">
-                        <i class="fa-solid fa-coins"></i>
-                        <span>FISCAL ENGINE</span>
-                    </div>
-                    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-base-content/50">Lodge & Retail</span>
-                </div>
-                <div>
-                    <h3 class="font-bold text-base text-base-content">Commercial Operations</h3>
-                    <p class="text-sm text-base-content/70 leading-relaxed font-normal mt-2">
-                        Build luxury slope-side lodges, mountain restaurants, equipment rental centers, and parking lots. Calibrate ticket pricing to maximize revenue without exceeding lift capacity. Top resort: <span class="font-semibold text-base-content"><?= $topPlayer ? esc($topPlayer['username']) : 'Top Operator' ?></span>.
-                    </p>
-                </div>
-                <div class="pt-2 flex items-center gap-2 text-xs font-mono text-base-content/60">
-                    <i class="fa-solid fa-arrow-trend-up text-success"></i>
-                    <span>Dynamic pass yield pricing</span>
-                </div>
+            <div class="pillar">
+                <div class="pillar-mark" aria-hidden="true"><i class="fa-solid fa-ticket text-lg text-warning"></i></div>
+                <h3>Money</h3>
+                <p>Set ticket prices, build lodges, restaurants, rentals and parking, borrow when you have to, and try not to run dry before the season ends.</p>
             </div>
-
-            <!-- Pillar 3: Industrial Snowmaking & Fleet Grooming -->
-            <div class="p-6 bg-base-100 rounded-2xl border border-base-300 shadow-sm space-y-4">
-                <div class="flex items-center justify-between pb-3 border-b border-base-200">
-                    <div class="flex items-center gap-1.5 text-info font-mono text-xs font-bold">
-                        <i class="fa-solid fa-snowflake"></i>
-                        <span>SNOWPACK OPS</span>
-                    </div>
-                    <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-base-content/50"><?= $weather ? $weather['temp_formatted'] : '24°F' ?></span>
-                </div>
-                <div>
-                    <h3 class="font-bold text-base text-base-content">Snowmaking & Grooming</h3>
-                    <p class="text-sm text-base-content/70 leading-relaxed font-normal mt-2">
-                        Track wet-bulb temperature thresholds to trigger automated snow cannon banks during dry stretches. Dispatch snowcat grooming shifts at dusk to lay down corduroy and preserve surface ratings.
-                    </p>
-                </div>
-                <div class="pt-2 flex items-center gap-2 text-xs font-mono text-base-content/60">
-                    <i class="fa-solid fa-gauge-high text-info"></i>
-                    <span>Wet-bulb telemetry & fleet routing</span>
-                </div>
+            <div class="pillar">
+                <div class="pillar-mark" aria-hidden="true"><i class="fa-solid fa-snowflake text-lg text-info"></i></div>
+                <h3>Snow</h3>
+                <p>Watch the forecast, fire up the snow guns when it's cold enough, and send groomers out overnight so the runs are in shape by morning.</p>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Real Maps Section -->
-<section class="py-16 bg-base-100 border-b border-base-300">
+<!-- Real maps -->
+<section class="home-section bg-base-200 border-b border-base-300">
+    <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+        <div class="lg:col-span-5 space-y-4">
+            <div class="home-kicker">Real mountains</div>
+            <h2 class="sign">Built on real trail maps.</h2>
+            <p class="text-base-content/75 leading-relaxed">You build on the actual terrain of well-known resorts, following their ridges, bowls and base areas.</p>
+            <ul class="resort-list pt-1">
+                <li>Park City</li><li>Deer Valley</li><li>Vail</li><li>Aspen</li><li>Big Sky</li><li>Palisades Tahoe</li>
+            </ul>
+            <p class="text-xs text-base-content/55 pt-2">Maps by <a href="https://skimap.com" target="_blank" rel="noopener noreferrer" class="underline">Mapsynergy</a></p>
+        </div>
+        <div class="lg:col-span-7">
+            <a href="<?= auth()->loggedIn() ? '/map' : '/register' ?>" class="map-frame">
+                <img src="/img/ParkCity_low.jpg" alt="Park City trail map" width="600" height="340" loading="lazy" decoding="async">
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Seasons -->
+<section class="home-section bg-base-100 border-b border-base-300">
     <div class="max-w-6xl mx-auto px-4">
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div class="lg:col-span-5 space-y-4">
-                <div class="inline-flex items-center gap-1.5 text-xs font-mono text-base-content/60 uppercase tracking-wider">
-                    <i class="fa-solid fa-map text-primary"></i> Map Database
+        <div class="home-kicker">Seasons</div>
+        <h2 class="sign mb-12">The mountain opens up a sector at a time.</h2>
+        <div class="seasons">
+            <?php foreach ($__seasons as $__n => $__s) :
+                $__isNow  = $__n === 3 ? $currentSeasonNum >= 3 : $__n === $currentSeasonNum;
+                $__isDone = $__n < $currentSeasonNum && !$__isNow;
+                $__state  = $__isNow ? 'is-now' : ($__isDone ? 'is-done' : '');
+            ?>
+            <div class="season <?= $__state ?>">
+                <div class="season-dot"></div>
+                <div class="season-tag">Season <?= $__n ?><?= $__n === 3 ? '+' : '' ?> · <?= $__isNow ? 'Now playing' : ($__isDone ? 'Finished' : 'Coming up') ?></div>
+                <h3><?= esc($__s['title']) ?></h3>
+                <p><?= esc($__s['text']) ?></p>
+                <?php if ($__isNow) : ?>
+                <div class="mt-3">
+                    <progress class="progress progress-primary w-full h-1.5" value="<?= $seasonDay ?>" max="<?= max(1, $seasonLen) ?>"></progress>
+                    <div class="flex justify-between text-xs text-base-content/60 mt-1"><span>Day <?= $seasonDay ?> of <?= $seasonLen ?></span><span><?= $daysRemaining ?> days left</span></div>
                 </div>
-                <h2 class="text-3xl font-bold tracking-tight text-base-content">Built on real resort maps.</h2>
-                <p class="text-sm text-base-content/70 leading-relaxed font-normal">
-                    Manage real-world topography from famous ski destinations. Plot runs across natural ridge lines, bowl formations, and valley bases.
-                </p>
-
-                <div class="flex flex-wrap gap-2 pt-2">
-                    <span class="px-2.5 py-1 rounded-md bg-base-200 border border-base-300 text-xs font-medium text-base-content">Park City</span>
-                    <span class="px-2.5 py-1 rounded-md bg-base-200 border border-base-300 text-xs font-medium text-base-content">Deer Valley</span>
-                    <span class="px-2.5 py-1 rounded-md bg-base-200 border border-base-300 text-xs font-medium text-base-content">Vail</span>
-                    <span class="px-2.5 py-1 rounded-md bg-base-200 border border-base-300 text-xs font-medium text-base-content">Aspen</span>
-                    <span class="px-2.5 py-1 rounded-md bg-base-200 border border-base-300 text-xs font-medium text-base-content">Big Sky</span>
-                    <span class="px-2.5 py-1 rounded-md bg-base-200 border border-base-300 text-xs font-medium text-base-content">Palisades Tahoe</span>
-                </div>
-
-                <div class="pt-2 text-xs text-base-content/50">
-                    Map overlays powered by <a href="https://skimap.com" target="_blank" rel="noopener noreferrer" class="link link-hover font-semibold">Mapsynergy</a>
-                </div>
+                <?php endif ?>
+                <ul>
+                    <?php foreach ($__s['items'] as $__it) : ?><li><?= esc($__it) ?></li><?php endforeach ?>
+                </ul>
+                <?php if ($__n === 3) : ?>
+                <a href="<?= auth()->loggedIn() ? '/vote' : '/register' ?>" class="inline-block text-sm font-semibold text-primary mt-3">Vote on the next mountain →</a>
+                <?php endif ?>
             </div>
-
-            <div class="lg:col-span-7">
-                <a href="<?= auth()->loggedIn() ? '/map' : '/register' ?>" class="block relative rounded-2xl overflow-hidden border border-base-300 shadow-sm">
-                    <img src="/img/ParkCity_low.jpg" alt="Park City Trail Map" class="w-full h-auto object-cover" width="600" height="340" loading="lazy" decoding="async">
-                    <div class="absolute inset-0 bg-base-900/5"></div>
-                </a>
-            </div>
+            <?php endforeach ?>
         </div>
     </div>
 </section>
 
-<!-- Season Progression Roadmap -->
-<section class="py-16 bg-base-200/40 border-b border-base-300">
+<!-- Everything else -->
+<section class="home-section bg-base-200 border-b border-base-300">
     <div class="max-w-6xl mx-auto px-4">
-        <div class="mb-10 text-center max-w-xl mx-auto">
-            <span class="text-xs font-mono text-primary font-semibold uppercase tracking-wider">Season Progression</span>
-            <h2 class="text-3xl font-bold tracking-tight text-base-content mt-1">Mountain Expansion Roadmap</h2>
-            <p class="text-sm text-base-content/60 mt-2">Unlocking sectors, steeper elevation, and new resort challenges over time.</p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-            <!-- Season 1 -->
-            <div class="p-6 bg-base-100 rounded-2xl border-2 border-primary/80 shadow-sm space-y-4 flex flex-col justify-between">
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between">
-                        <span class="badge badge-primary font-mono text-xs font-bold">Season 1</span>
-                        <span class="text-xs font-bold text-success flex items-center gap-1">
-                            <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span> Active
-                        </span>
-                    </div>
-
-                    <h3 class="font-bold text-lg text-base-content">Sector 1 &bull; Park City Base</h3>
-                    <p class="text-xs text-base-content/70 leading-relaxed">
-                        Founding sector with beginner and intermediate terrain. Build core lifts, establish ski patrol, and maintain financial stability.
-                    </p>
-
-                    <div class="p-3.5 bg-base-200/80 rounded-xl border border-base-300 space-y-2">
-                        <div class="flex justify-between text-xs font-semibold">
-                            <span class="text-base-content/70">Season Days</span>
-                            <span class="font-mono text-primary font-bold"><?= $seasonProgressPct ?>%</span>
-                        </div>
-                        <progress class="progress progress-primary w-full h-2" value="<?= getSeasonDay() ?>" max="<?= getSeasonLength() ?>"></progress>
-                        <div class="flex justify-between text-[11px] text-base-content/60 font-medium">
-                            <span>Day <?= getSeasonDay() ?>/<?= getSeasonLength() ?></span>
-                            <span><?= $daysRemaining ?> days left</span>
-                        </div>
-                    </div>
-
-                    <ul class="space-y-2 text-xs text-base-content/80 pt-2 border-t border-base-200">
-                        <li class="flex items-center gap-2"><i class="fa-solid fa-check text-success text-xs"></i> Beginner & Intermediate Slopes</li>
-                        <li class="flex items-center gap-2"><i class="fa-solid fa-check text-success text-xs"></i> Snowmaking & Grooming Systems</li>
-                        <li class="flex items-center gap-2"><i class="fa-solid fa-check text-success text-xs"></i> Survival & Cash Management</li>
-                    </ul>
-                </div>
-
-                <div class="pt-2">
-                    <?php if (!auth()->loggedIn()): ?>
-                    <a href="/register" class="btn btn-primary btn-sm rounded-xl w-full font-semibold">Join Season 1 Free</a>
-                    <?php else: ?>
-                    <a href="/dashboard" class="btn btn-primary btn-sm rounded-xl w-full font-semibold">Go to Dashboard</a>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- Season 2 -->
-            <div class="p-6 bg-base-100 rounded-2xl border-2 <?= $daysRemaining <= 14 ? 'border-warning/80 shadow-md' : 'border-base-300 shadow-sm' ?> space-y-4 flex flex-col justify-between">
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between">
-                        <span class="badge <?= $daysRemaining <= 14 ? 'badge-warning font-bold' : 'badge-neutral font-medium' ?> font-mono text-xs">Season 2</span>
-                        <?php if ($daysRemaining <= 14): ?>
-                            <span class="text-xs font-bold text-warning flex items-center gap-1.5">
-                                <span class="relative flex h-2 w-2">
-                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-75"></span>
-                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-warning"></span>
-                                </span>
-                                Launching Oct 19
-                            </span>
-                        <?php else: ?>
-                            <span class="text-xs font-medium text-base-content/50 flex items-center gap-1"><i class="fa-solid fa-lock text-[10px]"></i> Locked</span>
-                        <?php endif; ?>
-                    </div>
-
-                    <h3 class="font-bold text-lg text-base-content">Sector 2 &bull; Advanced Peaks</h3>
-                    <p class="text-xs text-base-content/70 leading-relaxed">
-                        Expands terrain into steep bowls and high-altitude ridges. Introduce express gondolas and handle storm emergency operations.
-                    </p>
-
-                    <div class="p-3.5 bg-base-200/80 rounded-xl border border-warning/30 space-y-1.5">
-                        <div class="flex justify-between items-center text-xs font-bold">
-                            <span class="text-warning flex items-center gap-1"><i class="fa-solid fa-hourglass-half text-[10px]"></i> Unlocks in <?= $daysRemaining ?> Days</span>
-                            <span class="text-xs text-base-content/50 font-mono">Oct 19, 2026</span>
-                        </div>
-                        <div class="text-[11px] text-base-content/70">100% Progress Carryover: Cash & assets carry forward into Season 2!</div>
-                    </div>
-
-                    <ul class="space-y-2 text-xs text-base-content/80 pt-2 border-t border-base-200">
-                        <li class="flex items-center gap-2"><i class="fa-solid fa-mountain text-warning text-xs"></i> Black Diamond & Expert Bowls</li>
-                        <li class="flex items-center gap-2"><i class="fa-solid fa-cable-car text-warning text-xs"></i> High-Speed Express Gondolas</li>
-                        <li class="flex items-center gap-2"><i class="fa-solid fa-arrow-right-rotate text-success text-xs"></i> Full Progress & Cash Carryover</li>
-                    </ul>
-                </div>
-
-                <div class="pt-2">
-                    <?php if (!auth()->loggedIn()): ?>
-                    <a href="/register" class="btn btn-warning btn-sm rounded-xl w-full font-bold shadow-xs">Join & Prepare for Season 2</a>
-                    <?php else: ?>
-                    <a href="/dashboard" class="btn btn-warning btn-sm rounded-xl w-full font-bold shadow-xs">Prepare Your Resort <i class="fa-solid fa-arrow-right text-[10px]"></i></a>
-                    <?php endif; ?>
-                </div>
-            </div>
-
-            <!-- Season 3 & Beyond -->
-            <div class="p-6 bg-base-100 rounded-2xl border border-base-300 shadow-sm space-y-4 flex flex-col justify-between">
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between">
-                        <span class="badge badge-accent font-mono text-xs font-bold">Season 3+</span>
-                        <span class="text-xs font-semibold text-accent"><i class="fa-solid fa-check-to-slot text-[10px]"></i> Voting Active</span>
-                    </div>
-
-                    <h3 class="font-bold text-lg text-base-content">Global Mountain Expansion</h3>
-                    <p class="text-xs text-base-content/70 leading-relaxed">
-                        Conquer the complete mountain before participating in community votes for future destinations like Aspen or European alpine passes.
-                    </p>
-
-                    <div class="p-3.5 bg-accent/5 rounded-xl border border-accent/20 text-center">
-                        <span class="text-xs font-bold text-accent"><i class="fa-solid fa-vote-yea mr-1"></i> Community Destination Voting</span>
-                        <div class="text-[11px] text-base-content/60 mt-0.5">Help choose the next ski area</div>
-                    </div>
-
-                    <ul class="space-y-2 text-xs text-base-content/80 pt-2 border-t border-base-200">
-                        <li class="flex items-center gap-2"><i class="fa-solid fa-snowflake text-accent text-xs"></i> Backcountry & Terrain Parks</li>
-                        <li class="flex items-center gap-2"><i class="fa-solid fa-globe text-accent text-xs"></i> Community-Selected Resorts</li>
-                        <li class="flex items-center gap-2"><i class="fa-solid fa-trophy text-accent text-xs"></i> Inter-Resort Tournaments</li>
-                    </ul>
-                </div>
-
-                <div class="pt-2">
-                    <?php if (auth()->loggedIn()): ?>
-                    <a href="/vote" class="btn btn-accent btn-outline btn-sm rounded-xl w-full font-semibold">Vote for Season 4</a>
-                    <?php else: ?>
-                    <a href="/register" class="btn btn-accent btn-outline btn-sm rounded-xl w-full font-semibold">Register To Vote</a>
-                    <?php endif; ?>
-                </div>
-            </div>
-
+        <h2 class="sign mb-10">Also in the game</h2>
+        <div class="feature-list">
+            <div><b><i class="fa-solid fa-users"></i>Ten staff roles</b>Patrol, groomers, instructors, chefs and more.</div>
+            <div><b><i class="fa-solid fa-cloud-sun"></i>Changing weather</b>Temperatures move through the day.</div>
+            <div><b><i class="fa-solid fa-building-columns"></i>Loans and insurance</b>Borrow to grow, insure against bad luck.</div>
+            <div><b><i class="fa-solid fa-truck-monster"></i>Real equipment</b>PistenBully groomers, TechnoAlpin guns.</div>
+            <div><b><i class="fa-solid fa-person-snowboarding"></i>Terrain parks</b>Halfpipes, jumps and rail gardens.</div>
+            <div><b><i class="fa-solid fa-ranking-star"></i>Leaderboard</b>See how your resort stacks up each season.</div>
+            <div><b><i class="fa-solid fa-bolt"></i>Energy and water</b>Lifts and snow guns need both.</div>
+            <div><b><i class="fa-solid fa-hotel"></i>Lodging and food</b>Hotels, restaurants, rentals and retail.</div>
         </div>
     </div>
 </section>
 
-<!-- Modular Systems Grid -->
-<section class="py-16 bg-base-100 border-b border-base-300">
-    <div class="max-w-6xl mx-auto px-4">
-        <div class="mb-10 text-center max-w-xl mx-auto">
-            <h2 class="text-2xl font-bold tracking-tight text-base-content">Connected Tycoon Mechanics</h2>
-            <p class="text-sm text-base-content/60 mt-1">Every system impacts your resort's bottom line.</p>
+<!-- Call to action -->
+<section class="home-cta">
+    <div class="max-w-6xl mx-auto px-4 py-14 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+        <?php if (auth()->loggedIn()) : ?>
+        <div>
+            <h2>Your lifts are still turning.</h2>
+            <p class="mt-2" style="color:rgba(247,245,240,0.7)">The season keeps going while you're away.</p>
         </div>
-
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div class="p-4 bg-base-200/50 rounded-xl border border-base-300 text-center space-y-1.5">
-                <div class="w-8 h-8 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center mx-auto text-primary text-sm"><i class="fa-solid fa-map"></i></div>
-                <div class="text-xs font-bold text-base-content">Trail Map</div>
-                <div class="text-[11px] text-base-content/60">Draw & connect runs</div>
-            </div>
-
-            <div class="p-4 bg-base-200/50 rounded-xl border border-base-300 text-center space-y-1.5">
-                <div class="w-8 h-8 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center mx-auto text-warning text-sm"><i class="fa-solid fa-users"></i></div>
-                <div class="text-xs font-bold text-base-content">10 Staff Roles</div>
-                <div class="text-[11px] text-base-content/60">Patrol, groomers, chefs</div>
-            </div>
-
-            <div class="p-4 bg-base-200/50 rounded-xl border border-base-300 text-center space-y-1.5">
-                <div class="w-8 h-8 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center mx-auto text-info text-sm"><i class="fa-solid fa-cloud-sun"></i></div>
-                <div class="text-xs font-bold text-base-content">Dynamic Weather</div>
-                <div class="text-[11px] text-base-content/60">Hourly temperature shifts</div>
-            </div>
-
-            <div class="p-4 bg-base-200/50 rounded-xl border border-base-300 text-center space-y-1.5">
-                <div class="w-8 h-8 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center mx-auto text-success text-sm"><i class="fa-solid fa-coins"></i></div>
-                <div class="text-xs font-bold text-base-content">Economy Simulation</div>
-                <div class="text-[11px] text-base-content/60">Loans, tickets & insurance</div>
-            </div>
-
-            <div class="p-4 bg-base-200/50 rounded-xl border border-base-300 text-center space-y-1.5">
-                <div class="w-8 h-8 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center mx-auto text-error text-sm"><i class="fa-solid fa-snowflake"></i></div>
-                <div class="text-xs font-bold text-base-content">Real Brands</div>
-                <div class="text-[11px] text-base-content/60">PistenBully & TechnoAlpin</div>
-            </div>
-
-            <div class="p-4 bg-base-200/50 rounded-xl border border-base-300 text-center space-y-1.5">
-                <div class="w-8 h-8 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center mx-auto text-secondary text-sm"><i class="fa-solid fa-person-snowboarding"></i></div>
-                <div class="text-xs font-bold text-base-content">Terrain Parks</div>
-                <div class="text-[11px] text-base-content/60">Halfpipes & rail gardens</div>
-            </div>
-
-            <div class="p-4 bg-base-200/50 rounded-xl border border-base-300 text-center space-y-1.5">
-                <div class="w-8 h-8 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center mx-auto text-warning text-sm"><i class="fa-solid fa-trophy"></i></div>
-                <div class="text-xs font-bold text-base-content">Leaderboard</div>
-                <div class="text-[11px] text-base-content/60">Global seasonal rankings</div>
-            </div>
-
-            <div class="p-4 bg-base-200/50 rounded-xl border border-base-300 text-center space-y-1.5">
-                <div class="w-8 h-8 rounded-lg bg-base-100 border border-base-300 flex items-center justify-center mx-auto text-primary text-sm"><i class="fa-solid fa-bolt"></i></div>
-                <div class="text-xs font-bold text-base-content">Energy & Water</div>
-                <div class="text-[11px] text-base-content/60">Resource infrastructure</div>
-            </div>
+        <a href="/dashboard" class="btn btn-primary px-8">Go to your resort</a>
+        <?php else : ?>
+        <div>
+            <h2>The mountain's empty. Go build it.</h2>
+            <p class="mt-2" style="color:rgba(247,245,240,0.7)">Free, in your browser, with up to <?= currency(1000000) ?> to start.</p>
         </div>
-    </div>
-</section>
-
-<!-- Footer Banner -->
-<section class="py-16 bg-base-200/60">
-    <div class="max-w-4xl mx-auto px-4 text-center">
-        <div class="p-8 rounded-2xl bg-base-100 border border-base-300 shadow-sm space-y-4">
-            <?php if (auth()->loggedIn()) : ?>
-            <h2 class="text-2xl sm:text-3xl font-bold tracking-tight text-base-content">Return to your mountain.</h2>
-            <p class="text-sm text-base-content/70 max-w-md mx-auto">Your resort operations are running live in real-time.</p>
-            <div class="pt-2">
-                <a href="/dashboard" class="btn btn-primary rounded-xl font-semibold px-8 gap-2">
-                    <i class="fa-solid fa-gauge-high text-xs"></i> Go to Dashboard
-                </a>
-            </div>
-            <?php else : ?>
-            <h2 class="text-2xl sm:text-3xl font-bold tracking-tight text-base-content">Your mountain awaits.</h2>
-            <p class="text-sm text-base-content/70 max-w-md mx-auto">Start with up to <?= currency(1000000) ?> capital. No downloads required.</p>
-            <div class="pt-2">
-                <a href="/register" class="btn btn-primary rounded-xl font-semibold px-8 gap-2">
-                    <i class="fa-solid fa-play text-xs"></i> Start Building Free
-                </a>
-            </div>
-            <div class="text-xs text-base-content/50 pt-1">
-                Already playing? <a href="/login" class="underline font-medium hover:text-base-content">Sign in here</a>
-            </div>
-            <?php endif ?>
+        <div class="flex items-center gap-4">
+            <a href="/register" class="btn btn-primary px-8">Play free</a>
+            <a href="/login" class="text-sm underline underline-offset-4" style="color:rgba(247,245,240,0.8)">I already play</a>
         </div>
+        <?php endif ?>
     </div>
 </section>
 
