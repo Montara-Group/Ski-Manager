@@ -123,7 +123,7 @@ class ResortMap extends BaseController
                 ->get()->getResultArray();
             $builtSegmentIds = array_column($built, 'segment_id');
             foreach ($built as $b) {
-                $builtItems[(int) $b['segment_id']] = $b;
+                $builtItems[(int) $b['segment_id']] = $b + ['salvage' => self::salvageValue($b)];
             }
             $finRow   = $db->table('player_finances')->select('cash')->where('user_id', $userId)->get()->getRowArray();
             $userCash = (int) ($finRow['cash'] ?? 0);
@@ -315,7 +315,7 @@ class ResortMap extends BaseController
         }
 
         $length = (float) ($segment['length_meters'] ?? 0);
-        $cost   = $this->calcCost($segment['type'], $liftType, $seats, $length);
+        $cost   = self::calcCost($segment['type'], $liftType, $seats, $length);
 
         $fin  = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
         $cash = (int) ($fin['cash'] ?? 0);
@@ -344,6 +344,9 @@ class ResortMap extends BaseController
             'created_at'    => date('Y-m-d H:i:s'),
         ];
         $db->table('player_items')->insert($itemData);
+        // The map needs the row id (to demolish it later) and its salvage value
+        $itemData['id']      = (int) $db->insertID();
+        $itemData['salvage'] = self::salvageValue($itemData);
 
         return $this->response->setJSON([
             'success'    => true,
@@ -355,7 +358,87 @@ class ResortMap extends BaseController
         ]);
     }
 
-    private function calcCost(string $type, ?string $liftType, int $seats, float $meters): int
+    /**
+     * Demolish a built lift or slope for a 25% salvage refund (same rate as Buildings::sell).
+     * Answers JSON for the map, or redirects back with a flash message for plain form posts.
+     */
+    public function demolishItem($id = null)
+    {
+        $userId = auth()->id();
+        $isAjax = $this->request->isAJAX();
+        $fail = function (int $code, string $msg) use ($isAjax) {
+            return $isAjax
+                ? $this->response->setStatusCode($code)->setJSON(['error' => $msg, 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()])
+                : redirect()->back()->with('error', $msg);
+        };
+        if (!$userId) {
+            return $fail(401, 'Login required');
+        }
+
+        $db   = db_connect();
+        $item = $db->table('player_items')->where('id', (int) $id)->where('user_id', $userId)->get()->getRowArray();
+        if (!$item) {
+            return $fail(404, 'That lift or slope was not found.');
+        }
+
+        $refund = self::salvageValue($item);
+        $label  = $item['item_type'] === 'lift' ? 'lift' : 'slope';
+
+        $db->transStart();
+        $db->table('player_items')->where('id', $item['id'])->delete();
+        // Detach things that pointed at it rather than deleting them
+        $db->table('equipment')->where('user_id', $userId)->where('assigned_to', 'slope_' . $item['id'])->update(['assigned_to' => null]);
+        $db->table('terrain_parks')->where('user_id', $userId)->where('slope_id', $item['id'])->update(['slope_id' => null]);
+        $db->table('scenic_lifts')->where('user_id', $userId)->where('item_id', $item['id'])->delete();
+        if ($refund > 0) {
+            $db->table('player_finances')->where('user_id', $userId)->set('cash', "cash + {$refund}", false)->update();
+            $db->table('financial_transactions')->insert([
+                'user_id' => $userId, 'game_day' => getGameDay(),
+                'category' => 'Construction', 'description' => 'Demolished ' . $item['name'] . ' (Salvage Refund)',
+                'amount' => $refund, 'type' => 'income', 'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+        $db->transComplete();
+
+        if (!$db->transStatus()) {
+            return $fail(500, 'Could not demolish ' . $item['name'] . '. Nothing was changed.');
+        }
+
+        log_activity($userId, 'Construction', 'Demolished ' . $label . ' ' . $item['name'] . ' for ' . currency($refund) . ' salvage', 'fa-solid fa-trash-can');
+
+        $msg = $item['name'] . ' demolished. ' . currency($refund) . ' refunded (25% salvage).';
+        if (!$isAjax) {
+            return redirect()->back()->with('success', $msg);
+        }
+        $fin = $db->table('player_finances')->select('cash')->where('user_id', $userId)->get()->getRowArray();
+        return $this->response->setJSON([
+            'success'    => true,
+            'message'    => $msg,
+            'refund'     => $refund,
+            'segment_id' => $item['segment_id'] !== null ? (int) $item['segment_id'] : null,
+            'new_cash'   => (int) ($fin['cash'] ?? 0),
+            'csrf_token' => csrf_token(),
+            'csrf_hash'  => csrf_hash(),
+        ]);
+    }
+
+    /**
+     * 25% of what the item cost to build. Seats aren't stored, so this prices the cheapest
+     * carrier for its lift type: the refund can come out lower than 25%, never higher.
+     */
+    public static function salvageValue(array $item): int
+    {
+        $meters = (float) ($item['length_meters'] ?? 0);
+        if (($item['item_type'] ?? '') !== 'lift') {
+            return (int) round($meters * 50 * 0.25);
+        }
+        $minSeats = match ($item['subtype'] ?? '') {
+            'button' => 1, 'chair_detach' => 4, 'gondola' => 6, 'cable_car' => 20, default => 2,
+        };
+        return (int) round(self::calcCost('lift', $item['subtype'] ?? 'chair_fixed', $minSeats, $meters) * 0.25);
+    }
+
+    private static function calcCost(string $type, ?string $liftType, int $seats, float $meters): int
     {
         if ($type === 'lift') {
             $base = match ($liftType) {

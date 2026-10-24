@@ -11,7 +11,7 @@ $diffColors = ['green' => 'badge-success', 'blue' => 'badge-info', 'red' => 'bad
 ?>
 <div class="max-w-7xl mx-auto p-4 lg:p-8">
 
-    <?php if (session('success')) : ?><div class="alert alert-success mb-4" role="status"><span><?= session('success') ?></span></div><?php endif ?>
+    <?php if (session('success')) : ?><div class="alert alert-success mb-4" role="status"><span><?= esc(session('success')) ?></span></div><?php endif ?>
 
     <!-- Resort Header -->
     <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body">
@@ -147,6 +147,10 @@ $diffColors = ['green' => 'badge-success', 'blue' => 'badge-info', 'red' => 'bad
                                         <form action="/resort/toggle/<?= $lift['id'] ?>" method="post" class="inline"><?= csrf_field() ?>
                                             <button class="btn btn-ghost btn-xs" aria-label="Toggle on/off"><i class="fa-solid fa-power-off" aria-hidden="true"></i></button>
                                         </form>
+                                        <?php $__salvage = \App\Controllers\ResortMap::salvageValue($lift); ?>
+                                        <form action="/map/demolish/<?= $lift['id'] ?>" method="post" class="inline" onsubmit="return confirm('Demolish <?= esc($lift['name'], 'js') ?>? You get <?= esc(currency($__salvage), 'js') ?> back (25% salvage). This can\'t be undone.')"><?= csrf_field() ?>
+                                            <button class="btn btn-ghost btn-xs text-error" aria-label="Demolish <?= esc($lift['name']) ?>" title="Demolish (<?= currency($__salvage) ?> refund)"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>
+                                        </form>
                                     </td>
                                 </tr>
                             <?php endforeach ?>
@@ -183,6 +187,10 @@ $diffColors = ['green' => 'badge-success', 'blue' => 'badge-info', 'red' => 'bad
                                     <td>
                                         <form action="/resort/toggle/<?= $slope['id'] ?>" method="post" class="inline"><?= csrf_field() ?>
                                             <button class="btn btn-ghost btn-xs" aria-label="Toggle on/off"><i class="fa-solid fa-power-off" aria-hidden="true"></i></button>
+                                        </form>
+                                        <?php $__salvage = \App\Controllers\ResortMap::salvageValue($slope); ?>
+                                        <form action="/map/demolish/<?= $slope['id'] ?>" method="post" class="inline" onsubmit="return confirm('Demolish <?= esc($slope['name'], 'js') ?>? You get <?= esc(currency($__salvage), 'js') ?> back (25% salvage). This can\'t be undone.')"><?= csrf_field() ?>
+                                            <button class="btn btn-ghost btn-xs text-error" aria-label="Demolish <?= esc($slope['name']) ?>" title="Demolish (<?= currency($__salvage) ?> refund)"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>
                                         </form>
                                     </td>
                                 </tr>

@@ -1149,7 +1149,12 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
         var item = BUILT_ITEMS[seg.id] || {};
         var capInfo = seg.type === 'lift' && item.capacity ? ('<div class="flex justify-between"><span>Capacity:</span><b>' + Number(item.capacity).toLocaleString() + '/hr</b></div>') : '';
         var snowInfo = seg.type !== 'lift' && item.snow_quality ? ('<div class="flex justify-between"><span>Condition:</span><b class="capitalize">' + escHtml(item.snow_quality) + '</b></div>') : '';
-        var html = '<div class="p-1 text-xs min-w-[160px]">' +
+        var status = item.status || 'open';
+        var statusClass = { open: 'badge-success', closed: 'badge-ghost', broken: 'badge-error', building: 'badge-info' }[status] || 'badge-ghost';
+        var canDemolish = !!item.id;
+        var el = document.createElement('div');
+        el.className = 'p-1 text-xs min-w-[180px]';
+        el.innerHTML =
             '<div class="font-bold text-sm mb-1 flex items-center gap-1.5">' +
                 (seg.type === 'lift' ? '<i class="fa-solid fa-elevator text-warning"></i>' : '<i class="fa-solid fa-person-skiing text-success"></i>') +
                 ' <span>' + escHtml(seg.name || seg.type) + '</span>' +
@@ -1157,13 +1162,45 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
             '<div class="space-y-1 text-base-content/80">' +
                 '<div class="flex justify-between"><span>Length:</span><b class="font-mono">' + Math.round(seg.length_meters || 0) + ' ' + DIST_UNIT + '</b></div>' +
                 capInfo + snowInfo +
-                '<div class="flex justify-between"><span>Status:</span><span class="badge badge-success badge-xs">Active</span></div>' +
+                '<div class="flex justify-between"><span>Status:</span><span class="badge ' + statusClass + ' badge-xs capitalize">' + escHtml(status) + '</span></div>' +
             '</div>' +
-        '</div>';
+            (canDemolish
+                ? '<button type="button" class="btn btn-ghost btn-xs w-full mt-2 gap-1.5 text-error" data-demolish>' +
+                      '<i class="fa-solid fa-trash-can"></i> Demolish · refund $' + Number(item.salvage || 0).toLocaleString() +
+                  '</button>'
+                : '');
+        var btn = el.querySelector('[data-demolish]');
+        if (btn) btn.addEventListener('click', function() { demolishBuilt(seg, item, btn); });
         L.popup({ className: 'admin-leaflet-popup' })
             .setLatLng(latlng)
-            .setContent(html)
+            .setContent(el)
             .openOn(map);
+    }
+
+    function demolishBuilt(seg, item, btn) {
+        var name = seg.name || (seg.type === 'lift' ? 'this lift' : 'this slope');
+        var ok = confirm('Demolish ' + name + '?\n\nYou get $' + Number(item.salvage || 0).toLocaleString() +
+            ' back (25% salvage). Snow cannons and terrain parks on it are kept but unassigned. This can\'t be undone.');
+        if (!ok) return;
+        btn.disabled = true;
+        postJSON('/map/demolish/' + item.id, {}, function(res) {
+            if (!res || !res.success) {
+                btn.disabled = false;
+                showToast((res && res.error) ? res.error : 'Demolition failed', 'error');
+                return;
+            }
+            BUILT_IDS = BUILT_IDS.filter(function(id) { return Number(id) !== Number(seg.id); });
+            delete BUILT_ITEMS[seg.id];
+            if (typeof res.new_cash === 'number') {
+                USER_CASH = res.new_cash;
+                var cashEl = document.getElementById('drawerCashBalance');
+                if (cashEl) cashEl.textContent = '$' + USER_CASH.toLocaleString();
+            }
+            map.closePopup();
+            renderSegments(buildMode);
+            populateList(activeTab);
+            showToast(res.message || ('Demolished ' + name), 'success');
+        });
     }
 
     function renderSectorPolygons() {

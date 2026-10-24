@@ -143,6 +143,7 @@ $routes->post("/admin/optimize-storage", "Admin::optimizeStorage");
 $routes->post("/dashboard/reorder-widgets", "Dashboard::reorderWidgets");
 $routes->post("/dashboard/resize-widget", "Dashboard::resizeWidget");
 $routes->post("/map/build", "ResortMap::buildItem");
+$routes->post("/map/demolish/(:num)", "ResortMap::demolishItem/$1");
 $routes->get("/api/map-image/(:segment)", "MapImage::serve/$1");
 $routes->post("/map/change-map", "ResortMap::changeMap");
 $routes->post("/map/sector/create", "ResortMap::createSector");
