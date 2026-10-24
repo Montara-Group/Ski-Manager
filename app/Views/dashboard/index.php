@@ -2,8 +2,6 @@
 <?= $this->section('title') ?>Dashboard<?= $this->endSection() ?>
 <?= $this->section('content') ?>
 <?php
-$__hour = (int) date('G');
-$__greeting = $__hour < 12 ? 'Good morning' : ($__hour < 17 ? 'Good afternoon' : 'Good evening');
 $seasonLength   = max(1, (int) getSeasonLength());
 $seasonProgress = min($gameDay, $seasonLength);
 $seasonNum      = (int) ceil($gameDay / $seasonLength);
@@ -60,254 +58,93 @@ $cf = $cashflow ?? [
 ?>
 
 <style>
-.dash-shell {
-    max-width: 1320px;
-    margin: 0 auto;
-    padding: 1.25rem 1rem 2.5rem;
+.dash { max-width: 1240px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+@media (min-width: 1024px) { .dash { padding: 2rem 2rem 3rem; } }
+
+.dash-head {
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+    gap: 1rem; padding-bottom: 1.25rem; margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--color-base-300);
 }
+.dash-head h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.015em; line-height: 1.2; margin: 0; }
+.dash-meta { font-size: 0.8125rem; color: color-mix(in oklab, var(--color-base-content) 62%, transparent); margin-top: 0.3rem; }
+.dash-meta .sep { margin: 0 0.45em; opacity: 0.45; }
+.status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 0.35em; position: relative; top: -1px; }
+.dash-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+
+/* Headline numbers: one flat strip, no icons */
+.kpis {
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    background: var(--color-base-100); border: 1px solid var(--color-base-300);
+    border-radius: 8px; margin-bottom: 1.5rem;
+}
+@media (min-width: 1024px) { .kpis { grid-template-columns: repeat(4, 1fr); } }
+.kpi { padding: 1rem 1.25rem; min-width: 0; }
+.kpi:nth-child(even) { border-left: 1px solid var(--color-base-300); }
+.kpi:nth-child(n+3) { border-top: 1px solid var(--color-base-300); }
 @media (min-width: 1024px) {
-    .dash-shell {
-        padding: 1.75rem 2rem 3rem;
-    }
+    .kpi:nth-child(n+3) { border-top: 0; }
+    .kpi:nth-child(n+2) { border-left: 1px solid var(--color-base-300); }
 }
+.kpi-label { font-size: 0.75rem; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.kpi-value { font-size: 1.5rem; font-weight: 650; line-height: 1.25; margin-top: 0.15rem; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.kpi-value small { font-size: 0.75rem; font-weight: 500; opacity: 0.55; margin-left: 1px; }
+.kpi-sub { font-size: 0.75rem; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); margin-top: 0.35rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Executive Hero Header */
-.dash-hero {
-    background: linear-gradient(135deg, rgba(30, 41, 59, 0.85) 0%, rgba(15, 23, 42, 0.95) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1.25rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
-}
-.dash-hero-badges {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-}
-.dash-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    padding: 3px 10px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #e2e8f0;
-}
-.dash-pill-open {
-    background: rgba(34, 197, 94, 0.15);
-    border-color: rgba(34, 197, 94, 0.35);
-    color: #4ade80;
-}
-.dash-pill-closed {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: rgba(239, 68, 68, 0.35);
-    color: #f87171;
-}
-.dash-pill-mountain {
-    background: rgba(56, 189, 248, 0.14);
-    border-color: rgba(56, 189, 248, 0.35);
-    color: #38bdf8;
-}
-
-/* Top 4 Executive KPI Cards */
-.dash-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.875rem;
-    margin-bottom: 1.25rem;
-}
-@media (min-width: 1024px) {
-    .dash-kpi-grid {
-        grid-template-columns: repeat(4, 1fr);
-    }
-}
-.dash-kpi-card {
-    background: rgba(15, 23, 42, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 14px;
-    padding: 1rem 1.15rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 0.65rem;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
-}
-.dash-kpi-top {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 0.75rem;
-}
-.dash-kpi-label {
-    font-size: 0.6875rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: #94a3b8;
-    margin-bottom: 4px;
-}
-.dash-kpi-value {
-    font-size: 1.45rem;
-    font-weight: 800;
-    line-height: 1.15;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-.dash-kpi-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1rem;
-    flex-shrink: 0;
-}
-.dash-kpi-foot {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    font-size: 0.6875rem;
-    color: #94a3b8;
-    padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-/* Alert Strip */
-.dash-alert-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 14px;
-    border-radius: 12px;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    text-decoration: none;
-}
-
-/* Edit Mode Banner */
+/* Customize banner */
 .edit-mode-banner {
-    display: none;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 16px;
-    margin-bottom: 14px;
-    border-radius: 12px;
-    background: rgba(37, 99, 235, 0.18);
-    border: 1px solid rgba(59, 130, 246, 0.45);
-    color: #bfdbfe;
-    font-size: 0.75rem;
+    display: none; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 0.6rem 0.9rem; margin-bottom: 1rem; border-radius: 8px; font-size: 0.8125rem;
+    background: color-mix(in oklab, var(--color-primary) 10%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-primary) 35%, transparent);
 }
-.edit-mode-active .edit-mode-banner {
-    display: flex;
-}
+.edit-mode-active .edit-mode-banner { display: flex; }
 
-/* Widget Grid */
-.widget-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 1rem;
-}
-@media (max-width: 1024px) {
-    .widget-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-@media (max-width: 640px) {
-    .widget-grid {
-        grid-template-columns: 1fr;
-    }
-}
+/* Widget grid */
+.widget-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+@media (max-width: 1024px) { .widget-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 640px) { .widget-grid { grid-template-columns: 1fr; } }
 .widget-small { grid-column: span 1; }
 .widget-medium { grid-column: span 2; }
 .widget-large { grid-column: span 4; }
-@media (max-width: 1024px) {
-    .widget-small { grid-column: span 1; }
-    .widget-medium { grid-column: span 2; }
-    .widget-large { grid-column: span 2; }
-}
-@media (max-width: 640px) {
-    .widget-small, .widget-medium, .widget-large { grid-column: span 1; }
-}
+@media (max-width: 1024px) { .widget-large { grid-column: span 2; } }
+@media (max-width: 640px) { .widget-small, .widget-medium, .widget-large { grid-column: span 1; } }
 
 .widget-item {
     container-type: inline-size;
-    background: rgba(15, 23, 42, 0.78);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 15px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    background: var(--color-base-100); border: 1px solid var(--color-base-300);
+    border-radius: 8px; overflow: hidden; display: flex; flex-direction: column;
 }
-/* Defer off-screen rendering for lower dashboard rows while preserving intrinsic height */
-.widget-grid > .widget-item:nth-child(n+5) {
-    content-visibility: auto;
-    contain-intrinsic-size: auto none auto 180px;
-}
+.widget-grid > .widget-item:nth-child(n+5) { content-visibility: auto; contain-intrinsic-size: auto none auto 180px; }
 
-/* Size-aware container query layouts for modular widgets */
+/* Size-aware layouts */
 .cq-compact { display: block; }
 .cq-expanded { display: none; }
 .cq-large-only { display: none; }
-.cq-stats-grid,
-.cq-overview-grid,
-.cq-actions-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.625rem;
-}
-.cq-season-grid,
-.cq-ach-mini-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.625rem;
-}
+.cq-stats-grid, .cq-overview-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem 1.25rem; }
+.cq-actions-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 1rem; }
+.cq-season-grid { display: grid; grid-template-columns: 1fr; gap: 0.875rem; }
+.cq-ach-mini-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
 
-/* Media query fallback for older browsers without container queries */
 @media (min-width: 640px) {
-    .widget-medium .cq-compact,
-    .widget-large .cq-compact { display: none; }
-    .widget-medium .cq-expanded,
-    .widget-large .cq-expanded { display: block; }
+    .widget-medium .cq-compact, .widget-large .cq-compact { display: none; }
+    .widget-medium .cq-expanded, .widget-large .cq-expanded { display: block; }
     .widget-large .cq-large-only { display: block; }
     .widget-medium .cq-stats-grid { grid-template-columns: repeat(4, 1fr); }
     .widget-large .cq-stats-grid { grid-template-columns: repeat(6, 1fr); }
     .widget-large .cq-overview-grid { grid-template-columns: repeat(5, 1fr); }
-    .widget-medium .cq-season-grid,
-    .widget-large .cq-season-grid { grid-template-columns: repeat(2, 1fr); }
+    .widget-medium .cq-season-grid, .widget-large .cq-season-grid { grid-template-columns: repeat(2, 1fr); }
     .widget-medium .cq-actions-grid { grid-template-columns: repeat(3, 1fr); }
     .widget-large .cq-actions-grid { grid-template-columns: repeat(6, 1fr); }
-    .widget-medium .cq-ach-mini-grid,
-    .widget-large .cq-ach-mini-grid { grid-template-columns: repeat(3, 1fr); }
+    .widget-medium .cq-ach-mini-grid, .widget-large .cq-ach-mini-grid { grid-template-columns: repeat(3, 1fr); }
 }
-
-/* Overwrite with container queries where supported so S/M/L live resize adapts immediately */
 @supports (container-type: inline-size) {
-    @container (min-width: 360px) {
-        .cq-compact { display: none; }
-        .cq-expanded { display: block; }
-    }
-    @container (min-width: 440px) {
-        .cq-actions-grid { grid-template-columns: repeat(3, 1fr); }
-        .cq-ach-mini-grid { grid-template-columns: repeat(3, 1fr); }
-    }
-    @container (min-width: 480px) {
-        .cq-stats-grid { grid-template-columns: repeat(4, 1fr); }
-        .cq-season-grid { grid-template-columns: repeat(2, 1fr); }
-    }
+    @container (min-width: 360px) { .cq-compact { display: none; } .cq-expanded { display: block; } }
+    @container (min-width: 440px) { .cq-actions-grid { grid-template-columns: repeat(3, 1fr); } .cq-ach-mini-grid { grid-template-columns: repeat(3, 1fr); } }
+    @container (min-width: 480px) { .cq-stats-grid { grid-template-columns: repeat(4, 1fr); } .cq-season-grid { grid-template-columns: repeat(2, 1fr); } }
     @container (min-width: 720px) {
         .cq-large-only { display: block; }
         .cq-stats-grid { grid-template-columns: repeat(6, 1fr); }
@@ -316,265 +153,117 @@ $cf = $cashflow ?? [
     }
 }
 
-.widget-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-.widget-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.8125rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #e2e8f0;
-    margin: 0;
-}
-.widget-title i {
-    font-size: 0.8125rem;
-}
-.widget-link {
-    font-size: 0.6875rem;
-    font-weight: 700;
-    color: #38bdf8;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-.widget-content {
-    padding: 1rem 1.15rem;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-.widget-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    text-align: center;
-    padding: 0.5rem 0;
-}
+.widget-content { padding: 1rem 1.25rem 1.125rem; flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.widget-header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.875rem; }
+.widget-title { font-size: 0.875rem; font-weight: 600; margin: 0; }
+.widget-title .aside { font-weight: 400; margin-left: 0.4em; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
+.widget-links { display: flex; gap: 0.875rem; }
+.widget-link { font-size: 0.75rem; white-space: nowrap; text-decoration: none; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.widget-link:hover { color: var(--color-base-content); text-decoration: underline; }
+.widget-center { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 0.5rem 0; }
 
-/* Inner Sub-Cards & Tiles */
-.dash-subcard {
-    background: rgba(30, 41, 59, 0.45);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 11px;
-    padding: 10px 12px;
-}
+/* Plain label-over-number stats */
+.stat { display: block; min-width: 0; color: inherit; text-decoration: none; }
+a.stat:hover .stat-value { text-decoration: underline; text-underline-offset: 3px; }
+.stat-label { font-size: 0.75rem; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.stat-value { font-size: 1.125rem; font-weight: 600; margin-top: 0.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.stat-value small { font-size: 0.75rem; font-weight: 400; color: color-mix(in oklab, var(--color-base-content) 50%, transparent); }
+.stat-note { font-size: 0.6875rem; margin-top: 0.3rem; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
+
+/* List rows separated by rules, not boxes */
+.dash-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; font-size: 0.8125rem; border-top: 1px solid var(--color-base-300); }
+.dash-row:first-child { border-top: 0; padding-top: 0; }
+.dash-row .day { font-size: 0.6875rem; font-variant-numeric: tabular-nums; color: color-mix(in oklab, var(--color-base-content) 50%, transparent); }
+.dash-row > i { width: 1rem; text-align: center; opacity: 0.55; }
+
 .dash-action-tile {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 9px 11px;
-    background: rgba(30, 41, 59, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 10px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    color: #f1f5f9;
-    text-decoration: none;
+    display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.4rem; margin: 0 -0.4rem;
+    font-size: 0.8125rem; color: inherit; text-decoration: none; border-radius: 6px;
 }
-.dash-action-tile:hover {
-    background: rgba(37, 99, 235, 0.2);
-    border-color: rgba(56, 189, 248, 0.45);
-}
-.dash-action-icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8125rem;
-    flex-shrink: 0;
-}
+.dash-action-tile i { width: 1rem; text-align: center; opacity: 0.5; }
+.dash-action-tile:hover { background: color-mix(in oklab, var(--color-base-content) 6%, transparent); }
 
-/* Drag Handle for Layout Edit Mode */
+.forecast { display: flex; }
+.forecast > div { padding: 0 0.75rem; text-align: center; border-left: 1px solid var(--color-base-300); }
+.forecast > div:first-child { border-left: 0; }
+
+/* Customize mode */
 .drag-handle {
-    display: none;
-    align-items: center;
-    justify-content: space-between;
-    padding: 6px 12px;
-    font-size: 0.6875rem;
-    font-weight: 700;
-    cursor: grab;
-    user-select: none;
-    background: rgba(30, 41, 59, 0.9);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    display: none; align-items: center; justify-content: space-between;
+    padding: 6px 10px; font-size: 0.75rem; cursor: grab; user-select: none;
+    background: var(--color-base-200); border-bottom: 1px solid var(--color-base-300);
 }
 .drag-handle:active { cursor: grabbing; }
 .edit-mode .drag-handle { display: flex !important; }
-.edit-mode .widget-item { outline: 2px dashed rgba(56, 189, 248, 0.35); }
+.edit-mode .widget-item { outline: 1px dashed color-mix(in oklab, var(--color-primary) 50%, transparent); outline-offset: 2px; }
 .widget-item.dragging { opacity: 0.35; }
-.widget-item.drag-over { outline-color: #38bdf8 !important; outline-width: 3px; }
+.widget-item.drag-over { outline: 2px solid var(--color-primary) !important; }
 </style>
 
-<div class="dash-shell" id="dashRoot">
+<div class="dash" id="dashRoot">
 
-    <!-- Executive Resort Command Header -->
-    <div class="dash-hero">
+    <header class="dash-head">
         <div>
-            <div class="dash-hero-badges">
-                <span class="dash-pill dash-pill-mountain">
-                    <i class="fa-solid fa-mountain-sun"></i> <?= esc($resortMapName ?? 'Park City') ?>
-                </span>
-                <span class="dash-pill <?= $resortOpen ? 'dash-pill-open' : 'dash-pill-closed' ?>">
-                    <span style="width:7px;height:7px;border-radius:50%;background:currentColor"></span>
-                    <?= $resortOpen ? 'Resort Open' : 'Resort Closed' ?>
-                </span>
-                <span class="dash-pill">
-                    <i class="fa-regular fa-calendar"></i> Season <?= $seasonNum ?> · Day <?= $gameDay ?>
-                </span>
-                <span class="dash-pill">
-                    <i class="fa-solid fa-star text-warning"></i> <?= number_format($repScore) ?> Rep
-                </span>
-            </div>
-            <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight"><?= $__greeting ?>, <?= esc(auth()->user()->username) ?></h1>
-            <p class="text-xs sm:text-sm text-base-content/60 mt-1">
-                <?= $liftCount ?> open lift<?= $liftCount === 1 ? '' : 's' ?> &amp; <?= $slopeCount ?> open slope<?= $slopeCount === 1 ? '' : 's' ?>
-                · Trail condition avg <b class="<?= ($avgSlopeCondition ?? 100) >= 70 ? 'text-success' : 'text-warning' ?>"><?= $avgSlopeCondition ?? 100 ?>%</b>
-                · <?= date('l, F j') ?>
+            <h1><?= esc($resortMapName ?? 'Park City') ?></h1>
+            <p class="dash-meta">
+                <span class="<?= $resortOpen ? 'text-success' : 'text-error' ?>"><span class="status-dot"></span><?= $resortOpen ? 'Open' : 'Closed' ?></span><span class="sep">·</span>Season <?= $seasonNum ?>, day <?= $gameDay ?><span class="sep">·</span><?= $liftCount ?> lift<?= $liftCount === 1 ? '' : 's' ?>, <?= $slopeCount ?> slope<?= $slopeCount === 1 ? '' : 's' ?> running<span class="sep">·</span><span class="num"><?= number_format($repScore) ?></span> reputation
             </p>
         </div>
-
-        <div class="flex flex-wrap items-center gap-2">
-            <a href="/map" class="btn btn-primary btn-sm gap-1.5 font-bold shadow-md">
-                <i class="fa-solid fa-map-location-dot"></i> Trail Map
-            </a>
-            <a href="/resort" class="btn btn-outline btn-sm gap-1.5">
-                <i class="fa-solid fa-sliders"></i> Resort Ops
-            </a>
+        <div class="dash-actions">
             <?php if ($bonusAvailable): ?>
-            <a href="/daily-bonus" class="btn btn-warning btn-sm gap-1.5 font-bold shadow-md">
-                <i class="fa-solid fa-gift"></i> Claim Bonus
-            </a>
+            <a href="/daily-bonus" class="btn btn-warning btn-sm">Claim daily bonus</a>
             <?php endif; ?>
-            <button id="editModeBtn" type="button" onclick="toggleEditMode()" aria-pressed="false" class="btn btn-ghost btn-sm border border-white/10 gap-1.5">
-                <i class="fa-solid fa-table-columns" aria-hidden="true"></i> Customize
-            </button>
+            <a href="/map" class="btn btn-primary btn-sm">Trail map</a>
+            <a href="/resort" class="btn btn-ghost btn-sm">Resort settings</a>
+            <button id="editModeBtn" type="button" onclick="toggleEditMode()" aria-pressed="false" class="btn btn-ghost btn-sm">Customize</button>
         </div>
-    </div>
+    </header>
 
-    <!-- Layout Edit Mode Banner -->
     <div class="edit-mode-banner">
-        <div class="flex items-center gap-2">
-            <i class="fa-solid fa-wand-magic-sparkles text-info" aria-hidden="true"></i>
-            <span><b>Customize Dashboard:</b> Drag any widget header to reorder, click <b>S / M / L</b> to change width, or click the eye icon to hide/restore widgets.</span>
-        </div>
-        <button type="button" onclick="toggleEditMode()" class="btn btn-xs btn-primary font-bold">Done</button>
+        <span>Drag a widget by its top bar to reorder it. Use S / M / L to change its width, or the eye icon to hide it.</span>
+        <button type="button" onclick="toggleEditMode()" class="btn btn-xs btn-primary">Done</button>
     </div>
 
-    <!-- Priority Operational Alerts -->
     <?php if (!empty($alerts) || $unclaimedAchievements > 0) : ?>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 mb-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
         <?php foreach ($alerts as $alert) : ?>
-        <a href="<?= $alert['link'] ?>" class="alert alert-<?= $alert['type'] ?> py-2.5 px-3.5 text-xs font-semibold flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2.5">
-                <i class="<?= $alert['icon'] ?> text-sm"></i>
-                <span><?= esc($alert['msg']) ?></span>
-            </div>
-            <span class="underline opacity-90 whitespace-nowrap ml-2">Resolve <i class="fa-solid fa-arrow-right ml-0.5"></i></span>
+        <a href="<?= $alert['link'] ?>" class="alert alert-<?= $alert['type'] ?> py-2 px-3.5 text-sm flex items-center justify-between">
+            <span class="flex items-center gap-2.5"><i class="<?= $alert['icon'] ?>"></i><?= esc($alert['msg']) ?></span>
+            <span class="underline whitespace-nowrap ml-2">Fix</span>
         </a>
         <?php endforeach ?>
         <?php if ($unclaimedAchievements > 0): ?>
-        <a href="/achievements" class="alert alert-warning py-2.5 px-3.5 text-xs font-semibold flex items-center justify-between shadow-sm">
-            <div class="flex items-center gap-2.5">
-                <i class="fa-solid fa-trophy text-sm"></i>
-                <span>You have <b><?= $unclaimedAchievements ?> unclaimed achievement reward<?= $unclaimedAchievements > 1 ? 's' : '' ?></b> waiting!</span>
-            </div>
-            <span class="underline whitespace-nowrap ml-2">Claim Rewards <i class="fa-solid fa-arrow-right ml-0.5"></i></span>
+        <a href="/achievements" class="alert alert-warning py-2 px-3.5 text-sm flex items-center justify-between">
+            <span><?= $unclaimedAchievements ?> achievement reward<?= $unclaimedAchievements > 1 ? 's' : '' ?> to claim</span>
+            <span class="underline whitespace-nowrap ml-2">Claim</span>
         </a>
         <?php endif; ?>
     </div>
     <?php endif ?>
 
-    <!-- Top 4 Executive KPI Cards -->
-    <div class="dash-kpi-grid">
-        <!-- 1. Treasury & Balance -->
-        <div class="dash-kpi-card">
-            <div class="dash-kpi-top">
-                <div>
-                    <div class="dash-kpi-label">Treasury Balance</div>
-                    <div class="dash-kpi-value <?= $cashBalance >= 0 ? 'text-success' : 'text-error' ?>"><?= currency($cashBalance) ?></div>
-                </div>
-                <div class="dash-kpi-icon" style="background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.3);color:#4ade80">
-                    <i class="fa-solid fa-sack-dollar"></i>
-                </div>
-            </div>
-            <div class="dash-kpi-foot">
-                <span>Lifetime Net: <b class="<?= $netProfit >= 0 ? 'text-success' : 'text-error' ?>"><?= $netProfit >= 0 ? '+' : '' ?><?= currency($netProfit) ?></b></span>
-                <span class="flex items-center gap-1 text-warning font-semibold"><i class="fa-solid fa-seedling"></i> <?= number_format($genepisBal) ?></span>
-            </div>
+    <section class="kpis" aria-label="Key numbers">
+        <div class="kpi">
+            <div class="kpi-label">Cash</div>
+            <div class="kpi-value <?= $cashBalance < 0 ? 'text-error' : '' ?>"><?= currency($cashBalance) ?></div>
+            <div class="kpi-sub">Lifetime <span class="<?= $netProfit >= 0 ? 'text-success' : 'text-error' ?>"><?= $netProfit >= 0 ? '+' : '' ?><?= currency($netProfit) ?></span> · <?= number_format($genepisBal) ?> genepis</div>
         </div>
-
-        <!-- 2. Projected Daily Cashflow -->
-        <div class="dash-kpi-card">
-            <div class="dash-kpi-top">
-                <div>
-                    <div class="dash-kpi-label">Projected Daily Net</div>
-                    <div class="dash-kpi-value <?= $dailyProfit >= 0 ? 'text-success' : 'text-error' ?>">
-                        <?= $dailyProfit >= 0 ? '+' : '' ?><?= currency($dailyProfit) ?><span style="font-size:11px;font-weight:600;opacity:0.6">/d</span>
-                    </div>
-                </div>
-                <div class="dash-kpi-icon" style="background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.3);color:#38bdf8">
-                    <i class="fa-solid fa-chart-line"></i>
-                </div>
-            </div>
-            <div class="dash-kpi-foot">
-                <span class="text-success">In: +<?= currency($cf['total_income']) ?></span>
-                <span class="text-error">Out: -<?= currency($cf['total_expenses']) ?></span>
-            </div>
+        <div class="kpi">
+            <div class="kpi-label">Net per day</div>
+            <div class="kpi-value <?= $dailyProfit >= 0 ? 'text-success' : 'text-error' ?>"><?= $dailyProfit >= 0 ? '+' : '' ?><?= currency($dailyProfit) ?></div>
+            <div class="kpi-sub"><?= currency($cf['total_income']) ?> in · <?= currency($cf['total_expenses']) ?> out</div>
         </div>
-
-        <!-- 3. Mountain Traffic & Capacity -->
-        <div class="dash-kpi-card">
-            <div class="dash-kpi-top">
-                <div>
-                    <div class="dash-kpi-label">Daily Visitors</div>
-                    <div class="dash-kpi-value text-info" id="liveVisitors" data-count="<?= $dailyVisitors ?>" data-lifts="<?= $liftCount ?>" data-slopes="<?= $slopeCount ?>">
-                        <?= number_format($dailyVisitors) ?>
-                    </div>
-                </div>
-                <div class="dash-kpi-icon" style="background:rgba(99,102,241,0.16);border:1px solid rgba(99,102,241,0.35);color:#818cf8">
-                    <i class="fa-solid fa-users"></i>
-                </div>
-            </div>
-            <div class="dash-kpi-foot">
-                <span>Lift Cap: <b><?= number_format($totalLiftCapacity ?? 0) ?>/hr</b></span>
-                <span>Ticket: <b><?= $cf['ticket_price'] > 0 ? currency($cf['ticket_price']) : 'Not set' ?></b></span>
-            </div>
+        <div class="kpi">
+            <div class="kpi-label">Visitors today</div>
+            <div class="kpi-value" id="liveVisitors" data-count="<?= $dailyVisitors ?>" data-lifts="<?= $liftCount ?>" data-slopes="<?= $slopeCount ?>"><?= number_format($dailyVisitors) ?></div>
+            <div class="kpi-sub">Ticket <?= $cf['ticket_price'] > 0 ? currency($cf['ticket_price']) : 'not set' ?> · lifts <?= number_format($totalLiftCapacity ?? 0) ?>/hr</div>
         </div>
-
-        <!-- 4. Alpine Weather & Snowpack -->
-        <div class="dash-kpi-card">
-            <div class="dash-kpi-top">
-                <div>
-                    <div class="dash-kpi-label">Mountain Weather</div>
-                    <div class="dash-kpi-value">
-                        <?= $weather ? ($weather['temp_formatted'] ?? temp((int)($weather['temp'] ?? 0))) : '-' ?>
-                    </div>
-                </div>
-                <div class="dash-kpi-icon" style="background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.3);color:#fbbf24">
-                    <i class="fa-solid <?= $weather ? ($wIcons[$weather['condition_name']] ?? 'fa-cloud') : 'fa-cloud' ?>"></i>
-                </div>
-            </div>
-            <div class="dash-kpi-foot">
-                <span class="truncate"><?= esc($weather['condition_name'] ?? 'Clear') ?></span>
-                <span>Base: <b><?= $weather ? snow($weather['snow_base'] ?? 0) : '-' ?></b></span>
-            </div>
+        <div class="kpi">
+            <div class="kpi-label">Weather</div>
+            <div class="kpi-value"><?= $weather ? ($weather['temp_formatted'] ?? temp((int)($weather['temp'] ?? 0))) : '–' ?></div>
+            <div class="kpi-sub"><?= esc($weather['condition_name'] ?? 'Clear') ?> · <?= $weather ? snow($weather['snow_base'] ?? 0) : '–' ?> base</div>
         </div>
-    </div>
+    </section>
 
-    <!-- Modular Widget Grid -->
     <div id="widgetContainer" class="widget-grid">
     <?php foreach ($widgets as $w) : ?>
         <?php if (!$w['visible']) continue; ?>
@@ -583,8 +272,8 @@ $cf = $cashflow ?? [
 
         <div class="widget-item widget-<?= $sz ?>" data-key="<?= $w['widget_key'] ?>" data-name="<?= esc($info['name']) ?>" data-size="<?= $sz ?>" id="widget-<?= $w['widget_key'] ?>">
             <div class="drag-handle">
-                <div class="flex items-center gap-2 text-base-content/80">
-                    <i class="fa-solid fa-grip-vertical text-info" aria-hidden="true"></i>
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-grip-vertical opacity-50" aria-hidden="true"></i>
                     <span><?= esc($info['name']) ?></span>
                 </div>
                 <div class="flex items-center gap-1">
@@ -593,7 +282,7 @@ $cf = $cashflow ?? [
                         <button type="button" onclick="resizeWidget('<?= $w['widget_key'] ?>','medium')" aria-label="Resize <?= esc($info['name']) ?> widget to medium" aria-pressed="<?= $sz === 'medium' ? 'true' : 'false' ?>" class="btn btn-xs join-item size-btn <?= $sz === 'medium' ? 'btn-primary' : 'btn-ghost' ?>" data-sz="medium">M</button>
                         <button type="button" onclick="resizeWidget('<?= $w['widget_key'] ?>','large')" aria-label="Resize <?= esc($info['name']) ?> widget to large" aria-pressed="<?= $sz === 'large' ? 'true' : 'false' ?>" class="btn btn-xs join-item size-btn <?= $sz === 'large' ? 'btn-primary' : 'btn-ghost' ?>" data-sz="large">L</button>
                     </div>
-                    <button type="button" onclick="hideWidget('<?= $w['widget_key'] ?>')" class="btn btn-ghost btn-xs text-error ml-1" aria-label="Hide <?= esc($info['name']) ?> widget">
+                    <button type="button" onclick="hideWidget('<?= $w['widget_key'] ?>')" class="btn btn-ghost btn-xs ml-1" aria-label="Hide <?= esc($info['name']) ?> widget">
                         <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
                     </button>
                 </div>
@@ -601,168 +290,99 @@ $cf = $cashflow ?? [
 
             <div class="widget-content">
 
-            <?php // ===== STATS (DAILY CASHFLOW & FINANCIAL HEALTH) ===== ?>
             <?php if ($w['widget_key'] === 'stats') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-chart-pie text-primary" aria-hidden="true"></i> Financial &amp; Revenue Breakdown</h2>
-                    <a href="/finances" class="widget-link">Full Ledger <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
+                    <h2 class="widget-title">Cash flow <span class="aside">per day</span></h2>
+                    <a href="/finances" class="widget-link">Ledger →</a>
                 </div>
-                <div class="cq-compact space-y-2 my-auto">
-                    <div class="dash-subcard flex justify-between items-center text-xs">
-                        <span class="text-base-content/60">Daily Revenue</span>
-                        <b class="text-success font-mono">+<?= currency($cf['total_income']) ?></b>
-                    </div>
-                    <div class="dash-subcard flex justify-between items-center text-xs">
-                        <span class="text-base-content/60">Daily Expenses</span>
-                        <b class="text-error font-mono">-<?= currency($cf['total_expenses']) ?></b>
-                    </div>
+                <div class="cq-compact my-auto">
+                    <div class="dash-row"><span class="flex-1 muted">Revenue</span><b class="num text-success">+<?= currency($cf['total_income']) ?></b></div>
+                    <div class="dash-row"><span class="flex-1 muted">Expenses</span><b class="num text-error">−<?= currency($cf['total_expenses']) ?></b></div>
                 </div>
                 <div class="cq-expanded">
                     <div class="cq-stats-grid">
-                        <div class="dash-subcard">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-ticket text-success mr-1" aria-hidden="true"></i>Ticket Sales</div>
-                            <div class="text-sm font-extrabold font-mono text-success">+<?= currency($cf['ticket_income']) ?><span class="text-[10px] opacity-60">/d</span></div>
-                        </div>
-                        <div class="dash-subcard">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-hotel text-info mr-1" aria-hidden="true"></i>Buildings &amp; F&amp;B</div>
-                            <div class="text-sm font-extrabold font-mono text-info">+<?= currency($cf['building_income']) ?><span class="text-[10px] opacity-60">/d</span></div>
-                        </div>
-                        <div class="dash-subcard">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-user-tie text-warning mr-1" aria-hidden="true"></i>Staff Payroll</div>
-                            <div class="text-sm font-extrabold font-mono text-error">-<?= currency($cf['salaries']) ?><span class="text-[10px] opacity-60">/d</span></div>
-                        </div>
-                        <div class="dash-subcard">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-gears text-warning mr-1" aria-hidden="true"></i>Ops &amp; Marketing</div>
-                            <div class="text-sm font-extrabold font-mono text-error">-<?= currency($cf['equipment_cost'] + $cf['marketing_cost']) ?><span class="text-[10px] opacity-60">/d</span></div>
-                        </div>
-                        <div class="dash-subcard cq-large-only">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-arrow-trend-up text-success mr-1" aria-hidden="true"></i>All-Time Income</div>
-                            <div class="text-sm font-extrabold font-mono text-success"><?= currency($finance['total_income'] ?? 0) ?></div>
-                        </div>
-                        <div class="dash-subcard cq-large-only">
-                            <div class="text-[11px] text-base-content/50 mb-1"><i class="fa-solid fa-arrow-trend-down text-error mr-1" aria-hidden="true"></i>All-Time Costs</div>
-                            <div class="text-sm font-extrabold font-mono text-error"><?= currency($finance['total_expenses'] ?? 0) ?></div>
-                        </div>
+                        <div class="stat"><div class="stat-label">Tickets</div><div class="stat-value">+<?= currency($cf['ticket_income']) ?></div></div>
+                        <div class="stat"><div class="stat-label">Buildings &amp; food</div><div class="stat-value">+<?= currency($cf['building_income']) ?></div></div>
+                        <div class="stat"><div class="stat-label">Payroll</div><div class="stat-value">−<?= currency($cf['salaries']) ?></div></div>
+                        <div class="stat"><div class="stat-label">Equipment &amp; marketing</div><div class="stat-value">−<?= currency($cf['equipment_cost'] + $cf['marketing_cost']) ?></div></div>
+                        <div class="stat cq-large-only"><div class="stat-label">All-time income</div><div class="stat-value"><?= currency($finance['total_income'] ?? 0) ?></div></div>
+                        <div class="stat cq-large-only"><div class="stat-label">All-time costs</div><div class="stat-value"><?= currency($finance['total_expenses'] ?? 0) ?></div></div>
                     </div>
                 </div>
             <?php endif ?>
 
-            <?php // ===== OVERVIEW (MOUNTAIN INFRASTRUCTURE & TRAIL HEALTH) ===== ?>
             <?php if ($w['widget_key'] === 'overview') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-mountain-sun text-info" aria-hidden="true"></i> Mountain Infrastructure</h2>
-                    <div class="flex items-center gap-3">
+                    <h2 class="widget-title">Mountain</h2>
+                    <div class="widget-links">
                         <a href="/grooming" class="widget-link">Grooming</a>
-                        <a href="/map" class="widget-link">Trail Map <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
+                        <a href="/map" class="widget-link">Trail map →</a>
                     </div>
                 </div>
                 <div class="cq-overview-grid">
-                    <a href="/map" class="dash-subcard hover:border-info/40 no-underline">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs text-base-content/60">Open Slopes</span>
-                            <i class="fa-solid fa-person-skiing text-success text-xs" aria-hidden="true"></i>
-                        </div>
-                        <div class="text-xl font-extrabold mt-1"><?= $slopeCount ?> <span class="text-xs font-normal text-base-content/40">/ <?= $totalSlopes ?? $slopeCount ?></span></div>
-                    </a>
-                    <a href="/map" class="dash-subcard hover:border-warning/40 no-underline">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs text-base-content/60">Open Lifts</span>
-                            <i class="fa-solid fa-elevator text-warning text-xs" aria-hidden="true"></i>
-                        </div>
-                        <div class="text-xl font-extrabold mt-1"><?= $liftCount ?> <span class="text-xs font-normal text-base-content/40">/ <?= $totalLifts ?? $liftCount ?></span></div>
-                    </a>
-                    <a href="/staff" class="dash-subcard hover:border-primary/40 no-underline">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs text-base-content/60">Active Staff</span>
-                            <i class="fa-solid fa-users text-info text-xs" aria-hidden="true"></i>
-                        </div>
-                        <div class="text-xl font-extrabold mt-1"><?= $staffCount ?> <span class="text-xs font-normal text-base-content/40">hired</span></div>
-                    </a>
-                    <a href="/buildings" class="dash-subcard hover:border-primary/40 no-underline">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs text-base-content/60">Buildings</span>
-                            <i class="fa-solid fa-building text-primary text-xs" aria-hidden="true"></i>
-                        </div>
-                        <div class="text-xl font-extrabold mt-1"><?= $buildingCount ?> <span class="text-xs font-normal text-base-content/40">built</span></div>
-                    </a>
-                    <a href="/grooming" class="dash-subcard hover:border-success/40 no-underline cq-large-only">
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs text-base-content/60">Trail Grooming</span>
-                            <span class="text-xs font-mono font-bold <?= ($avgSlopeCondition ?? 100) >= 70 ? 'text-success' : 'text-warning' ?>"><?= $avgSlopeCondition ?? 100 ?>%</span>
-                        </div>
-                        <progress class="progress <?= ($avgSlopeCondition ?? 100) >= 70 ? 'progress-success' : 'progress-warning' ?> w-full" value="<?= $avgSlopeCondition ?? 100 ?>" max="100"></progress>
-                        <div class="text-[10px] text-base-content/50 mt-1">
-                            <?= ($ungroomedCount ?? 0) > 0 ? ($ungroomedCount . ' trail(s) need grooming') : 'All trails in good shape' ?>
-                        </div>
+                    <a href="/map" class="stat"><div class="stat-label">Slopes open</div><div class="stat-value"><?= $slopeCount ?> <small>/ <?= $totalSlopes ?? $slopeCount ?></small></div></a>
+                    <a href="/map" class="stat"><div class="stat-label">Lifts open</div><div class="stat-value"><?= $liftCount ?> <small>/ <?= $totalLifts ?? $liftCount ?></small></div></a>
+                    <a href="/staff" class="stat"><div class="stat-label">Staff</div><div class="stat-value"><?= $staffCount ?></div></a>
+                    <a href="/buildings" class="stat"><div class="stat-label">Buildings</div><div class="stat-value"><?= $buildingCount ?></div></a>
+                    <a href="/grooming" class="stat cq-large-only">
+                        <div class="stat-label">Trail condition</div>
+                        <div class="stat-value <?= ($avgSlopeCondition ?? 100) >= 70 ? '' : 'text-warning' ?>"><?= $avgSlopeCondition ?? 100 ?>%</div>
+                        <div class="stat-note"><?= ($ungroomedCount ?? 0) > 0 ? ($ungroomedCount . ' need grooming') : 'All groomed' ?></div>
                     </a>
                 </div>
             <?php endif ?>
 
-            <?php // ===== SEASON ===== ?>
             <?php if ($w['widget_key'] === 'season') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-calendar-check text-info" aria-hidden="true"></i> Season <?= $seasonNum ?> Timeline</h2>
-                    <span class="badge badge-info badge-sm font-mono">Day <?= $seasonProgress ?> / <?= $seasonLength ?> (<?= $seasonPct ?>%)</span>
+                    <h2 class="widget-title">Season <?= $seasonNum ?> <span class="aside">day <?= $seasonProgress ?> of <?= $seasonLength ?></span></h2>
                 </div>
                 <div class="cq-compact">
                     <div class="widget-center">
-                        <div class="radial-progress text-primary font-bold" style="--value:<?= $seasonPct ?>;--size:4.25rem;--thickness:5px;" role="progressbar" aria-valuenow="<?= $seasonPct ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Season progress"><?= $seasonPct ?>%</div>
-                        <div class="text-xs text-base-content/60 mt-2">Day <?= $seasonProgress ?> of <?= $seasonLength ?></div>
+                        <div class="radial-progress text-primary text-sm" style="--value:<?= $seasonPct ?>;--size:4rem;--thickness:4px;" role="progressbar" aria-valuenow="<?= $seasonPct ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Season progress"><?= $seasonPct ?>%</div>
                     </div>
                 </div>
                 <div class="cq-expanded">
                     <div class="cq-season-grid">
-                        <div class="dash-subcard">
-                            <div class="flex justify-between text-xs mb-1.5">
-                                <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-snowflake text-info" aria-hidden="true"></i> Winter Peak Season</span>
-                                <span class="font-mono text-base-content/60"><?= min($seasonProgress, 100) ?> / 100 days</span>
-                            </div>
-                            <progress class="progress progress-info w-full" value="<?= min($seasonProgress, 100) ?>" max="100"></progress>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1.5"><span>Winter</span><span class="muted num"><?= min($seasonProgress, 100) ?> / 100 days</span></div>
+                            <progress class="progress progress-primary w-full" value="<?= min($seasonProgress, 100) ?>" max="100"></progress>
                         </div>
-                        <div class="dash-subcard">
-                            <div class="flex justify-between text-xs mb-1.5">
-                                <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-sun text-warning" aria-hidden="true"></i> Off-Season / Summer</span>
-                                <span class="font-mono text-base-content/60"><?= max(0, $seasonProgress - 100) ?> / 35 days</span>
-                            </div>
-                            <progress class="progress progress-warning w-full" value="<?= max(0, $seasonProgress - 100) ?>" max="35"></progress>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1.5"><span>Summer</span><span class="muted num"><?= max(0, $seasonProgress - 100) ?> / 35 days</span></div>
+                            <progress class="progress w-full" value="<?= max(0, $seasonProgress - 100) ?>" max="35"></progress>
                         </div>
                     </div>
                 </div>
             <?php endif ?>
 
-            <?php // ===== WEATHER ===== ?>
             <?php if ($w['widget_key'] === 'weather_mini' && $weather) : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-cloud-sun-rain text-warning" aria-hidden="true"></i> Alpine Weather &amp; Forecast</h2>
-                    <a href="/weather" class="widget-link">Weather Center <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
+                    <h2 class="widget-title">Weather</h2>
+                    <a href="/weather" class="widget-link">Forecast →</a>
                 </div>
                 <div class="cq-compact">
                     <div class="widget-center">
-                        <i class="fa-solid <?= $wIcons[$weather['condition_name']] ?? 'fa-cloud' ?> text-3xl" aria-hidden="true"></i>
-                        <div class="text-xl font-bold mt-1.5"><?= $weather['temp_formatted'] ?></div>
-                        <div class="text-xs text-base-content/60"><?= esc($weather['condition_name']) ?></div>
+                        <i class="fa-solid <?= $wIcons[$weather['condition_name']] ?? 'fa-cloud' ?> text-2xl" aria-hidden="true"></i>
+                        <div class="text-xl font-semibold mt-1.5"><?= $weather['temp_formatted'] ?></div>
+                        <div class="text-xs muted"><?= esc($weather['condition_name']) ?></div>
                     </div>
                 </div>
                 <div class="cq-expanded my-auto">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="flex items-center gap-3.5">
-                            <div class="dash-kpi-icon" style="width:46px;height:46px;font-size:1.375rem;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.28)">
-                                <i class="fa-solid <?= $wIcons[$weather['condition_name']] ?? 'fa-cloud' ?>" aria-hidden="true"></i>
-                            </div>
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center gap-3">
+                            <i class="fa-solid <?= $wIcons[$weather['condition_name']] ?? 'fa-cloud' ?> text-2xl" aria-hidden="true"></i>
                             <div>
-                                <div class="text-xl font-extrabold"><?= $weather['temp_formatted'] ?> <span class="text-xs font-semibold text-base-content/60">· <?= esc($weather['condition_name']) ?></span></div>
-                                <div class="text-xs text-base-content/60 mt-0.5">
-                                    Wind: <b><?= speed((int)$weather['wind']) ?></b> · Snowfall: <b><?= snow($weather['snowfall'] ?? 0) ?></b> · Base: <b><?= snow($weather['snow_base'] ?? 0) ?></b>
-                                </div>
+                                <div class="text-xl font-semibold"><?= $weather['temp_formatted'] ?> <span class="text-sm font-normal muted"><?= esc($weather['condition_name']) ?></span></div>
+                                <div class="text-xs muted mt-0.5">Wind <?= speed((int)$weather['wind']) ?> · new snow <?= snow($weather['snowfall'] ?? 0) ?> · base <?= snow($weather['snow_base'] ?? 0) ?></div>
                             </div>
                         </div>
                         <?php if (!empty($forecast)) : ?>
-                        <div class="flex gap-2">
+                        <div class="forecast">
                             <?php foreach (array_slice($forecast, 0, 5) as $i => $fc) : ?>
-                            <div class="dash-subcard text-center px-2.5 py-1.5 min-w-[54px] <?= $i >= 3 ? 'cq-large-only' : '' ?>">
-                                <div class="text-[10px] text-base-content/50 font-semibold">+<?= $i + 1 ?>d</div>
+                            <div class="<?= $i >= 3 ? 'cq-large-only' : '' ?>">
+                                <div class="text-[11px] muted"><?= $i === 0 ? 'Tmrw' : '+' . ($i + 1) . 'd' ?></div>
                                 <i class="fa-solid <?= $wIcons[$fc['condition']] ?? 'fa-cloud' ?> text-xs my-1" aria-hidden="true"></i>
-                                <div class="text-xs font-bold font-mono"><?= temp($fc['temp']) ?></div>
+                                <div class="text-xs num"><?= temp($fc['temp']) ?></div>
                             </div>
                             <?php endforeach ?>
                         </div>
@@ -771,277 +391,191 @@ $cf = $cashflow ?? [
                 </div>
             <?php endif ?>
 
-            <?php // ===== QUICK ACTIONS (OPERATIONS COMMAND DECK) ===== ?>
             <?php if ($w['widget_key'] === 'actions') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-bolt text-warning" aria-hidden="true"></i> Operations Command Deck</h2>
+                    <h2 class="widget-title">Manage</h2>
                 </div>
-                <div class="cq-actions-grid">
-                    <a href="/map" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(56,189,248,0.16);color:#38bdf8"><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i></span>
-                        <span>Trail Map</span>
-                    </a>
-                    <a href="/resort" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(34,197,94,0.16);color:#4ade80"><i class="fa-solid fa-mountain-sun" aria-hidden="true"></i></span>
-                        <span>Resort Ops</span>
-                    </a>
-                    <a href="/finances" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(245,158,11,0.16);color:#fbbf24"><i class="fa-solid fa-coins" aria-hidden="true"></i></span>
-                        <span>Finances</span>
-                    </a>
-                    <a href="/staff" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(99,102,241,0.18);color:#818cf8"><i class="fa-solid fa-users" aria-hidden="true"></i></span>
-                        <span>Staff (<?= $staffCount ?>)</span>
-                    </a>
-                    <a href="/grooming" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(20,184,166,0.16);color:#2dd4bf"><i class="fa-solid fa-tractor" aria-hidden="true"></i></span>
-                        <span>Grooming</span>
-                    </a>
-                    <a href="/snowmaking" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(59,130,246,0.16);color:#60a5fa"><i class="fa-solid fa-snowflake" aria-hidden="true"></i></span>
-                        <span>Snowmaking</span>
-                    </a>
-                    <a href="/buildings" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(168,85,247,0.16);color:#c084fc"><i class="fa-solid fa-hotel" aria-hidden="true"></i></span>
-                        <span>Buildings</span>
-                    </a>
-                    <a href="/terrain-parks" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(236,72,153,0.16);color:#f472b6"><i class="fa-solid fa-person-snowboarding" aria-hidden="true"></i></span>
-                        <span>Terrain Parks</span>
-                    </a>
-                    <a href="/parking" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(148,163,184,0.16);color:#cbd5e1"><i class="fa-solid fa-square-parking" aria-hidden="true"></i></span>
-                        <span>Parking</span>
-                    </a>
-                    <a href="/equipment" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(251,146,60,0.16);color:#fb923c"><i class="fa-solid fa-toolbox" aria-hidden="true"></i></span>
-                        <span>Equipment</span>
-                    </a>
-                    <a href="/marketing" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(244,63,94,0.16);color:#fb7185"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i></span>
-                        <span>Marketing</span>
-                    </a>
-                    <a href="/vote" class="dash-action-tile">
-                        <span class="dash-action-icon" style="background:rgba(56,189,248,0.16);color:#38bdf8"><i class="fa-solid fa-check-to-slot" aria-hidden="true"></i></span>
-                        <span>Resort Vote</span>
-                    </a>
-                </div>
+                <nav class="cq-actions-grid" aria-label="Manage resort">
+                    <a href="/map" class="dash-action-tile"><i class="fa-solid fa-map" aria-hidden="true"></i>Trail map</a>
+                    <a href="/resort" class="dash-action-tile"><i class="fa-solid fa-sliders" aria-hidden="true"></i>Resort</a>
+                    <a href="/finances" class="dash-action-tile"><i class="fa-solid fa-coins" aria-hidden="true"></i>Finances</a>
+                    <a href="/staff" class="dash-action-tile"><i class="fa-solid fa-users" aria-hidden="true"></i>Staff <span class="muted num"><?= $staffCount ?></span></a>
+                    <a href="/grooming" class="dash-action-tile"><i class="fa-solid fa-tractor" aria-hidden="true"></i>Grooming</a>
+                    <a href="/snowmaking" class="dash-action-tile"><i class="fa-solid fa-snowflake" aria-hidden="true"></i>Snowmaking</a>
+                    <a href="/buildings" class="dash-action-tile"><i class="fa-solid fa-hotel" aria-hidden="true"></i>Buildings</a>
+                    <a href="/terrain-parks" class="dash-action-tile"><i class="fa-solid fa-person-snowboarding" aria-hidden="true"></i>Terrain parks</a>
+                    <a href="/parking" class="dash-action-tile"><i class="fa-solid fa-square-parking" aria-hidden="true"></i>Parking</a>
+                    <a href="/equipment" class="dash-action-tile"><i class="fa-solid fa-toolbox" aria-hidden="true"></i>Equipment</a>
+                    <a href="/marketing" class="dash-action-tile"><i class="fa-solid fa-bullhorn" aria-hidden="true"></i>Marketing</a>
+                    <a href="/vote" class="dash-action-tile"><i class="fa-solid fa-check-to-slot" aria-hidden="true"></i>Vote</a>
+                </nav>
             <?php endif ?>
 
-            <?php // ===== ACHIEVEMENT ALERTS (MILESTONE REWARDS SUMMARY) ===== ?>
             <?php if ($w['widget_key'] === 'achievements_mini') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-trophy text-warning" aria-hidden="true"></i> Milestone Rewards</h2>
-                    <a href="/achievements" class="widget-link">Rewards Page <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
+                    <h2 class="widget-title">Rewards</h2>
+                    <a href="/achievements" class="widget-link">All →</a>
                 </div>
                 <?php if ($unclaimedAchievements > 0) : ?>
-                    <div class="dash-subcard flex items-center justify-between gap-3 my-auto" style="border-color:rgba(245,158,11,0.4);background:rgba(245,158,11,0.1)">
-                        <div class="flex items-center gap-3">
-                            <i class="fa-solid fa-award text-warning text-2xl" aria-hidden="true"></i>
-                            <div>
-                                <div class="text-sm font-extrabold"><?= $unclaimedAchievements ?> Unclaimed Reward<?= $unclaimedAchievements > 1 ? 's' : '' ?></div>
-                                <div class="text-xs text-base-content/60"><?= $completedAchievements ?? 0 ?> total milestones unlocked</div>
-                            </div>
+                    <div class="flex items-center justify-between gap-3 my-auto">
+                        <div>
+                            <div class="text-sm font-semibold"><?= $unclaimedAchievements ?> reward<?= $unclaimedAchievements > 1 ? 's' : '' ?> ready</div>
+                            <div class="text-xs muted"><?= $completedAchievements ?? 0 ?> achievements unlocked so far</div>
                         </div>
-                        <a href="/achievements" class="btn btn-warning btn-sm font-bold">Claim Now</a>
+                        <a href="/achievements" class="btn btn-warning btn-sm">Claim</a>
                     </div>
                 <?php else : ?>
                     <div class="cq-ach-mini-grid my-auto">
-                        <div class="dash-subcard flex items-center gap-3">
-                            <i class="fa-solid fa-medal text-warning text-xl" aria-hidden="true"></i>
-                            <div>
-                                <div class="text-lg font-extrabold"><?= $completedAchievements ?? 0 ?></div>
-                                <div class="text-[11px] text-base-content/50">Completed Milestones</div>
-                            </div>
-                        </div>
-                        <div class="dash-subcard flex items-center gap-3">
-                            <i class="fa-solid fa-hourglass-half text-info text-xl" aria-hidden="true"></i>
-                            <div>
-                                <div class="text-lg font-extrabold"><?= count($inProgressAchievements) ?></div>
-                                <div class="text-[11px] text-base-content/50">Active Next Goals</div>
-                            </div>
-                        </div>
-                        <div class="dash-subcard flex items-center justify-between gap-2">
-                            <div>
-                                <div class="text-xs font-bold text-success">All Rewards Claimed</div>
-                                <div class="text-[11px] text-base-content/50">Keep expanding your resort</div>
-                            </div>
-                            <a href="/achievements" class="btn btn-ghost btn-xs border border-white/10">View</a>
-                        </div>
+                        <div class="stat"><div class="stat-label">Completed</div><div class="stat-value"><?= $completedAchievements ?? 0 ?></div></div>
+                        <div class="stat"><div class="stat-label">In progress</div><div class="stat-value"><?= count($inProgressAchievements) ?></div></div>
+                        <div class="stat"><div class="stat-label">Unclaimed</div><div class="stat-value">0</div></div>
                     </div>
                 <?php endif ?>
             <?php endif ?>
 
-            <?php // ===== ACHIEVEMENTS (NEXT GOALS PROGRESS) ===== ?>
             <?php if ($w['widget_key'] === 'achievements' || $w['widget_key'] === 'getting_started') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-award text-warning" aria-hidden="true"></i> Next Achievement Goals</h2>
-                    <a href="/achievements" class="widget-link">View All <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
+                    <h2 class="widget-title">Achievements in progress</h2>
+                    <a href="/achievements" class="widget-link">All →</a>
                 </div>
                 <?php if (empty($inProgressAchievements)) : ?>
-                    <div class="widget-center text-sm text-base-content/40">All achievements completed!</div>
+                    <div class="widget-center text-sm muted">Nothing left to unlock.</div>
                 <?php else : ?>
-                    <div class="space-y-2 flex-1 overflow-y-auto">
+                    <div class="flex-1 overflow-y-auto">
                         <?php foreach (array_slice($inProgressAchievements, 0, 4) as $ach) : ?>
                         <?php $pct = $ach['target'] > 0 ? min(100, (int) round($ach['progress'] / $ach['target'] * 100)) : 0; ?>
-                        <div class="dash-subcard py-2 px-3 flex items-center gap-3">
-                            <i class="<?= esc($ach['icon'] ?: 'fa-solid fa-star') ?> text-warning text-sm w-4 text-center" aria-hidden="true"></i>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex justify-between items-center text-xs mb-1">
-                                    <span class="font-bold truncate"><?= esc($ach['name']) ?></span>
-                                    <span class="font-mono text-[11px] text-base-content/60"><?= number_format($ach['progress']) ?> / <?= number_format($ach['target']) ?> (<?= $pct ?>%)</span>
-                                </div>
-                                <progress class="progress progress-primary w-full" value="<?= $ach['progress'] ?>" max="<?= max(1, $ach['target']) ?>"></progress>
+                        <div class="dash-row" style="display:block">
+                            <div class="flex justify-between items-baseline gap-3 mb-1.5">
+                                <span class="truncate"><?= esc($ach['name']) ?></span>
+                                <span class="text-xs muted num whitespace-nowrap"><?= number_format($ach['progress']) ?> / <?= number_format($ach['target']) ?></span>
                             </div>
+                            <progress class="progress progress-primary w-full h-1.5" value="<?= $ach['progress'] ?>" max="<?= max(1, $ach['target']) ?>" aria-label="<?= $pct ?>%"></progress>
                         </div>
                         <?php endforeach ?>
                     </div>
                 <?php endif ?>
             <?php endif ?>
 
-            <?php // ===== ACTIVITY (LIVE OPERATIONS LOG) ===== ?>
             <?php if ($w['widget_key'] === 'activity') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-clock-rotate-left text-info" aria-hidden="true"></i> Recent Resort Activity</h2>
-                    <a href="/activity" class="widget-link">Full Log <i class="fa-solid fa-chevron-right text-[10px]" aria-hidden="true"></i></a>
+                    <h2 class="widget-title">Recent activity</h2>
+                    <a href="/activity" class="widget-link">Full log →</a>
                 </div>
                 <?php if (empty($recentActivity)) : ?>
-                    <div class="widget-center text-sm text-base-content/40">No recent activity logged</div>
+                    <div class="widget-center text-sm muted">Nothing yet.</div>
                 <?php else : ?>
-                    <div id="activityFeedList" class="space-y-1.5 flex-1 overflow-y-auto">
+                    <div id="activityFeedList" class="flex-1 overflow-y-auto">
                         <?php foreach (array_slice($recentActivity, 0, 6) as $log) : ?>
-                        <div class="dash-subcard py-1.5 px-2.5 flex items-center gap-2.5 text-xs">
-                            <i class="<?= esc($log['icon'] ?? 'fa-solid fa-circle-dot') ?> text-info w-4 text-center" aria-hidden="true"></i>
-                            <span class="flex-1 truncate font-medium"><?= esc($log['message']) ?></span>
-                            <span class="badge badge-ghost badge-xs font-mono">D<?= esc($log['game_day'] ?? $gameDay) ?></span>
+                        <div class="dash-row">
+                            <span class="flex-1 truncate"><?= esc($log['message']) ?></span>
+                            <span class="day">Day <?= esc($log['game_day'] ?? $gameDay) ?></span>
                         </div>
                         <?php endforeach ?>
                     </div>
                 <?php endif ?>
             <?php endif ?>
 
-            <?php // ===== PARKING ===== ?>
             <?php if ($w['widget_key'] === 'parking_mini') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-square-parking text-info" aria-hidden="true"></i> Parking Capacity</h2>
+                    <h2 class="widget-title">Parking</h2>
                     <a href="/parking" class="widget-link">Manage</a>
                 </div>
-                <div class="grid grid-cols-3 gap-2 text-center my-auto">
-                    <div class="dash-subcard"><div class="text-base font-extrabold"><?= count($parkingFacilities) ?></div><div class="text-[10px] text-base-content/50">Lots</div></div>
-                    <div class="dash-subcard"><div class="text-base font-extrabold"><?= number_format($totalParkingCap) ?></div><div class="text-[10px] text-base-content/50">Spots</div></div>
-                    <div class="dash-subcard"><div class="text-base font-extrabold <?= $parkingPct > 90 ? 'text-error' : ($parkingPct > 70 ? 'text-warning' : 'text-success') ?>"><?= $parkingPct ?>%</div><div class="text-[10px] text-base-content/50">Occupied</div></div>
+                <div class="grid grid-cols-3 gap-3 my-auto">
+                    <div class="stat"><div class="stat-label">Lots</div><div class="stat-value"><?= count($parkingFacilities) ?></div></div>
+                    <div class="stat"><div class="stat-label">Spaces</div><div class="stat-value"><?= number_format($totalParkingCap) ?></div></div>
+                    <div class="stat"><div class="stat-label">Full</div><div class="stat-value <?= $parkingPct > 90 ? 'text-error' : ($parkingPct > 70 ? 'text-warning' : '') ?>"><?= $parkingPct ?>%</div></div>
                 </div>
-                <progress class="progress progress-info w-full mt-2.5" value="<?= $totalOccupied ?>" max="<?= max(1, $totalParkingCap) ?>"></progress>
+                <progress class="progress w-full h-1.5 mt-3" value="<?= $totalOccupied ?>" max="<?= max(1, $totalParkingCap) ?>"></progress>
             <?php endif ?>
 
-            <?php // ===== TERRAIN PARKS ===== ?>
             <?php if ($w['widget_key'] === 'terrain_parks_mini') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-person-snowboarding text-warning" aria-hidden="true"></i> Terrain Parks</h2>
+                    <h2 class="widget-title">Terrain parks</h2>
                     <a href="/terrain-parks" class="widget-link">Manage</a>
                 </div>
-                <div class="grid grid-cols-3 gap-2 text-center my-auto">
-                    <div class="dash-subcard"><div class="text-base font-extrabold text-success"><?= count($openParks) ?></div><div class="text-[10px] text-base-content/50">Open</div></div>
-                    <div class="dash-subcard"><div class="text-base font-extrabold text-warning"><?= count($buildingParks) ?></div><div class="text-[10px] text-base-content/50">Building</div></div>
-                    <div class="dash-subcard"><div class="text-base font-extrabold text-info"><?= number_format($totalParkVisitors) ?></div><div class="text-[10px] text-base-content/50">Riders</div></div>
+                <div class="grid grid-cols-3 gap-3 my-auto">
+                    <div class="stat"><div class="stat-label">Open</div><div class="stat-value"><?= count($openParks) ?></div></div>
+                    <div class="stat"><div class="stat-label">Building</div><div class="stat-value"><?= count($buildingParks) ?></div></div>
+                    <div class="stat"><div class="stat-label">Riders</div><div class="stat-value"><?= number_format($totalParkVisitors) ?></div></div>
                 </div>
             <?php endif ?>
 
-            <?php // ===== FINANCES MINI ===== ?>
             <?php if ($w['widget_key'] === 'finances_mini' && $finance) : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-coins text-warning" aria-hidden="true"></i> All-Time Finances</h2>
+                    <h2 class="widget-title">All-time finances</h2>
                     <a href="/finances" class="widget-link">Details</a>
                 </div>
-                <div class="grid grid-cols-3 gap-2 text-center my-auto">
-                    <div class="dash-subcard"><div class="font-bold text-success text-xs font-mono"><?= currency($finance['total_income'] ?? 0) ?></div><div class="text-[10px] text-base-content/50 mt-0.5">Income</div></div>
-                    <div class="dash-subcard"><div class="font-bold text-error text-xs font-mono"><?= currency($finance['total_expenses'] ?? 0) ?></div><div class="text-[10px] text-base-content/50 mt-0.5">Expenses</div></div>
-                    <div class="dash-subcard"><div class="font-bold text-xs font-mono <?= $netProfit >= 0 ? 'text-success' : 'text-error' ?>"><?= $netProfit >= 0 ? '+' : '' ?><?= currency($netProfit) ?></div><div class="text-[10px] text-base-content/50 mt-0.5">Net</div></div>
+                <div class="my-auto">
+                    <div class="dash-row"><span class="flex-1 muted">Income</span><span class="num"><?= currency($finance['total_income'] ?? 0) ?></span></div>
+                    <div class="dash-row"><span class="flex-1 muted">Expenses</span><span class="num"><?= currency($finance['total_expenses'] ?? 0) ?></span></div>
+                    <div class="dash-row"><span class="flex-1 muted">Net</span><b class="num <?= $netProfit >= 0 ? 'text-success' : 'text-error' ?>"><?= $netProfit >= 0 ? '+' : '' ?><?= currency($netProfit) ?></b></div>
                 </div>
             <?php endif ?>
 
-            <?php // ===== STAFF MINI ===== ?>
             <?php if ($w['widget_key'] === 'staff_mini') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-users text-info" aria-hidden="true"></i> Staff &amp; Morale</h2>
+                    <h2 class="widget-title">Staff</h2>
                     <a href="/staff" class="widget-link">Manage</a>
                 </div>
                 <?php if (empty($staffAll)) : ?>
-                    <div class="widget-center text-xs text-base-content/50">
-                        <p>No staff hired yet</p>
-                        <a href="/staff/hire" class="btn btn-xs btn-primary mt-2">Hire Staff</a>
+                    <div class="widget-center text-sm muted">
+                        <p>No one hired yet.</p>
+                        <a href="/staff/hire" class="btn btn-xs btn-primary mt-2">Hire staff</a>
                     </div>
                 <?php else : ?>
-                    <div class="grid grid-cols-2 gap-1.5 text-xs mb-2">
+                    <div class="mb-3">
                         <?php foreach ($roles as $role => $count) : ?>
-                        <div class="dash-subcard py-1.5 px-2.5 flex justify-between">
-                            <span class="text-base-content/70 truncate capitalize"><?= esc(str_replace('_', ' ', $role)) ?></span>
-                            <span class="font-bold"><?= $count ?></span>
-                        </div>
+                        <div class="dash-row"><span class="flex-1 capitalize truncate"><?= esc(str_replace('_', ' ', $role)) ?></span><span class="num"><?= $count ?></span></div>
                         <?php endforeach ?>
                     </div>
-                    <div class="flex items-center gap-2 mt-auto pt-1 text-xs">
-                        <span class="text-base-content/60">Morale</span>
-                        <progress class="progress <?= $avgMorale >= 60 ? 'progress-success' : ($avgMorale >= 30 ? 'progress-warning' : 'progress-error') ?> flex-1" value="<?= $avgMorale ?>" max="100"></progress>
-                        <span class="font-mono font-bold"><?= $avgMorale ?>%</span>
+                    <div class="flex items-center gap-2 mt-auto text-xs">
+                        <span class="muted">Morale</span>
+                        <progress class="progress <?= $avgMorale >= 60 ? 'progress-success' : ($avgMorale >= 30 ? 'progress-warning' : 'progress-error') ?> flex-1 h-1.5" value="<?= $avgMorale ?>" max="100"></progress>
+                        <span class="num"><?= $avgMorale ?>%</span>
                     </div>
                 <?php endif ?>
             <?php endif ?>
 
-            <?php // ===== EQUIPMENT MINI ===== ?>
             <?php if ($w['widget_key'] === 'equipment_mini') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-toolbox text-warning" aria-hidden="true"></i> Equipment</h2>
+                    <h2 class="widget-title">Equipment</h2>
                     <a href="/equipment" class="widget-link">Fleet</a>
                 </div>
-                <div class="widget-center">
-                    <div class="text-2xl font-extrabold"><?= count($equipment) ?></div>
-                    <div class="text-xs text-base-content/50">units in fleet</div>
-                </div>
+                <div class="stat my-auto"><div class="stat-label">Units</div><div class="stat-value"><?= count($equipment) ?></div></div>
             <?php endif ?>
 
-            <?php // ===== INSURANCE MINI ===== ?>
             <?php if ($w['widget_key'] === 'insurance_mini') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-shield-halved text-success" aria-hidden="true"></i> Insurance</h2>
+                    <h2 class="widget-title">Insurance</h2>
                     <a href="/insurance" class="widget-link">Policies</a>
                 </div>
-                <div class="grid grid-cols-2 gap-2 text-center my-auto">
-                    <div class="dash-subcard"><div class="text-lg font-extrabold text-success"><?= count($activeIns) ?></div><div class="text-[10px] text-base-content/50">Active</div></div>
-                    <div class="dash-subcard"><div class="text-lg font-extrabold"><?= max(0, count($insurance) - count($activeIns)) ?></div><div class="text-[10px] text-base-content/50">Available</div></div>
+                <div class="grid grid-cols-2 gap-3 my-auto">
+                    <div class="stat"><div class="stat-label">Active</div><div class="stat-value"><?= count($activeIns) ?></div></div>
+                    <div class="stat"><div class="stat-label">Available</div><div class="stat-value"><?= max(0, count($insurance) - count($activeIns)) ?></div></div>
                 </div>
             <?php endif ?>
 
-            <?php // ===== LOANS MINI ===== ?>
             <?php if ($w['widget_key'] === 'loans_mini') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-landmark text-primary" aria-hidden="true"></i> Bank Loans</h2>
+                    <h2 class="widget-title">Loans</h2>
                     <a href="/bank" class="widget-link">Bank</a>
                 </div>
                 <?php if (empty($loans)) : ?>
-                    <div class="widget-center text-xs text-success font-semibold"><i class="fa-solid fa-circle-check mb-1 text-base" aria-hidden="true"></i>Debt-Free</div>
+                    <div class="stat my-auto"><div class="stat-label">Owed</div><div class="stat-value">None</div></div>
                 <?php else : ?>
-                    <div class="widget-center">
-                        <div class="text-lg font-extrabold text-error font-mono"><?= currency(array_sum(array_column($loans, 'remaining'))) ?></div>
-                        <div class="text-[11px] text-base-content/50"><?= count($loans) ?> active loan<?= count($loans) > 1 ? 's' : '' ?></div>
+                    <div class="stat my-auto">
+                        <div class="stat-label"><?= count($loans) ?> loan<?= count($loans) > 1 ? 's' : '' ?> outstanding</div>
+                        <div class="stat-value"><?= currency(array_sum(array_column($loans, 'remaining'))) ?></div>
                     </div>
                 <?php endif ?>
             <?php endif ?>
 
-            <?php // ===== MARKETING MINI ===== ?>
             <?php if ($w['widget_key'] === 'marketing_mini') : ?>
                 <div class="widget-header">
-                    <h2 class="widget-title"><i class="fa-solid fa-bullhorn text-secondary" aria-hidden="true"></i> Marketing</h2>
+                    <h2 class="widget-title">Marketing</h2>
                     <a href="/marketing" class="widget-link">Campaigns</a>
                 </div>
-                <?php if (empty($marketing)) : ?>
-                    <div class="widget-center text-xs text-base-content/50">No active campaigns</div>
-                <?php else : ?>
-                    <div class="widget-center">
-                        <div class="text-2xl font-extrabold text-success"><?= count($marketing) ?></div>
-                        <div class="text-xs text-base-content/50">active campaign<?= count($marketing) > 1 ? 's' : '' ?></div>
-                    </div>
-                <?php endif ?>
+                <div class="stat my-auto"><div class="stat-label">Running campaigns</div><div class="stat-value"><?= count($marketing) ?></div></div>
             <?php endif ?>
 
             </div><!-- /widget-content -->
@@ -1049,16 +583,13 @@ $cf = $cashflow ?? [
     <?php endforeach ?>
     </div>
 
-    <!-- Hidden Widgets Drawer (Shown in Customize Mode) -->
-    <div id="hiddenWidgets" class="hidden mt-6 p-4 rounded-xl bg-base-100/80 border border-white/10" inert>
-        <h2 class="text-xs font-bold uppercase tracking-wider text-base-content/60 mb-3">
-            <i class="fa-solid fa-eye-slash mr-1" aria-hidden="true"></i> Hidden Widgets — Click to Add to Dashboard
-        </h2>
+    <div id="hiddenWidgets" class="hidden mt-6 p-4 rounded-lg border border-base-300" inert>
+        <h2 class="text-sm font-semibold mb-3">Hidden widgets</h2>
         <div class="flex flex-wrap gap-2" id="hiddenWidgetList">
         <?php foreach ($widgets as $w) : ?>
             <?php if ($w['visible']) continue; $info = $availableWidgets[$w['widget_key']] ?? null; if (!$info) continue; ?>
             <button type="button" onclick="showWidget('<?= $w['widget_key'] ?>')" class="btn btn-outline btn-sm gap-1.5 hidden-widget-btn" data-key="<?= $w['widget_key'] ?>">
-                <i class="<?= $info['icon'] ?> text-xs" aria-hidden="true"></i> <?= esc($info['name']) ?> <i class="fa-solid fa-plus text-xs text-success" aria-hidden="true"></i>
+                <i class="fa-solid fa-plus text-xs" aria-hidden="true"></i> <?= esc($info['name']) ?>
             </button>
         <?php endforeach ?>
         </div>
@@ -1082,8 +613,8 @@ function toggleEditMode() {
     hiddenSection.toggleAttribute('inert', !editMode);
     editBtn.setAttribute('aria-pressed', editMode ? 'true' : 'false');
     editBtn.innerHTML = editMode
-        ? '<i class="fa-solid fa-check" aria-hidden="true"></i> Done'
-        : '<i class="fa-solid fa-table-columns" aria-hidden="true"></i> Customize';
+        ? 'Done'
+        : 'Customize';
     editBtn.classList.toggle('btn-primary', editMode);
     editBtn.classList.toggle('btn-ghost', !editMode);
     container.querySelectorAll('.widget-item').forEach(el => el.setAttribute('draggable', editMode ? 'true' : 'false'));
@@ -1119,10 +650,12 @@ function hideWidget(key) {
     btn.type = 'button';
     btn.className = 'btn btn-outline btn-sm gap-1.5 hidden-widget-btn';
     btn.dataset.key = key;
-    btn.innerHTML = '<i class="fa-solid fa-plus text-xs text-success" aria-hidden="true"></i> ' + widgetName;
+    btn.innerHTML = '<i class="fa-solid fa-plus text-xs" aria-hidden="true"></i> ' + esc2(widgetName);
     btn.onclick = () => showWidget(key);
     list.appendChild(btn);
 }
+
+function esc2(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 function showWidget(key) {
     ajaxPost('/dashboard/toggle-widget', { widget_key: key }).then(() => {
@@ -1196,7 +729,7 @@ if (sessionStorage.getItem('editMode')) {
 </script>
 <?php if (featureEnabled("live_visitors")) : ?>
 <script data-cfasync="false">
-(function(){var el=document.getElementById("liveVisitors");if(!el)return;var base=parseInt(el.dataset.count)||0,lifts=parseInt(el.dataset.lifts)||0,slopes=parseInt(el.dataset.slopes)||0;var capacity=Math.max(1,lifts*80+slopes*40);var cur=Math.min(base,capacity);el.textContent=cur.toLocaleString();var nv=document.getElementById("navVisitors");if(nv)nv.textContent=cur.toLocaleString()+" visitors";function tick(){if(lifts===0&&slopes===0){el.textContent="0";setTimeout(tick,10000);return}var range=Math.max(1,Math.ceil(capacity*0.02));var d=Math.floor(Math.random()*(range*2+1))-range;if(Math.random()<0.4)d=0;cur=Math.max(0,Math.min(cur+d,capacity));el.textContent=cur.toLocaleString();var nv2=document.getElementById("navVisitors");if(nv2)nv2.textContent=cur.toLocaleString()+" visitors";if(d!==0){el.style.transition="color 0.5s";el.style.color=d>0?"rgb(34,197,94)":"rgb(248,113,113)";setTimeout(function(){el.style.color=""},1500)}setTimeout(tick,8000+Math.floor(Math.random()*7000))}setTimeout(tick,5000)})();
+(function(){var el=document.getElementById("liveVisitors");if(!el)return;var base=parseInt(el.dataset.count)||0,lifts=parseInt(el.dataset.lifts)||0,slopes=parseInt(el.dataset.slopes)||0;var capacity=Math.max(1,lifts*80+slopes*40);var cur=Math.min(base,capacity);el.textContent=cur.toLocaleString();var nv=document.getElementById("navVisitors");if(nv)nv.textContent=cur.toLocaleString()+" visitors";function tick(){if(lifts===0&&slopes===0){el.textContent="0";setTimeout(tick,10000);return}var range=Math.max(1,Math.ceil(capacity*0.02));var d=Math.floor(Math.random()*(range*2+1))-range;if(Math.random()<0.4)d=0;cur=Math.max(0,Math.min(cur+d,capacity));el.textContent=cur.toLocaleString();var nv2=document.getElementById("navVisitors");if(nv2)nv2.textContent=cur.toLocaleString()+" visitors";if(d!==0){/* no colour flash */}setTimeout(tick,8000+Math.floor(Math.random()*7000))}setTimeout(tick,5000)})();
 </script>
 <?php endif ?>
 <?php if (featureEnabled("activity_feed")) : ?>
@@ -1215,10 +748,9 @@ if (sessionStorage.getItem('editMode')) {
             feedList.innerHTML = "";
             logs.slice(0, 6).forEach(function(log) {
                 var div = document.createElement("div");
-                div.className = "dash-subcard py-1.5 px-2.5 flex items-center gap-2.5 text-xs";
-                div.innerHTML = '<i class="' + esc(log.icon || 'fa-solid fa-circle-dot') + ' text-info w-4 text-center" aria-hidden="true"></i>' +
-                    '<span class="flex-1 truncate font-medium">' + esc(log.message) + '</span>' +
-                    '<span class="badge badge-ghost badge-xs font-mono">D' + esc(log.game_day || '') + '</span>';
+                div.className = "dash-row";
+                div.innerHTML = '<span class="flex-1 truncate">' + esc(log.message) + '</span>' +
+                    '<span class="day">Day ' + esc(log.game_day || '') + '</span>';
                 feedList.appendChild(div);
             });
         }).catch(function(){});
