@@ -44,6 +44,11 @@ class Settings extends BaseController
         $resort = session()->get('resort') ?? ['name' => 'My Resort', 'location' => '', 'description' => '', 'altitude' => 'medium', 'aspect' => 'north', 'is_open' => true];
         $resort['name'] = $name;
         session()->set('resort', $resort);
+        // Persist it so it survives logout and shows up in season archives
+        $db = db_connect();
+        if ($db->fieldExists('resort_name', 'player_finances')) {
+            $db->table('player_finances')->where('user_id', auth()->id())->update(['resort_name' => $name]);
+        }
         log_activity(auth()->id(), 'settings', 'Renamed resort to ' . $name);
         return redirect()->to('/settings')->with('success', 'Resort name updated!');
     }

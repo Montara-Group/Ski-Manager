@@ -654,7 +654,9 @@ class GameTick extends BaseCommand
                     log_activity($userId, 'rescue', 'Ski patrol & medics promptly treated an injured skier on Slope #' . rand(1, max(1, $openSlopes)) . '. Fast response prevented liability.', 'fa-solid fa-kit-medical');
                 } else {
                     $accidentCost = rand(2500, 8000);
-                    $liabilityPolicy = $db->table('insurance')->where('user_id', $userId)->where('active', 1)->where('insurance_type', 'liability')->get()->getRowArray();
+                    $liabilityPolicy = $db->table('insurance')->where('user_id', $userId)->where('active', 1)
+                        ->groupStart()->where('policy_type', 'liability')->orLike('name', 'Liability')->groupEnd()
+                        ->get()->getRowArray();
                     if ($liabilityPolicy) {
                         $claimPayout = (int) round($accidentCost * 0.85);
                         $netExpense = $accidentCost - $claimPayout;

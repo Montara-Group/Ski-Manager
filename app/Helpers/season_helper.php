@@ -242,8 +242,10 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null): bool
 
             if ($alreadyArchived === 0) {
                 $now = date('Y-m-d H:i:s');
+                // resort_name lives on player_finances (users has no such column)
+                $resortNameCol = $db->fieldExists('resort_name', 'player_finances') ? ', player_finances.resort_name' : '';
                 $leaders = $db->table('player_finances')
-                    ->select('player_finances.user_id, player_finances.cash, player_finances.reputation, users.username, users.resort_name')
+                    ->select('player_finances.user_id, player_finances.cash, player_finances.reputation, users.username' . $resortNameCol)
                     ->join('users', 'users.id = player_finances.user_id')
                     ->where('users.id !=', 1)
                     ->orderBy('player_finances.cash', 'DESC')
