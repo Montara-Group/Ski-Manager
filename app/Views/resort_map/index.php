@@ -85,6 +85,11 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     pointer-events: none;
     padding: 0 12px;
 }
+@media (min-width: 900px) {
+    .admin-editor-toolbar-wrap.has-open-drawer {
+        right: 406px;
+    }
+}
 .admin-editor-toolbar {
     pointer-events: auto;
     backdrop-filter: blur(16px);
@@ -211,20 +216,342 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     background: #1e293b !important;
 }
 
-/* Side Drawers */
+/* Side Drawers - Floating Glassmorphic Panel inside Map Viewport */
 .map-side-drawer {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 360px;
-    max-width: 92vw;
-    height: 100vh;
-    background-color: #161d26;
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
-    z-index: 1000;
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: 390px;
+    max-width: calc(100vw - 24px);
+    background: rgba(15, 23, 42, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 16px;
+    z-index: 950;
     display: flex;
     flex-direction: column;
-    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.55);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    overflow: hidden;
+    color: #f1f5f9;
+}
+
+.drawer-header {
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.4) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.drawer-header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(56, 189, 248, 0.15);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    color: #38bdf8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+.drawer-cash-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #4ade80;
+    background: rgba(34, 197, 94, 0.14);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    padding: 1px 8px;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-weight: 700;
+    font-size: 11px;
+}
+
+.drawer-close-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #cbd5e1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.drawer-close-btn:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.45);
+    color: #fca5a5;
+}
+
+/* Segmented Tabs inside Build Drawer */
+.drawer-segmented-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    background: #090d16;
+    padding: 4px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 12px;
+}
+.drawer-seg-tab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+.drawer-seg-tab:hover {
+    color: #e2e8f0;
+    background: rgba(255, 255, 255, 0.04);
+}
+.drawer-seg-tab.is-active {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: rgba(147, 197, 253, 0.35);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+.drawer-seg-tab .tab-count-pill {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.28);
+    color: inherit;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Filter & Search Bar inside Drawer */
+.drawer-search-wrap {
+    position: relative;
+    flex: 1;
+}
+.drawer-search-wrap i {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #64748b;
+    font-size: 12px;
+    pointer-events: none;
+}
+.drawer-search-input {
+    width: 100%;
+    height: 34px;
+    padding: 0 10px 0 30px;
+    background: #0b111e;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 9px;
+    color: #f1f5f9;
+    font-size: 12px;
+    outline: none;
+}
+.drawer-search-input:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+.drawer-select {
+    height: 34px;
+    padding: 0 26px 0 10px;
+    background: #0b111e;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 9px;
+    color: #e2e8f0;
+    font-size: 11px;
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+}
+.drawer-select:focus {
+    border-color: #38bdf8;
+}
+
+/* Run & Lift Item Cards in Build List */
+.build-item-card {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 10px 12px;
+    background: rgba(30, 41, 59, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    text-align: left;
+    cursor: pointer;
+    margin-bottom: 7px;
+}
+.build-item-card:hover {
+    background: rgba(30, 41, 59, 0.95);
+    border-color: rgba(56, 189, 248, 0.45);
+}
+.build-item-card.is-selected {
+    background: rgba(37, 99, 235, 0.2);
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35), 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+.build-item-emblem {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-weight: 900;
+}
+.build-item-info {
+    flex: 1;
+    min-width: 0;
+}
+.build-item-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+.build-item-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #f8fafc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.build-diff-pill {
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 5px;
+    flex-shrink: 0;
+}
+.build-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: #94a3b8;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.build-item-price-col {
+    text-align: right;
+    flex-shrink: 0;
+}
+.build-item-price {
+    font-size: 12px;
+    font-weight: 800;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.build-item-cta {
+    font-size: 10px;
+    color: #38bdf8;
+    font-weight: 600;
+    margin-top: 1px;
+}
+
+/* Selected Segment Configuration Blueprint Card */
+.blueprint-card {
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+    border: 1.5px solid rgba(56, 189, 248, 0.5);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 14px;
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(56, 189, 248, 0.15);
+}
+.blueprint-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    background: rgba(9, 13, 22, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+}
+.blueprint-stat-cell {
+    display: flex;
+    flex-direction: column;
+}
+.blueprint-stat-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    font-weight: 700;
+}
+.blueprint-stat-val {
+    font-size: 12px;
+    font-weight: 700;
+    color: #e2e8f0;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+    margin-top: 1px;
+}
+
+/* Radio Option Cards inside Blueprint */
+.build-option-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 11px;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 9px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #cbd5e1;
+}
+.build-option-card:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(30, 41, 59, 0.8);
+}
+.build-option-card.is-checked {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: #38bdf8;
+    color: #ffffff;
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.3);
+}
+.seat-pill-btn {
+    flex: 1;
+    text-align: center;
+    padding: 7px 6px;
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #94a3b8;
+    cursor: pointer;
+    font-family: ui-monospace, SFMono-Regular, monospace;
+}
+.seat-pill-btn:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #f1f5f9;
+}
+.seat-pill-btn.is-checked {
+    background: rgba(245, 158, 11, 0.18);
+    border-color: #f59e0b;
+    color: #fbbf24;
+    box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3);
 }
 </style>
 
@@ -442,163 +769,305 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         <div class="map-legend-item"><span class="legend-swatch" style="background:#dc2626"></span> Double Black</div>
         <div class="map-legend-item"><span class="legend-swatch" style="background:#a855f7"></span> Terrain Park / Available</div>
     </div>
+
+    <!-- Player Build Drawer (Docked Floating Panel inside Map Viewport) -->
+    <div id="buildDrawer" class="map-side-drawer" style="display:none">
+        <div class="drawer-header">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="drawer-header-icon">
+                    <i class="fa-solid fa-hammer"></i>
+                </div>
+                <div class="min-w-0">
+                    <h2 style="font-size:15px;font-weight:800;color:#f8fafc;line-height:1.2">Build Infrastructure</h2>
+                    <div class="flex items-center gap-1.5 mt-1">
+                        <span style="font-size:11px;color:#94a3b8">Budget:</span>
+                        <span class="drawer-cash-pill" id="drawerCashBalance">$<?= number_format($userCashVal) ?></span>
+                    </div>
+                </div>
+            </div>
+            <button type="button" id="closeDrawer" class="drawer-close-btn" title="Close Build Menu (Esc)">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div id="buildDrawerBody" class="p-3.5 flex-1 overflow-y-auto">
+            <!-- Segmented Tabs -->
+            <div class="drawer-segmented-tabs">
+                <button type="button" class="build-tab drawer-seg-tab is-active" data-tab="lift">
+                    <i class="fa-solid fa-elevator" style="color:#fbbf24"></i>
+                    <span>Build Lifts</span>
+                    <span class="tab-count-pill" id="tabCountLift">0</span>
+                </button>
+                <button type="button" class="build-tab drawer-seg-tab" data-tab="slope">
+                    <i class="fa-solid fa-person-skiing" style="color:#4ade80"></i>
+                    <span>Build Slopes</span>
+                    <span class="tab-count-pill" id="tabCountSlope">0</span>
+                </button>
+            </div>
+
+            <!-- Selected Segment Build Configuration Blueprint Card -->
+            <div id="segmentDetail" style="display:none">
+                <div class="blueprint-card">
+                    <div class="flex items-start justify-between gap-2 mb-2.5">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5 mb-1">
+                                <span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#38bdf8">Selected Blueprint</span>
+                                <span id="selSegBadge" class="build-diff-pill"></span>
+                            </div>
+                            <p style="font-size:15px;font-weight:800;color:#ffffff" class="truncate" id="selSegName">-</p>
+                        </div>
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                            <button type="button" id="btnZoomSelectedSeg" class="drawer-close-btn" style="width:28px;height:28px;font-size:11px" title="Center map on this run">
+                                <i class="fa-solid fa-location-crosshairs"></i>
+                            </button>
+                            <button type="button" id="btnDeselectSeg" class="drawer-close-btn" style="width:28px;height:28px;font-size:11px" title="Deselect segment">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="blueprint-stat-grid">
+                        <div class="blueprint-stat-cell">
+                            <span class="blueprint-stat-label">Length</span>
+                            <span class="blueprint-stat-val" id="selSegLength">-</span>
+                        </div>
+                        <div class="blueprint-stat-cell">
+                            <span class="blueprint-stat-label">Build Time</span>
+                            <span class="blueprint-stat-val" id="selSegTime">-</span>
+                        </div>
+                        <div class="blueprint-stat-cell">
+                            <span class="blueprint-stat-label">Sector</span>
+                            <span class="blueprint-stat-val truncate" id="selSegSector" style="font-family:inherit">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Lift Configuration -->
+                    <div id="liftOptions">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <span style="font-size:11px;font-weight:700;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.04em">Lift System</span>
+                            <span style="font-size:10px;color:#64748b">Hourly Capacity</span>
+                        </div>
+                        <div class="flex flex-col gap-1.5 mb-3" id="liftTypeGrid">
+                            <label class="build-option-card" data-lift-card="button">
+                                <input type="radio" name="liftType" value="button" class="hidden">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-circle-dot text-xs" style="color:#94a3b8"></i>
+                                    <div>
+                                        <div style="font-weight:700;color:#f8fafc">Button / Surface Lift</div>
+                                        <div style="font-size:10px;color:#64748b">$80 / m base rate</div>
+                                    </div>
+                                </div>
+                                <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fbbf24">1,000/hr</span>
+                            </label>
+                            <label class="build-option-card is-checked" data-lift-card="chair_fixed">
+                                <input type="radio" name="liftType" value="chair_fixed" class="hidden" checked>
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-circle-dot text-xs" style="color:#38bdf8"></i>
+                                    <div>
+                                        <div style="font-weight:700;color:#f8fafc">Fixed-Grip Chairlift</div>
+                                        <div style="font-size:10px;color:#64748b">$150 / m base rate</div>
+                                    </div>
+                                </div>
+                                <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fbbf24">2,400/hr</span>
+                            </label>
+                            <label class="build-option-card" data-lift-card="chair_detach">
+                                <input type="radio" name="liftType" value="chair_detach" class="hidden">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-circle-dot text-xs" style="color:#94a3b8"></i>
+                                    <div>
+                                        <div style="font-weight:700;color:#f8fafc">Detachable High-Speed</div>
+                                        <div style="font-size:10px;color:#64748b">$250 / m base rate</div>
+                                    </div>
+                                </div>
+                                <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fbbf24">3,400/hr</span>
+                            </label>
+                            <label class="build-option-card" data-lift-card="gondola">
+                                <input type="radio" name="liftType" value="gondola" class="hidden">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-circle-dot text-xs" style="color:#94a3b8"></i>
+                                    <div>
+                                        <div style="font-weight:700;color:#f8fafc">8-10p Cabin Gondola</div>
+                                        <div style="font-size:10px;color:#64748b">$400 / m base rate</div>
+                                    </div>
+                                </div>
+                                <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fbbf24">3,500/hr</span>
+                            </label>
+                            <label class="build-option-card" data-lift-card="cable_car">
+                                <input type="radio" name="liftType" value="cable_car" class="hidden">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-circle-dot text-xs" style="color:#94a3b8"></i>
+                                    <div>
+                                        <div style="font-weight:700;color:#f8fafc">Aerial Tram / Cable Car</div>
+                                        <div style="font-size:10px;color:#64748b">$600 / m base rate</div>
+                                    </div>
+                                </div>
+                                <span style="font-family:monospace;font-size:11px;font-weight:700;color:#fbbf24">4,000/hr</span>
+                            </label>
+                        </div>
+
+                        <p style="font-size:11px;font-weight:700;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Carrier Size (Seats / Cabin)</p>
+                        <div class="flex gap-1.5 mb-3" id="seatGrid"></div>
+                    </div>
+
+                    <!-- Slope Configuration -->
+                    <div id="slopeOptions">
+                        <p style="font-size:11px;font-weight:700;color:#cbd5e1;text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px">Trail Discipline</p>
+                        <div class="grid grid-cols-2 gap-1.5 mb-3" id="slopeTypeGrid">
+                            <label class="build-option-card is-checked" data-slope-card="downhill">
+                                <input type="radio" name="slopeType" value="downhill" class="hidden" checked>
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-person-skiing text-success"></i>
+                                    <span style="font-weight:700">Downhill</span>
+                                </div>
+                            </label>
+                            <label class="build-option-card" data-slope-card="crosscountry">
+                                <input type="radio" name="slopeType" value="crosscountry" class="hidden">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-person-skiing-nordic text-info"></i>
+                                    <span style="font-weight:700">Cross-Country</span>
+                                </div>
+                            </label>
+                            <label class="build-option-card" data-slope-card="snowpark">
+                                <input type="radio" name="slopeType" value="snowpark" class="hidden">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-person-snowboarding" style="color:#c084fc"></i>
+                                    <span style="font-weight:700">Snow Park</span>
+                                </div>
+                            </label>
+                            <label class="build-option-card" data-slope-card="luge">
+                                <input type="radio" name="slopeType" value="luge" class="hidden">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-sleigh" style="color:#f472b6"></i>
+                                    <span style="font-weight:700">Alpine Luge</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-3" style="border-top:1px solid rgba(255,255,255,0.1)">
+                        <div>
+                            <p style="font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;font-weight:700">Construction Cost</p>
+                            <p style="font-size:18px;font-weight:800;font-family:monospace;line-height:1.2" id="selSegCost">-</p>
+                            <p style="font-size:10px;color:#64748b;font-family:monospace" id="selSegAfterCash"></p>
+                        </div>
+                        <button type="button" id="btnBuild" class="btn btn-success btn-sm gap-1.5 font-bold shadow-lg px-4" style="height:36px">
+                            <i class="fa-solid fa-hammer"></i> Construct
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search, Grade Filter & Sort Bar -->
+            <div class="flex flex-col gap-2 mb-3">
+                <div class="drawer-search-wrap">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="buildSearchInput" class="drawer-search-input" placeholder="Search run or lift by name...">
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <select id="buildDiffFilter" class="drawer-select flex-1" style="display:none">
+                        <option value="">All Grades</option>
+                        <option value="green">🟢 Green (Easy)</option>
+                        <option value="blue">🟦 Blue (Intermediate)</option>
+                        <option value="black">◆ Black (Advanced)</option>
+                        <option value="double_black">◆◆ Double Black</option>
+                    </select>
+                    <select id="buildSortSelect" class="drawer-select flex-1">
+                        <option value="cost_asc">Sort: Cheapest First</option>
+                        <option value="cost_desc">Sort: Expensive First</option>
+                        <option value="len_desc">Sort: Longest First</option>
+                        <option value="name_asc">Sort: Name (A–Z)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="segmentList" class="flex flex-col">
+                <p class="text-sm text-base-content/50 text-center py-4">Select a purple line to build</p>
+            </div>
+        </div>
+    </div>
+
+    <?php if ($isAdmin): ?>
+    <!-- Admin Segment & Sector Inspector Drawer (Docked Floating Panel inside Map Viewport) -->
+    <div id="adminInspectorDrawer" class="map-side-drawer" style="display:none">
+        <div class="drawer-header">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="drawer-header-icon">
+                    <i class="fa-solid fa-compass-drafting"></i>
+                </div>
+                <div class="min-w-0">
+                    <h2 style="font-size:15px;font-weight:800;color:#f8fafc;line-height:1.2">Map Inspector</h2>
+                    <p style="font-size:11px;color:#94a3b8;margin-top:2px">Manage segments & mountain sectors</p>
+                </div>
+            </div>
+            <button type="button" id="closeInspectorBtn" class="drawer-close-btn" title="Close Inspector">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="p-3.5 flex-1 overflow-y-auto space-y-5">
+            <!-- Sectors Management -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <p style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em">Mountain Sectors</p>
+                    <div class="flex gap-1">
+                        <button type="button" id="autoAssign" class="btn btn-xs btn-outline btn-info gap-1" title="Auto-assign segments inside sector boundaries">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Assign
+                        </button>
+                        <button type="button" id="newSector" class="btn btn-xs btn-primary gap-1">
+                            <i class="fa-solid fa-plus"></i> Add Sector
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Inline New Sector Form (hidden by default) -->
+                <div id="newSectorForm" class="p-2.5 rounded-xl bg-base-200 border border-white/10 mb-2 space-y-2" style="display:none">
+                    <div class="flex gap-2">
+                        <input type="text" id="newSectorName" class="drawer-search-input" style="padding-left:10px" placeholder="Sector name (e.g. Sector 3)">
+                        <input type="color" id="newSectorColor" value="#3b82f6" class="w-9 h-8 rounded cursor-pointer bg-transparent border-0">
+                    </div>
+                    <div class="flex justify-end gap-1.5">
+                        <button type="button" id="cancelNewSectorBtn" class="btn btn-xs btn-ghost">Cancel</button>
+                        <button type="button" id="saveNewSectorBtn" class="btn btn-xs btn-success">Create</button>
+                    </div>
+                </div>
+
+                <div id="sectorList" class="flex flex-col gap-1.5"></div>
+            </div>
+
+            <!-- Segments Directory -->
+            <div style="border-top:1px solid rgba(255,255,255,0.1);padding-top:14px">
+                <div class="flex items-center justify-between mb-2.5">
+                    <p style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.06em">All Segments (<span id="inspectorSegCount"><?= count($segments) ?></span>)</p>
+                    <div class="flex gap-1">
+                        <button type="button" class="btn btn-xs btn-warning gap-1 font-bold" id="inspectorNewLiftBtn"><i class="fa-solid fa-plus"></i> Lift</button>
+                        <button type="button" class="btn btn-xs btn-success gap-1 font-bold" id="inspectorNewSlopeBtn"><i class="fa-solid fa-plus"></i> Slope</button>
+                    </div>
+                </div>
+
+                <div class="flex gap-1.5 mb-2.5">
+                    <div class="drawer-search-wrap">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="inspectorSearch" class="drawer-search-input" placeholder="Filter by name...">
+                    </div>
+                    <select id="inspectorFilterType" class="drawer-select">
+                        <option value="all">All Types</option>
+                        <option value="lift">Lifts Only</option>
+                        <option value="slope">Slopes Only</option>
+                        <option value="unassigned">Unassigned</option>
+                    </select>
+                </div>
+
+                <div id="inspectorSegmentList" class="flex flex-col gap-1.5"></div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
 </div>
 
 <!-- Floating Build FAB -->
 <button type="button" class="build-fab btn btn-primary btn-circle btn-lg shadow-xl" id="buildFab" title="Open Build Menu">
     <i class="fa-solid fa-hammer text-xl"></i>
 </button>
-
-<!-- Player Build Drawer -->
-<div id="buildDrawer" class="map-side-drawer" style="display:none">
-    <div class="p-4 border-b border-white/10 flex items-center justify-between bg-base-200/40">
-        <div>
-            <h2 class="text-base font-bold flex items-center gap-2"><i class="fa-solid fa-hammer text-primary"></i> Build Infrastructure</h2>
-            <p class="text-xs text-base-content/60 mt-0.5">Balance: <b class="text-success font-mono" id="drawerCashBalance">$<?= number_format($userCashVal) ?></b></p>
-        </div>
-        <button type="button" id="closeDrawer" class="btn btn-ghost btn-sm btn-circle"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-
-    <div class="p-4 flex-1 overflow-y-auto">
-        <div class="grid grid-cols-2 gap-2 mb-3">
-            <button type="button" class="build-tab btn btn-sm btn-primary" data-tab="lift"><i class="fa-solid fa-elevator mr-1"></i> Build Lift</button>
-            <button type="button" class="build-tab btn btn-sm btn-ghost" data-tab="slope"><i class="fa-solid fa-person-skiing mr-1"></i> Build Slope</button>
-        </div>
-
-        <!-- Search & Filter inside Build Drawer -->
-        <div class="flex gap-1.5 mb-3">
-            <input type="text" id="buildSearchInput" class="input input-xs input-bordered flex-1 text-xs" placeholder="Search run or lift name...">
-            <select id="buildDiffFilter" class="select select-xs select-bordered text-xs" style="display:none">
-                <option value="">All Grades</option>
-                <option value="green">Green</option>
-                <option value="blue">Blue</option>
-                <option value="black">Black</option>
-                <option value="double_black">Double Black</option>
-            </select>
-        </div>
-
-        <!-- Selected Segment Build Configuration Panel -->
-        <div id="segmentDetail" style="display:none" class="mb-4">
-            <div class="border border-primary/40 rounded-xl p-3.5 bg-base-200/80 shadow-lg">
-                <div class="flex items-center justify-between gap-2 mb-2">
-                    <p class="font-bold text-sm truncate" id="selSegName">-</p>
-                    <span id="selSegBadge" class="badge badge-xs uppercase font-bold"></span>
-                </div>
-                <div class="grid grid-cols-2 gap-2 text-xs text-base-content/70 mb-3 bg-base-300/50 p-2 rounded-lg">
-                    <div><i class="fa-solid fa-ruler mr-1 text-info"></i> <span id="selSegLength" class="font-mono font-semibold">-</span></div>
-                    <div><i class="fa-solid fa-clock mr-1 text-warning"></i> <span id="selSegTime" class="font-semibold">-</span></div>
-                </div>
-
-                <div id="liftOptions">
-                    <p class="text-xs font-semibold text-base-content/70 mb-1.5">Lift System</p>
-                    <div class="grid grid-cols-1 gap-1.5 mb-3" id="liftTypeGrid">
-                        <label class="cursor-pointer"><input type="radio" name="liftType" value="button" class="peer hidden"><div class="border border-base-300 rounded-lg p-2 peer-checked:border-warning peer-checked:bg-warning/10 text-xs flex justify-between"><b>Button / Surface Lift</b> <span class="opacity-70">1,000/hr</span></div></label>
-                        <label class="cursor-pointer"><input type="radio" name="liftType" value="chair_fixed" class="peer hidden" checked><div class="border border-base-300 rounded-lg p-2 peer-checked:border-warning peer-checked:bg-warning/10 text-xs flex justify-between"><b>Fixed-Grip Chairlift</b> <span class="opacity-70">2,400/hr</span></div></label>
-                        <label class="cursor-pointer"><input type="radio" name="liftType" value="chair_detach" class="peer hidden"><div class="border border-base-300 rounded-lg p-2 peer-checked:border-warning peer-checked:bg-warning/10 text-xs flex justify-between"><b>Detachable High-Speed</b> <span class="opacity-70">3,400/hr</span></div></label>
-                        <label class="cursor-pointer"><input type="radio" name="liftType" value="gondola" class="peer hidden"><div class="border border-base-300 rounded-lg p-2 peer-checked:border-warning peer-checked:bg-warning/10 text-xs flex justify-between"><b>8-10p Gondola</b> <span class="opacity-70">3,500/hr</span></div></label>
-                        <label class="cursor-pointer"><input type="radio" name="liftType" value="cable_car" class="peer hidden"><div class="border border-base-300 rounded-lg p-2 peer-checked:border-warning peer-checked:bg-warning/10 text-xs flex justify-between"><b>Aerial Tram / Cable Car</b> <span class="opacity-70">4,000/hr</span></div></label>
-                    </div>
-
-                    <p class="text-xs font-semibold text-base-content/70 mb-1.5">Carrier Capacity (Seats / Cabin)</p>
-                    <div class="flex gap-1.5 mb-3" id="seatGrid"></div>
-                </div>
-
-                <div id="slopeOptions">
-                    <p class="text-xs font-semibold text-base-content/70 mb-1.5">Trail Configuration</p>
-                    <div class="grid grid-cols-2 gap-1.5 mb-3">
-                        <label class="cursor-pointer"><input type="radio" name="slopeType" value="downhill" class="peer hidden" checked><div class="border border-base-300 rounded-lg p-2 text-center peer-checked:border-success peer-checked:bg-success/10 text-xs font-semibold">Downhill</div></label>
-                        <label class="cursor-pointer"><input type="radio" name="slopeType" value="crosscountry" class="peer hidden"><div class="border border-base-300 rounded-lg p-2 text-center peer-checked:border-success peer-checked:bg-success/10 text-xs font-semibold">Cross-Country</div></label>
-                        <label class="cursor-pointer"><input type="radio" name="slopeType" value="snowpark" class="peer hidden"><div class="border border-base-300 rounded-lg p-2 text-center peer-checked:border-success peer-checked:bg-success/10 text-xs font-semibold">Snow Park</div></label>
-                        <label class="cursor-pointer"><input type="radio" name="slopeType" value="luge" class="peer hidden"><div class="border border-base-300 rounded-lg p-2 text-center peer-checked:border-success peer-checked:bg-success/10 text-xs font-semibold">Alpine Luge</div></label>
-                    </div>
-                </div>
-
-                <div class="flex items-center justify-between border-t border-base-300 pt-3">
-                    <div>
-                        <p class="text-[11px] text-base-content/50">Construction Cost</p>
-                        <p class="text-lg font-bold text-primary font-mono" id="selSegCost">-</p>
-                    </div>
-                    <button type="button" id="btnBuild" class="btn btn-success btn-sm gap-1.5 font-bold shadow-md">
-                        <i class="fa-solid fa-hammer"></i> Construct
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div id="segmentList" class="flex flex-col gap-1">
-            <p class="text-sm text-base-content/50 text-center py-4">Select a purple line to build</p>
-        </div>
-    </div>
-</div>
-
-<?php if ($isAdmin): ?>
-<!-- Admin Segment & Sector Inspector Drawer -->
-<div id="adminInspectorDrawer" class="map-side-drawer" style="display:none">
-    <div class="p-4 border-b border-white/10 flex items-center justify-between bg-base-200/50">
-        <div>
-            <h2 class="text-base font-bold flex items-center gap-2">
-                <i class="fa-solid fa-compass-drafting text-info"></i> Map Inspector
-            </h2>
-            <p class="text-xs text-base-content/60">Manage segments & mountain sectors</p>
-        </div>
-        <button type="button" id="closeInspectorBtn" class="btn btn-ghost btn-sm btn-circle"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-
-    <div class="p-4 flex-1 overflow-y-auto space-y-5">
-        <!-- Sectors Management -->
-        <div>
-            <div class="flex items-center justify-between mb-2">
-                <p class="text-xs font-bold text-base-content/70 uppercase tracking-wider">Mountain Sectors</p>
-                <div class="flex gap-1">
-                    <button type="button" id="autoAssign" class="btn btn-xs btn-outline btn-info gap-1" title="Auto-assign segments inside sector boundaries">
-                        <i class="fa-solid fa-wand-magic-sparkles"></i> Auto-Assign
-                    </button>
-                    <button type="button" id="newSector" class="btn btn-xs btn-primary gap-1">
-                        <i class="fa-solid fa-plus"></i> Add Sector
-                    </button>
-                </div>
-            </div>
-
-            <!-- Inline New Sector Form (hidden by default) -->
-            <div id="newSectorForm" class="p-2.5 rounded-lg bg-base-200 border border-white/10 mb-2 space-y-2" style="display:none">
-                <div class="flex gap-2">
-                    <input type="text" id="newSectorName" class="input input-xs input-bordered flex-1" placeholder="Sector name (e.g. Sector 3)">
-                    <input type="color" id="newSectorColor" value="#3b82f6" class="w-8 h-6 rounded cursor-pointer bg-transparent border-0">
-                </div>
-                <div class="flex justify-end gap-1.5">
-                    <button type="button" id="cancelNewSectorBtn" class="btn btn-xs btn-ghost">Cancel</button>
-                    <button type="button" id="saveNewSectorBtn" class="btn btn-xs btn-success">Create</button>
-                </div>
-            </div>
-
-            <div id="sectorList" class="flex flex-col gap-1.5"></div>
-        </div>
-
-        <!-- Segments Directory -->
-        <div class="border-t border-white/10 pt-4">
-            <div class="flex items-center justify-between mb-2">
-                <p class="text-xs font-bold text-base-content/70 uppercase tracking-wider">All Segments (<span id="inspectorSegCount"><?= count($segments) ?></span>)</p>
-                <div class="flex gap-1">
-                    <button type="button" class="btn btn-xs btn-warning gap-1" id="inspectorNewLiftBtn"><i class="fa-solid fa-plus"></i> Lift</button>
-                    <button type="button" class="btn btn-xs btn-success gap-1" id="inspectorNewSlopeBtn"><i class="fa-solid fa-plus"></i> Slope</button>
-                </div>
-            </div>
-
-            <div class="flex gap-1.5 mb-2.5">
-                <input type="text" id="inspectorSearch" class="input input-xs input-bordered flex-1 text-xs" placeholder="Filter by name...">
-                <select id="inspectorFilterType" class="select select-xs select-bordered text-xs">
-                    <option value="all">All Types</option>
-                    <option value="lift">Lifts Only</option>
-                    <option value="slope">Slopes Only</option>
-                    <option value="unassigned">Unassigned Sector</option>
-                </select>
-            </div>
-
-            <div id="inspectorSegmentList" class="flex flex-col gap-1 max-h-[52vh] overflow-y-auto pr-1"></div>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
 
 <script data-cfasync="false" src="/js/leaflet.js"></script>
 
@@ -959,6 +1428,71 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         });
     }
 
+    function syncDrawerLayoutState() {
+        var buildEl = document.getElementById('buildDrawer');
+        var inspEl  = document.getElementById('adminInspectorDrawer');
+        var isOpen  = (buildEl && buildEl.style.display !== 'none') || (inspEl && inspEl.style.display !== 'none');
+        var wrap    = document.querySelector('.admin-editor-toolbar-wrap');
+        if (wrap) {
+            wrap.classList.toggle('has-open-drawer', !!isOpen);
+        }
+    }
+
+    function updateTabCounts() {
+        var availLifts = 0, availSlopes = 0;
+        SEGMENTS.forEach(function(s) {
+            if (!isSegmentReleased(s) || isSegmentBuilt(s.id)) return;
+            if (s.type === 'lift') availLifts++;
+            else availSlopes++;
+        });
+        var lc = document.getElementById('tabCountLift');
+        var sc = document.getElementById('tabCountSlope');
+        if (lc) lc.textContent = availLifts;
+        if (sc) sc.textContent = availSlopes;
+    }
+
+    function getSegmentBaseCost(seg) {
+        var m = parseFloat(seg.length_meters) || 0;
+        if (seg.type === 'lift') {
+            return Math.round(m * 150); // Standard 2-seat fixed chairlift baseline
+        }
+        return Math.round(m * 50);
+    }
+
+    function buildEmblemHtml(seg) {
+        if (seg.type === 'lift') {
+            return '<div class="build-item-emblem" style="background:rgba(245,158,11,0.16);border:1px solid rgba(245,158,11,0.4);color:#fbbf24;font-size:14px"><i class="fa-solid fa-elevator"></i></div>';
+        }
+        var d = seg.difficulty || 'blue';
+        if (d === 'green') {
+            return '<div class="build-item-emblem" style="background:rgba(34,197,94,0.16);border:1px solid rgba(34,197,94,0.4);color:#4ade80;font-size:16px" title="Green Circle (Easy)">●</div>';
+        }
+        if (d === 'black') {
+            return '<div class="build-item-emblem" style="background:#090d16;border:1.5px solid #94a3b8;color:#f8fafc;font-size:16px" title="Black Diamond (Advanced)">◆</div>';
+        }
+        if (d === 'double_black') {
+            return '<div class="build-item-emblem" style="background:rgba(220,38,38,0.18);border:1px solid rgba(248,113,113,0.5);color:#f87171;font-size:13px;letter-spacing:-2px" title="Double Black Diamond (Expert)">◆◆</div>';
+        }
+        return '<div class="build-item-emblem" style="background:rgba(59,130,246,0.16);border:1px solid rgba(59,130,246,0.45);color:#60a5fa;font-size:14px" title="Blue Square (Intermediate)">■</div>';
+    }
+
+    function buildDiffPillHtml(seg) {
+        if (seg.type === 'lift') {
+            return '<span class="build-diff-pill" style="background:rgba(245,158,11,0.2);color:#fbbf24;border:1px solid rgba(245,158,11,0.35)">LIFT</span>';
+        }
+        var d = seg.difficulty || 'blue';
+        if (d === 'green') {
+            return '<span class="build-diff-pill" style="background:rgba(34,197,94,0.2);color:#4ade80;border:1px solid rgba(34,197,94,0.35)">GREEN</span>';
+        }
+        if (d === 'black') {
+            return '<span class="build-diff-pill" style="background:#090d16;color:#f1f5f9;border:1px solid #94a3b8">BLACK</span>';
+        }
+        if (d === 'double_black') {
+            return '<span class="build-diff-pill" style="background:rgba(220,38,38,0.22);color:#fca5a5;border:1px solid rgba(248,113,113,0.45)">DBL BLACK</span>';
+        }
+        return '<span class="build-diff-pill" style="background:rgba(59,130,246,0.22);color:#93c5fd;border:1px solid rgba(59,130,246,0.4)">BLUE</span>';
+    }
+
     function openDrawer(tab) {
         var insp = document.getElementById('adminInspectorDrawer');
         if (insp) insp.style.display = 'none';
@@ -973,14 +1507,10 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         if (diffFilter) diffFilter.style.display = (targetTab === 'slope') ? 'inline-block' : 'none';
 
         document.querySelectorAll('.build-tab').forEach(function(b) {
-            if (b.dataset.tab === targetTab) {
-                b.classList.add('btn-primary');
-                b.classList.remove('btn-ghost');
-            } else {
-                b.classList.remove('btn-primary');
-                b.classList.add('btn-ghost');
-            }
+            b.classList.toggle('is-active', b.dataset.tab === targetTab);
         });
+        updateTabCounts();
+        syncDrawerLayoutState();
         renderSegments(targetTab);
         populateList(targetTab);
         deselectSeg();
@@ -991,15 +1521,48 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         drawer.style.display = 'none';
         if (fab) fab.style.display = '';
         deselectSeg();
+        syncDrawerLayoutState();
         renderSegments(null);
     }
 
+    function syncOptionCardHighlights() {
+        document.querySelectorAll('#liftTypeGrid .build-option-card').forEach(function(card) {
+            var inp = card.querySelector('input[name="liftType"]');
+            var checked = !!(inp && inp.checked);
+            card.classList.toggle('is-checked', checked);
+            var icon = card.querySelector('i');
+            if (icon) icon.style.color = checked ? '#38bdf8' : '#94a3b8';
+        });
+        document.querySelectorAll('#slopeTypeGrid .build-option-card').forEach(function(card) {
+            var inp = card.querySelector('input[name="slopeType"]');
+            var checked = !!(inp && inp.checked);
+            card.classList.toggle('is-checked', checked);
+        });
+    }
+
     function bindUI() {
+        updateTabCounts();
         var fab = document.getElementById('buildFab');
         var headerBtn = document.getElementById('headerBuildBtn');
         if (fab) fab.addEventListener('click', function() { openDrawer('lift'); });
         if (headerBtn) headerBtn.addEventListener('click', function() { openDrawer('lift'); });
         document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
+
+        var btnZoomSel = document.getElementById('btnZoomSelectedSeg');
+        if (btnZoomSel) {
+            btnZoomSel.addEventListener('click', function() {
+                if (selectedSegId && segmentLayers[selectedSegId] && typeof segmentLayers[selectedSegId].getBounds === 'function') {
+                    map.fitBounds(segmentLayers[selectedSegId].getBounds(), { maxZoom: 2.2, padding: [70, 70], animate: true });
+                }
+            });
+        }
+        var btnDesel = document.getElementById('btnDeselectSeg');
+        if (btnDesel) {
+            btnDesel.addEventListener('click', function() {
+                deselectSeg();
+                populateList(activeTab);
+            });
+        }
 
         var btnFit = document.getElementById('btnFitMap');
         if (btnFit) {
@@ -1027,22 +1590,35 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
 
         var searchInput = document.getElementById('buildSearchInput');
         var diffFilter  = document.getElementById('buildDiffFilter');
+        var sortSelect  = document.getElementById('buildSortSelect');
         if (searchInput) searchInput.addEventListener('input', function() { populateList(activeTab); });
         if (diffFilter)  diffFilter.addEventListener('change', function() { populateList(activeTab); });
+        if (sortSelect)  sortSelect.addEventListener('change', function() { populateList(activeTab); });
 
         document.querySelectorAll('input[name="liftType"]').forEach(function(el) {
-            el.addEventListener('change', updateSeats);
+            el.addEventListener('change', function() {
+                syncOptionCardHighlights();
+                updateSeats();
+            });
+        });
+        document.querySelectorAll('input[name="slopeType"]').forEach(function(el) {
+            el.addEventListener('change', function() {
+                syncOptionCardHighlights();
+                updateCost();
+            });
         });
         document.getElementById('btnBuild').addEventListener('click', doBuild);
     }
 
     function populateList(type) {
         activeTab = type;
+        updateTabCounts();
         var list = document.getElementById('segmentList');
         if (!list) return;
 
-        var q = (document.getElementById('buildSearchInput') ? document.getElementById('buildSearchInput').value : '').trim().toLowerCase();
-        var df = (document.getElementById('buildDiffFilter') ? document.getElementById('buildDiffFilter').value : '');
+        var q    = (document.getElementById('buildSearchInput') ? document.getElementById('buildSearchInput').value : '').trim().toLowerCase();
+        var df   = (document.getElementById('buildDiffFilter') ? document.getElementById('buildDiffFilter').value : '');
+        var sort = (document.getElementById('buildSortSelect') ? document.getElementById('buildSortSelect').value : 'cost_asc');
 
         var avail = SEGMENTS.filter(function(s) {
             if (type === 'lift' && s.type !== 'lift') return false;
@@ -1054,24 +1630,84 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
             return true;
         });
 
+        avail.sort(function(a, b) {
+            var lenA = parseFloat(a.length_meters) || 0;
+            var lenB = parseFloat(b.length_meters) || 0;
+            if (sort === 'cost_asc') return lenA - lenB;
+            if (sort === 'cost_desc') return lenB - lenA;
+            if (sort === 'len_desc') return lenB - lenA;
+            return String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' });
+        });
+
         if (!avail.length) {
-            list.innerHTML = '<p class="text-sm text-base-content/50 text-center py-6">No available ' + type + 's match your filter</p>';
+            list.innerHTML =
+                '<div style="text-align:center;padding:32px 16px;background:rgba(15,23,42,0.5);border:1px dashed rgba(255,255,255,0.1);border-radius:12px">' +
+                    '<i class="fa-solid ' + (type === 'lift' ? 'fa-elevator' : 'fa-person-skiing') + '" style="font-size:24px;color:#475569;margin-bottom:8px"></i>' +
+                    '<p style="font-size:13px;font-weight:700;color:#cbd5e1">No available ' + type + 's match</p>' +
+                    '<p style="font-size:11px;color:#64748b;margin-top:2px">Try clearing your search or grade filter</p>' +
+                '</div>';
             return;
         }
 
-        list.innerHTML = '<p class="text-xs text-base-content/60 font-medium mb-1">Select a ' + type + ' below or click a purple line on the map (' + avail.length + ' available):</p>';
+        list.innerHTML =
+            '<div class="flex items-center justify-between mb-2 px-0.5">' +
+                '<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#94a3b8">Available ' + (type === 'lift' ? 'Lifts' : 'Slopes') + ' (' + avail.length + ')</span>' +
+                '<span style="font-size:10px;color:#64748b"><i class="fa-solid fa-hand-pointer mr-1"></i>Click card or purple line</span>' +
+            '</div>';
+
         avail.forEach(function(seg) {
             var btn = document.createElement('button');
             btn.type = 'button';
             var isSel = selectedSegId && Number(selectedSegId) === Number(seg.id);
-            btn.className = 'btn btn-sm justify-start text-left w-full gap-2 border transition-all py-2 h-auto mb-1 ' +
-                (isSel ? 'btn-primary/20 border-primary' : 'btn-ghost border-base-300/60 hover:border-primary hover:bg-base-200');
-            var c = segColor(seg);
-            var diffBadge = seg.difficulty ? '<span class="badge badge-xs text-[10px] uppercase font-bold" style="background:' + c + ';color:#fff">' + escHtml(seg.difficulty.replace('_', ' ')) + '</span> ' : '';
-            btn.innerHTML = '<span style="width:10px;height:10px;border-radius:50%;background:' + c + ';flex-shrink:0"></span> ' +
-                '<span class="truncate font-medium">' + escHtml(seg.name || 'Unnamed') + '</span> ' +
-                diffBadge +
-                '<span class="ml-auto text-base-content/60 text-xs font-mono">' + Math.round(seg.length_meters || 0) + ' ' + DIST_UNIT + '</span>';
+            btn.className = 'build-item-card' + (isSel ? ' is-selected' : '');
+
+            var baseCost = getSegmentBaseCost(seg);
+            var canAfford = USER_CASH >= baseCost;
+            var lenVal = Math.round(seg.length_meters || 0).toLocaleString();
+            var days = (seg.length_meters || 0) < 200 ? 1 : ((seg.length_meters || 0) < 500 ? 2 : 3);
+            var secTag = (seg.sector && Number(seg.sector) > 0) ? ('<span>• ' + escHtml(getSectorName(seg.sector)) + '</span>') : '';
+
+            btn.innerHTML =
+                buildEmblemHtml(seg) +
+                '<div class="build-item-info">' +
+                    '<div class="build-item-title-row">' +
+                        '<span class="build-item-name">' + escHtml(seg.name || 'Unnamed') + '</span>' +
+                        buildDiffPillHtml(seg) +
+                    '</div>' +
+                    '<div class="build-item-meta">' +
+                        '<span><i class="fa-solid fa-ruler-horizontal" style="font-size:9px;margin-right:3px;opacity:0.7"></i>' + lenVal + ' ' + DIST_UNIT + '</span>' +
+                        '<span>• ' + days + 'd</span>' +
+                        secTag +
+                    '</div>' +
+                '</div>' +
+                '<div class="build-item-price-col">' +
+                    '<div class="build-item-price" style="color:' + (canAfford ? '#4ade80' : '#f87171') + '">' +
+                        (seg.type === 'lift' ? '<span style="font-size:9px;color:#94a3b8;font-weight:600;margin-right:2px">from</span>' : '') +
+                        '$' + baseCost.toLocaleString() +
+                    '</div>' +
+                    '<div class="build-item-cta">' + (isSel ? '✓ Selected' : 'Configure ›') + '</div>' +
+                '</div>';
+
+            btn.addEventListener('mouseenter', function() {
+                if (editorMode) return;
+                if (segmentLayers[seg.id] && (!selectedSegId || Number(selectedSegId) !== Number(seg.id))) {
+                    segmentLayers[seg.id].setStyle({ weight: 8, opacity: 1, color: '#38bdf8', dashArray: null });
+                }
+            });
+
+            btn.addEventListener('mouseleave', function() {
+                if (editorMode) return;
+                if (segmentLayers[seg.id] && (!selectedSegId || Number(selectedSegId) !== Number(seg.id))) {
+                    var b = isSegmentBuilt(seg.id);
+                    segmentLayers[seg.id].setStyle({
+                        color: (b || !buildMode) ? segColor(seg) : '#a855f7',
+                        weight: b ? 5 : 6,
+                        opacity: b ? 0.95 : 0.85,
+                        dashArray: b ? (seg.type === 'lift' ? '10, 5' : null) : '6, 5'
+                    });
+                }
+            });
+
             btn.addEventListener('click', function() { selectSegment(seg); });
             list.appendChild(btn);
         });
@@ -1080,6 +1716,15 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     function selectSegment(seg) {
         deselectSeg();
         selectedSegId = seg.id;
+        var targetTab = (seg.type === 'lift') ? 'lift' : 'slope';
+        activeTab = targetTab;
+
+        document.querySelectorAll('.build-tab').forEach(function(b) {
+            b.classList.toggle('is-active', b.dataset.tab === targetTab);
+        });
+        var diffFilter = document.getElementById('buildDiffFilter');
+        if (diffFilter) diffFilter.style.display = (targetTab === 'slope') ? 'inline-block' : 'none';
+
         if (segmentLayers[seg.id]) {
             segmentLayers[seg.id].setStyle({ weight: 8, opacity: 1, color: '#38bdf8', dashArray: null });
             try {
@@ -1093,25 +1738,42 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         var badgeEl = document.getElementById('selSegBadge');
         if (badgeEl) {
             var c = segColor(seg);
-            badgeEl.style.background = c;
-            badgeEl.style.color = '#fff';
+            if (seg.difficulty === 'black') {
+                badgeEl.style.background = '#090d16';
+                badgeEl.style.color = '#f8fafc';
+                badgeEl.style.border = '1px solid #94a3b8';
+            } else {
+                badgeEl.style.background = c;
+                badgeEl.style.color = '#fff';
+                badgeEl.style.border = 'none';
+            }
             badgeEl.textContent = seg.type === 'lift' ? 'LIFT' : (seg.difficulty ? seg.difficulty.replace('_', ' ') : seg.type);
         }
-        document.getElementById('selSegLength').textContent = Math.round(seg.length_meters || 0) + ' ' + DIST_UNIT;
+        document.getElementById('selSegLength').textContent = Math.round(seg.length_meters || 0).toLocaleString() + ' ' + DIST_UNIT;
         var days = (seg.length_meters || 0) < 200 ? 1 : ((seg.length_meters || 0) < 500 ? 2 : 3);
         document.getElementById('selSegTime').textContent = days + ' day' + (days > 1 ? 's' : '');
+        var secEl = document.getElementById('selSegSector');
+        if (secEl) secEl.textContent = getSectorName(seg.sector);
+
         document.getElementById('liftOptions').style.display = seg.type === 'lift' ? 'block' : 'none';
         document.getElementById('slopeOptions').style.display = seg.type === 'lift' ? 'none' : 'block';
         if (seg.type !== 'lift') {
             var sr = document.querySelector('input[name="slopeType"][value="' + seg.type + '"]');
             if (sr) sr.checked = true;
         }
+        syncOptionCardHighlights();
+
         document.getElementById('buildDrawer').style.display = 'flex';
         var fab = document.getElementById('buildFab');
         if (fab) fab.style.display = 'none';
+        syncDrawerLayoutState();
+
         if (seg.type === 'lift') updateSeats();
         else updateCost();
-        populateList(seg.type === 'lift' ? 'lift' : 'slope');
+        populateList(targetTab);
+
+        var drawerBody = document.getElementById('buildDrawerBody');
+        if (drawerBody) drawerBody.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function deselectSeg() {
@@ -1144,10 +1806,21 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
             cost = m * 50;
         }
         var roundedCost = Math.round(cost);
+        var canAfford = USER_CASH >= roundedCost;
         var costEl = document.getElementById('selSegCost');
         if (costEl) {
             costEl.textContent = '$' + roundedCost.toLocaleString();
-            costEl.className = 'text-lg font-bold font-mono ' + (USER_CASH >= roundedCost ? 'text-primary' : 'text-error');
+            costEl.style.color = canAfford ? '#4ade80' : '#f87171';
+        }
+        var afterEl = document.getElementById('selSegAfterCash');
+        if (afterEl) {
+            if (canAfford) {
+                afterEl.textContent = 'Balance after: $' + (USER_CASH - roundedCost).toLocaleString();
+                afterEl.style.color = '#94a3b8';
+            } else {
+                afterEl.textContent = 'Need $' + (roundedCost - USER_CASH).toLocaleString() + ' more';
+                afterEl.style.color = '#f87171';
+            }
         }
     }
 
@@ -1159,13 +1832,19 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         grid.innerHTML = '';
         opts.forEach(function(n, i) {
             var label = document.createElement('label');
-            label.className = 'cursor-pointer flex-1';
-            label.innerHTML = '<input type="radio" name="seats" value="' + n + '" class="peer hidden"' + (i === 0 ? ' checked' : '') + '>' +
-                '<div class="border border-base-300 rounded-lg p-2 text-center peer-checked:border-warning peer-checked:bg-warning/10 text-xs font-bold">' + n + '</div>';
+            label.className = 'seat-pill-btn' + (i === 0 ? ' is-checked' : '');
+            label.innerHTML = '<input type="radio" name="seats" value="' + n + '" class="hidden"' + (i === 0 ? ' checked' : '') + '>' +
+                '<span>' + n + (type === 'gondola' || type === 'cable_car' ? 'p' : ' seats') + '</span>';
             grid.appendChild(label);
         });
         grid.querySelectorAll('input[name="seats"]').forEach(function(el) {
-            el.addEventListener('change', updateCost);
+            el.addEventListener('change', function() {
+                grid.querySelectorAll('.seat-pill-btn').forEach(function(lbl) {
+                    var r = lbl.querySelector('input[name="seats"]');
+                    lbl.classList.toggle('is-checked', !!(r && r.checked));
+                });
+                updateCost();
+            });
         });
         updateCost();
     }
@@ -2004,7 +2683,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         var list = document.getElementById('sectorList');
         if (!list) return;
         if (!SECTORS.length) {
-            list.innerHTML = '<p class="text-xs text-base-content/50 py-2">No sectors created for this mountain yet.</p>';
+            list.innerHTML = '<p style="font-size:12px;color:#64748b;padding:8px 0">No sectors created for this mountain yet.</p>';
             return;
         }
         list.innerHTML = '';
@@ -2014,13 +2693,21 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
             var segCountInSec = SEGMENTS.filter(function(s) { return Number(s.sector) === Number(sec.id); }).length;
 
             var row = document.createElement('div');
-            row.className = 'flex items-center justify-between p-2 rounded-lg bg-base-200/70 border border-white/5 text-xs';
+            row.className = 'build-item-card';
+            row.style.cursor = 'default';
+            row.style.marginBottom = '4px';
             row.innerHTML =
-                '<div class="flex items-center gap-2 min-w-0">' +
-                    '<span style="width:10px;height:10px;border-radius:50%;background:' + escHtml(sec.color || '#3b82f6') + ';flex-shrink:0"></span>' +
-                    '<div class="truncate">' +
-                        '<div class="font-bold truncate">' + escHtml(sec.name) + ' <span class="opacity-50 font-mono">#' + sec.id + '</span></div>' +
-                        '<div class="text-[10px] text-base-content/50">' + segCountInSec + ' runs • ' + (hasBoundary ? 'Boundary set' : 'No boundary') + '</div>' +
+                '<div class="build-item-emblem" style="width:30px;height:30px;background:' + escHtml(sec.color || '#3b82f6') + '22;border:1.5px solid ' + escHtml(sec.color || '#3b82f6') + ';color:' + escHtml(sec.color || '#3b82f6') + '">' +
+                    '<i class="fa-solid fa-layer-group text-xs"></i>' +
+                '</div>' +
+                '<div class="build-item-info">' +
+                    '<div class="build-item-title-row">' +
+                        '<span class="build-item-name">' + escHtml(sec.name) + '</span>' +
+                        '<span style="font-size:10px;color:#64748b;font-family:monospace">#' + sec.id + '</span>' +
+                    '</div>' +
+                    '<div class="build-item-meta">' +
+                        '<span>' + segCountInSec + ' runs</span>' +
+                        '<span>• ' + (hasBoundary ? '✓ Boundary set' : 'No boundary') + '</span>' +
                     '</div>' +
                 '</div>' +
                 '<div class="flex items-center gap-1 flex-shrink-0">' +
@@ -2031,6 +2718,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
 
             row.querySelector('.draw-sec-boundary').addEventListener('click', function() {
                 document.getElementById('adminInspectorDrawer').style.display = 'none';
+                syncDrawerLayoutState();
                 startEditSectorBoundary(sec);
             });
             row.querySelector('.toggle-sec-vis').addEventListener('click', function() {
@@ -2078,26 +2766,32 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         });
 
         if (!filtered.length) {
-            list.innerHTML = '<p class="text-xs text-base-content/50 text-center py-6">No segments match filter</p>';
+            list.innerHTML = '<p style="font-size:12px;color:#64748b;text-align:center;padding:24px 0">No segments match filter</p>';
             return;
         }
 
         list.innerHTML = '';
         filtered.forEach(function(seg) {
-            var c = segColor(seg);
             var secName = getSectorName(seg.sector);
             var row = document.createElement('div');
-            row.className = 'flex items-center justify-between p-2 rounded-lg bg-base-200/50 hover:bg-base-200 border border-white/5 text-xs transition-all';
+            row.className = 'build-item-card';
+            row.style.marginBottom = '4px';
             row.innerHTML =
-                '<div class="flex items-center gap-2 min-w-0 cursor-pointer flex-1 seg-zoom-trigger">' +
-                    '<span style="width:10px;height:10px;border-radius:50%;background:' + c + ';flex-shrink:0"></span>' +
-                    '<div class="truncate">' +
-                        '<div class="font-semibold truncate">' + escHtml(seg.name || 'Unnamed') + '</div>' +
-                        '<div class="text-[10px] text-base-content/50 font-mono">' + Math.round(seg.length_meters || 0) + 'm • ' + escHtml(secName) + '</div>' +
+                '<div class="flex items-center gap-2.5 min-w-0 cursor-pointer flex-1 seg-zoom-trigger">' +
+                    buildEmblemHtml(seg) +
+                    '<div class="build-item-info">' +
+                        '<div class="build-item-title-row">' +
+                            '<span class="build-item-name">' + escHtml(seg.name || 'Unnamed') + '</span>' +
+                            buildDiffPillHtml(seg) +
+                        '</div>' +
+                        '<div class="build-item-meta">' +
+                            '<span>' + Math.round(seg.length_meters || 0).toLocaleString() + ' ' + DIST_UNIT + '</span>' +
+                            '<span>• ' + escHtml(secName) + '</span>' +
+                        '</div>' +
                     '</div>' +
                 '</div>' +
                 '<div class="flex items-center gap-1 flex-shrink-0">' +
-                    '<button type="button" class="btn btn-ghost btn-xs seg-edit-trigger" title="Edit Path & Details"><i class="fa-solid fa-pen-to-square text-primary"></i></button>' +
+                    '<button type="button" class="btn btn-ghost btn-xs seg-edit-trigger" title="Edit Path & Details"><i class="fa-solid fa-pen-to-square text-info"></i></button>' +
                     '<button type="button" class="btn btn-ghost btn-xs text-error seg-del-trigger" title="Delete Segment"><i class="fa-solid fa-trash"></i></button>' +
                 '</div>';
 
@@ -2170,6 +2864,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
                 var insp = document.getElementById('adminInspectorDrawer');
                 if (insp) {
                     insp.style.display = (insp.style.display === 'none' ? 'flex' : 'none');
+                    syncDrawerLayoutState();
                     renderInspectorSectors();
                     renderInspectorSegments();
                 }
@@ -2178,6 +2873,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         if (closeInspBtn) {
             closeInspBtn.addEventListener('click', function() {
                 document.getElementById('adminInspectorDrawer').style.display = 'none';
+                syncDrawerLayoutState();
             });
         }
 
@@ -2186,12 +2882,14 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
         if (inspNewLift) {
             inspNewLift.addEventListener('click', function() {
                 document.getElementById('adminInspectorDrawer').style.display = 'none';
+                syncDrawerLayoutState();
                 startDraw('lift', false);
             });
         }
         if (inspNewSlope) {
             inspNewSlope.addEventListener('click', function() {
                 document.getElementById('adminInspectorDrawer').style.display = 'none';
+                syncDrawerLayoutState();
                 startDraw('slope', false);
             });
         }
