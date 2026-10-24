@@ -121,7 +121,19 @@ dialog::backdrop {
 .site-nav { min-height: 3.5rem; padding-top: 0.25rem; padding-bottom: 0.25rem; }
 .brand { display: inline-flex; align-items: center; gap: 0.55rem; padding: 0 0.5rem; color: inherit; text-decoration: none; }
 .brand-mark { width: 30px; height: 30px; flex-shrink: 0; }
-.brand-name { font-family: var(--sign); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.01em; line-height: 1; }
+.brand-name { font-family: var(--sign); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.01em; line-height: 1; white-space: nowrap; }
+/* Keep brand + Log in + Play free on one line without overflowing small phones */
+@media (max-width: 420px) {
+    .site-nav .navbar-end { gap: 0.25rem; }
+    .site-nav .navbar-end > .btn-sm:not(.btn-circle) { padding-left: 0.625rem; padding-right: 0.625rem; }
+    .site-nav .brand { padding: 0 0.25rem; }
+    .brand-name { font-size: 1.25rem; }
+}
+@media (max-width: 380px) {
+    .site-nav { padding-left: 0.25rem; padding-right: 0.25rem; }
+    .site-nav .brand { gap: 0.4rem; }
+    .brand-name { font-size: 1.0625rem; }
+}
 .site-nav .menu-horizontal > li > a,
 .site-nav .menu-horizontal > li > details > summary { font-weight: 500; border-radius: 6px; }
 .site-nav .menu-horizontal > li > a.active { background: transparent; color: var(--color-base-content); box-shadow: inset 0 -2px 0 var(--color-primary); border-radius: 0; }
@@ -201,7 +213,8 @@ a.link:hover{opacity:0.8}
     <!-- Navbar -->
     <?php
         $__currentPath = '/' . trim(uri_string(), '/');
-        $__isAdmin = auth()->loggedIn() && auth()->id() === 1;
+        // Same rule as AdminFilter: user #1 or anyone in the admin/superadmin groups
+        $__isAdmin = auth()->loggedIn() && (auth()->id() === 1 || auth()->user()?->inGroup('admin', 'superadmin'));
 
         $__bonusDue = false;
         if (auth()->loggedIn()) {
@@ -297,19 +310,19 @@ a.link:hover{opacity:0.8}
         </div>
     </div>
     <?php endif ?>
-    <?php if (function_exists('isMaintenanceMode') && isMaintenanceMode()) : ?>
-    <div class="bg-amber-600 text-white px-4 py-2 text-xs sm:text-sm font-semibold flex flex-wrap items-center justify-between gap-2 shadow-md sticky top-0 z-[10001]">
+    <?php if ($__isAdmin && function_exists('isMaintenanceMode') && isMaintenanceMode()) : ?>
+    <div class="bg-amber-600 text-white px-4 py-2 text-xs sm:text-sm font-semibold flex flex-wrap items-center justify-between gap-2">
         <div class="flex items-center gap-2">
             <i class="fa-solid fa-triangle-exclamation text-base"></i>
             <span><strong>MAINTENANCE ACTIVE (Season 2 In-Dev):</strong> Public site is paused for 4 days with HTTP 503. You are browsing with admin clearance.</span>
         </div>
         <div class="flex items-center gap-2">
-            <span class="badge badge-warning badge-sm text-neutral font-bold">Admin Clearance</span>
+            <span class="badge badge-sm border-0 bg-black/25 text-white font-bold">Admin Clearance</span>
             <a href="/admin" class="btn btn-xs btn-neutral text-white">Admin Controls</a>
         </div>
     </div>
     <?php endif ?>
-    <nav aria-label="Main navigation"><div class="navbar site-nav bg-base-100 border-b border-base-300" style="z-index:9999; position:sticky; top:0">
+    <nav aria-label="Main navigation" style="z-index:9999; position:sticky; top:0"><div class="navbar site-nav bg-base-100 border-b border-base-300">
         <div class="navbar-start">
             <div class="dropdown">
                 <div tabindex="0" role="button" class="btn btn-ghost lg:hidden" aria-label="Open menu"><i class="fa-solid fa-bars text-lg" aria-hidden="true"></i></div>

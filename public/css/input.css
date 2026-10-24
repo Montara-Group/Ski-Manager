@@ -1343,3 +1343,51 @@ div[class*="hj-"], iframe[id*="hotjar"], div[data-testid*="hotjar"],
 a:hover {
     text-decoration: none !important;
 }
+
+/* ===================================================
+   DaisyUI classes still used by views but missing from
+   this design system. Layered so utilities on the same
+   element (py-0, text-xs, ...) still win.
+   =================================================== */
+@layer components {
+  /* Form labels */
+  .label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.375rem 0.125rem;
+    user-select: none;
+    font-size: 0.875rem;
+  }
+  .label-text { font-size: 0.875rem; color: var(--color-base-content); }
+  .label-text-alt { font-size: 0.75rem; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+
+  /* Stat groups (resources pages) */
+  .stats {
+    display: inline-grid;
+    grid-auto-flow: column;
+    overflow-x: auto;
+    border-radius: 1rem;
+    border: 1px solid var(--color-base-300);
+  }
+  .stats > .stat + .stat { border-left: 1px solid var(--color-base-300); }
+  .stats-horizontal { grid-auto-flow: column; }
+  .stats-vertical { grid-auto-flow: row; }
+  .stats-vertical > .stat + .stat { border-left: 0; border-top: 1px solid var(--color-base-300); }
+
+  /* Toast placement */
+  .toast-top { top: 0; bottom: auto; }
+  .toast-middle { top: 50%; bottom: auto; transform: translateY(-50%); }
+  .toast-start { left: 0; right: auto; }
+  .toast-center { left: 50%; right: auto; transform: translateX(-50%); }
+}
+
+/* Selected button in a filter group. Unlayered on purpose: it has to beat the
+   unlayered .btn / .btn-ghost rules above. */
+.btn-active,
+.btn-ghost.btn-active {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-content);
+}
