@@ -73,6 +73,11 @@ class Dashboard extends BaseController
         $liftCount     = count($openLiftsArr);
         $totalSlopes   = count($slopesAll);
         $totalLifts    = count($liftsAll);
+        $slopesByDiff  = ['green' => 0, 'blue' => 0, 'black' => 0, 'double_black' => 0];
+        foreach ($openSlopesArr as $s) {
+            $d = $s['difficulty'] ?? '';
+            if (isset($slopesByDiff[$d])) $slopesByDiff[$d]++;
+        }
 
         $totalLiftCapacity = array_sum(array_map(fn($l) => (int)($l['capacity'] ?? 0), $openLiftsArr));
         $avgSlopeCondition = count($slopesAll) > 0
@@ -109,7 +114,7 @@ class Dashboard extends BaseController
             'widgets' => $widgets, 'availableWidgets' => $this->availableWidgets,
             'finance' => $finance, 'weather' => $weather, 'genepis' => $genepis,
             'slopeCount' => $slopeCount, 'liftCount' => $liftCount,
-            'totalSlopes' => $totalSlopes, 'totalLifts' => $totalLifts,
+            'totalSlopes' => $totalSlopes, 'totalLifts' => $totalLifts, 'slopesByDiff' => $slopesByDiff,
             'totalLiftCapacity' => $totalLiftCapacity, 'avgSlopeCondition' => $avgSlopeCondition, 'ungroomedCount' => $ungroomedCount,
             'staffCount' => $staffCount, 'buildingCount' => $buildingCount,
             'unclaimedAchievements' => $unclaimedAchievements, 'completedAchievements' => $completedAchievements,
