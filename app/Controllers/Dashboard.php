@@ -61,18 +61,38 @@ class Dashboard extends BaseController
         $finance = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
         $weather = getCurrentWeather();
         $genepis = $db->table('genepis')->where('user_id', $userId)->get()->getRowArray();
-        $slopeCount = $db->table('player_items')->where('user_id', $userId)->where('item_type', 'slope')->where('status', 'open')->countAllResults(false);
-        $liftCount = $db->table('player_items')->where('user_id', $userId)->where('item_type', 'lift')->where('status', 'open')->countAllResults(false);
-        $staffCount = $db->table('staff')->where('user_id', $userId)->where('status', 'active')->countAllResults(false);
-        $buildingCount = $db->table('buildings')->where('user_id', $userId)->countAllResults(false);
-        $unclaimedAchievements = $db->table('achievements')->where('user_id', $userId)->where('completed', 1)->where('claimed', 0)->countAllResults(false);
+
+        $allItems = $db->table('player_items')->where('user_id', $userId)->get()->getResultArray();
+        $slopeTypes = ['slope', 'downhill', 'crosscountry', 'snowpark', 'luge'];
+        $slopesAll = array_filter($allItems, fn($i) => in_array($i['item_type'] ?? '', $slopeTypes, true));
+        $liftsAll  = array_filter($allItems, fn($i) => ($i['item_type'] ?? '') === 'lift');
+
+        $openSlopesArr = array_filter($slopesAll, fn($i) => ($i['status'] ?? '') === 'open');
+        $openLiftsArr  = array_filter($liftsAll, fn($i) => ($i['status'] ?? '') === 'open');
+        $slopeCount    = count($openSlopesArr);
+        $liftCount     = count($openLiftsArr);
+        $totalSlopes   = count($slopesAll);
+        $totalLifts    = count($liftsAll);
+
+        $totalLiftCapacity = array_sum(array_map(fn($l) => (int)($l['capacity'] ?? 0), $openLiftsArr));
+        $avgSlopeCondition = count($slopesAll) > 0
+            ? (int) round(array_sum(array_map(fn($s) => (int)($s['condition_pct'] ?? 100), $slopesAll)) / count($slopesAll))
+            : 100;
+        $ungroomedCount = count(array_filter($slopesAll, fn($s) => (int)($s['condition_pct'] ?? 100) < 65));
+
+        $staffAll = $db->table('staff')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
+        $staffCount = count($staffAll);
+        $buildingsAll = $db->table('buildings')->where('user_id', $userId)->get()->getResultArray();
+        $buildingCount = count($buildingsAll);
+
+        $unclaimedAchievements = $db->table('achievements')->where('user_id', $userId)->where('completed', 1)->where('claimed', 0)->countAllResults();
+        $completedAchievements = $db->table('achievements')->where('user_id', $userId)->where('completed', 1)->countAllResults();
         $inProgressAchievements = $db->table('achievements')->where('user_id', $userId)->where('completed', 0)->orderBy('progress', 'DESC')->limit(5)->get()->getResultArray();
         $recentActivity = $db->table('activity_log')->where('user_id', $userId)->orderBy('created_at', 'DESC')->limit(8)->get()->getResultArray();
         $dailyBonus = $db->table('daily_bonus')->where('user_id', $userId)->get()->getRowArray();
         $bonusAvailable = !$dailyBonus || ($dailyBonus['last_claim_date'] ?? null) < date('Y-m-d');
         $parkingFacilities = $db->table('parking')->where('user_id', $userId)->get()->getResultArray();
         $terrainParks = $db->table('terrain_parks')->where('user_id', $userId)->get()->getResultArray();
-        $staffAll = $db->table('staff')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
         $equipment = $db->table('equipment')->where('user_id', $userId)->get()->getResultArray();
         $insurance = $db->table('insurance')->where('user_id', $userId)->get()->getResultArray();
         $loans = $db->table('loans')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
@@ -80,16 +100,27 @@ class Dashboard extends BaseController
         $dailyVisitors = (int)($finance['daily_visitors'] ?? 0);
         $netProfit = ($finance['total_income'] ?? 0) - ($finance['total_expenses'] ?? 0);
 
+        $cashflow = $this->calcCashflowBreakdown($userId, $dailyVisitors, $staffAll, $equipment, $loans, $marketing, $buildingsAll);
+        $resortMapKey = $finance['resort_map'] ?? 'ParkCity';
+        $resortNames = ResortMap::getResortMapNames();
+        $resortMapName = $resortNames[$resortMapKey] ?? 'Park City';
+
         return view('dashboard/index', [
             'widgets' => $widgets, 'availableWidgets' => $this->availableWidgets,
             'finance' => $finance, 'weather' => $weather, 'genepis' => $genepis,
-            'slopeCount' => $slopeCount, 'liftCount' => $liftCount, 'staffCount' => $staffCount, 'buildingCount' => $buildingCount,
-            'unclaimedAchievements' => $unclaimedAchievements, 'inProgressAchievements' => $inProgressAchievements,
+            'slopeCount' => $slopeCount, 'liftCount' => $liftCount,
+            'totalSlopes' => $totalSlopes, 'totalLifts' => $totalLifts,
+            'totalLiftCapacity' => $totalLiftCapacity, 'avgSlopeCondition' => $avgSlopeCondition, 'ungroomedCount' => $ungroomedCount,
+            'staffCount' => $staffCount, 'buildingCount' => $buildingCount,
+            'unclaimedAchievements' => $unclaimedAchievements, 'completedAchievements' => $completedAchievements,
+            'inProgressAchievements' => $inProgressAchievements,
             'recentActivity' => $recentActivity, 'bonusAvailable' => $bonusAvailable, 'gameDay' => $gameDay,
             'parkingFacilities' => $parkingFacilities, 'terrainParks' => $terrainParks,
             'staffAll' => $staffAll, 'equipment' => $equipment, 'insurance' => $insurance, 'loans' => $loans, 'marketing' => $marketing,
             'dailyVisitors' => $dailyVisitors, 'netProfit' => $netProfit,
-            'dailyProfit' => $this->calcDailyProfit($userId, $staffAll, $equipment, $loans),
+            'dailyProfit' => $cashflow['daily_profit'],
+            'cashflow' => $cashflow,
+            'resortMapName' => $resortMapName,
             'alerts' => $this->getAlerts($userId, $finance, $equipment, $staffAll),
         ]);
     }
@@ -106,7 +137,7 @@ class Dashboard extends BaseController
             $newVisible = $widget['visible'] ? 0 : 1;
             $db->table('dashboard_widgets')->where('id', $widget['id'])->update(['visible' => $newVisible]);
             if ($this->request->isAJAX()) {
-                return $this->response->setJSON(['success' => true, 'visible' => (bool) $newVisible]);
+                return $this->response->setJSON(['success' => true, 'visible' => (bool) $newVisible, 'csrf_hash' => csrf_hash()]);
             }
         }
         return redirect()->to('/dashboard');
@@ -121,14 +152,14 @@ class Dashboard extends BaseController
         $db = db_connect();
 
         if (!in_array($size, ['small', 'medium', 'large'])) {
-            if ($this->request->isAJAX()) return $this->response->setJSON(['success' => false]);
+            if ($this->request->isAJAX()) return $this->response->setJSON(['success' => false, 'csrf_hash' => csrf_hash()]);
             return redirect()->to('/dashboard');
         }
 
         $db->table('dashboard_widgets')->where('user_id', $userId)->where('widget_key', $key)->update(['size' => $size]);
 
         if ($this->request->isAJAX()) {
-            return $this->response->setJSON(['success' => true, 'size' => $size]);
+            return $this->response->setJSON(['success' => true, 'size' => $size, 'csrf_hash' => csrf_hash()]);
         }
         return redirect()->to('/dashboard');
     }
@@ -146,7 +177,7 @@ class Dashboard extends BaseController
             }
         }
         if ($this->request->isAJAX()) {
-            return $this->response->setJSON(['success' => true]);
+            return $this->response->setJSON(['success' => true, 'csrf_hash' => csrf_hash()]);
         }
         return redirect()->to('/dashboard');
     }
@@ -181,27 +212,55 @@ class Dashboard extends BaseController
         return $this->response->setJSON($logs);
     }
 
-    private function calcDailyProfit(int $userId, ?array $staff = null, ?array $equip = null, ?array $loans = null): int
-    {
+    private function calcCashflowBreakdown(
+        int $userId,
+        int $dailyVisitors,
+        array $staff,
+        array $equip,
+        array $loans,
+        array $marketing,
+        array $buildings
+    ): array {
         $db = db_connect();
-        if ($staff === null) {
-            $staff = $db->table('staff')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
-        }
-        $salaries = array_sum(array_column($staff, 'salary'));
 
-        if ($equip === null) {
-            $equip = $db->table('equipment')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
-        }
-        $equipCost = array_sum(array_map(fn($e) => (int)($e['fuel_cost'] ?? $e['daily_cost'] ?? 0), $equip));
+        $salaries = (int) array_sum(array_column($staff, 'salary'));
 
-        if ($loans === null) {
-            $loans = $db->table('loans')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
-        }
-        $loanPay = array_sum(array_map(fn($l) => (int)($l['daily_payment'] ?? 0), $loans));
+        $activeEquip = array_filter($equip, fn($e) => ($e['status'] ?? '') === 'active');
+        $equipCost = (int) array_sum(array_map(
+            fn($e) => (int)($e['fuel_cost'] ?? $e['energy_cost'] ?? $e['daily_cost'] ?? 0),
+            $activeEquip
+        ));
 
-        $tickets = $db->table('lift_tickets')->where('user_id', $userId)->where('active', 1)->where('ticket_type', 'full_day')->get()->getRowArray();
-        $ticketIncome = $tickets ? (int)$tickets['price'] * 84 : 0;
-        return $ticketIncome - $salaries - $equipCost - $loanPay;
+        $loanPay = (int) array_sum(array_map(fn($l) => (int)($l['daily_payment'] ?? 0), $loans));
+        $marketingCost = (int) array_sum(array_map(fn($m) => (int)($m['daily_cost'] ?? 0), $marketing));
+
+        $openBuildings = array_filter($buildings, fn($b) => ($b['status'] ?? 'open') === 'open');
+        $buildingIncome = (int) array_sum(array_map(fn($b) => (int)($b['revenue_per_day'] ?? 0), $openBuildings));
+
+        $tickets = $db->table('lift_tickets')
+            ->where('user_id', $userId)
+            ->where('active', 1)
+            ->where('ticket_type', 'full_day')
+            ->get()->getRowArray();
+        $ticketPrice = $tickets ? (int)$tickets['price'] : 0;
+        $effectiveVisitors = $dailyVisitors > 0 ? $dailyVisitors : ($ticketPrice > 0 ? 84 : 0);
+        $ticketIncome = $ticketPrice * $effectiveVisitors;
+
+        $totalIncome = $ticketIncome + $buildingIncome;
+        $totalExpenses = $salaries + $equipCost + $loanPay + $marketingCost;
+
+        return [
+            'ticket_price'    => $ticketPrice,
+            'ticket_income'   => $ticketIncome,
+            'building_income' => $buildingIncome,
+            'total_income'    => $totalIncome,
+            'salaries'        => $salaries,
+            'equipment_cost'  => $equipCost,
+            'marketing_cost'  => $marketingCost,
+            'loan_payments'   => $loanPay,
+            'total_expenses'  => $totalExpenses,
+            'daily_profit'    => $totalIncome - $totalExpenses,
+        ];
     }
 
     private function getAlerts(int $userId, ?array $finance = null, ?array $equipment = null, ?array $staff = null): array
