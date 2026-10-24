@@ -11,7 +11,7 @@ class Admin extends BaseController
         return auth()->id() === 1 || ($user && $user->inGroup('admin', 'superadmin'));
     }
 
-    public function index(): string
+    public function index(): string|\CodeIgniter\HTTP\RedirectResponse
     {
         if (!$this->checkAdmin()) return redirect()->to('/dashboard');
 
@@ -86,6 +86,29 @@ class Admin extends BaseController
 
         $onlineRecentRow = $db->query("SELECT COUNT(DISTINCT user_id) as cnt FROM activity_log WHERE created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)")->getRowArray();
         $onlineRecent = $onlineRecentRow['cnt'] ?? 0;
+        $newUsers7d = $db->table('users')->where('created_at >', date('Y-m-d H:i:s', strtotime('-7 days')))->countAllResults();
+        $bannedUsers = $db->table('users')->where('active', 0)->countAllResults();
+
+        $season = $db->table('seasons')->where('active', 1)->get()->getRowArray() ?? [];
+        $unreadSupport = $db->table('support_messages')->where('sender', 'player')->where('is_read', 0)->countAllResults();
+        // The tick writes tomorrow's weather row, so the newest row tells us when it last ran
+        $lastTick = $db->table('weather')->select('game_day, created_at')->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
+
+        $diskTotal = @disk_total_space('/') ?: 0;
+        $diskFree = @disk_free_space('/') ?: 0;
+        $cores = (int) (@shell_exec('nproc') ?: 1);
+        $dbSizeRow = $db->query("SELECT ROUND(SUM(data_length + index_length)/1048576, 1) AS mb FROM information_schema.tables WHERE table_schema = ?", [$db->getDatabase()])->getRowArray();
+        $server = [
+            'diskTotal' => $diskTotal,
+            'diskUsed' => $diskTotal - $diskFree,
+            'diskPct' => $diskTotal > 0 ? (int) round(($diskTotal - $diskFree) / $diskTotal * 100) : 0,
+            'load' => function_exists('sys_getloadavg') ? (sys_getloadavg() ?: [0, 0, 0]) : [0, 0, 0],
+            'cores' => max(1, $cores),
+            'memLimit' => ini_get('memory_limit'),
+            'memPeak' => round(memory_get_peak_usage(true) / 1048576, 1),
+            'dbVersion' => $db->getVersion(),
+            'dbSize' => $dbSizeRow['mb'] ?? 0,
+        ];
 
         return view('admin/index', [
             'totalUsers' => $totalUsers, 'totalStaff' => $totalStaff,
@@ -94,6 +117,9 @@ class Admin extends BaseController
             'totalParking' => $totalParking, 'totalParks' => $totalParks,
             'gameDay' => $gameDay, 'users' => $users, 'weather' => $weather,
             'recentLogs' => $recentLogs, 'onlineRecent' => $onlineRecent,
+            'newUsers7d' => $newUsers7d, 'bannedUsers' => $bannedUsers,
+            'season' => $season, 'unreadSupport' => $unreadSupport, 'lastTick' => $lastTick,
+            'server' => $server, 'isStaging' => str_contains(ROOTPATH, 'staging'),
         ]);
     }
 
@@ -259,9 +285,10 @@ class Admin extends BaseController
     {
         if (!$this->checkAdmin()) return redirect()->to("/admin");
         try {
-            exec("php /www/sites/skiv2/ci4/spark game:tick > /dev/null 2>&1 &");
-            
-            return redirect()->to("/admin")->with("success", "Game tick executed successfully.");
+            // Use this install's own spark: a hardcoded path made staging tick production
+            exec("php " . escapeshellarg(ROOTPATH . "spark") . " game:tick > /dev/null 2>&1 &");
+
+            return redirect()->to("/admin")->with("success", "Game tick started in the background. Refresh in a minute to see the results.");
         } catch (\Throwable $e) {
             return redirect()->to("/admin")->with("error", "Tick error: " . $e->getMessage());
         }
