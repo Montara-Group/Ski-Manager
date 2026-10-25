@@ -35,6 +35,9 @@ class GameTick extends BaseCommand
             $userId = (int) $user['id'];
             CLI::write("Processing user {$userId}...", 'yellow');
             try {
+                // CI4 keeps a failed transaction status until reset, so one player's error
+                // used to roll back every player processed after them
+                $db->resetTransStatus();
                 $db->transBegin();
 
                 $finance = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
@@ -321,7 +324,7 @@ class GameTick extends BaseCommand
                         'user_id' => $userId,
                         'amount' => 2,
                         'type' => 'earned',
-                        'description' => 'Daily Eco Score reward (Score: ' . $ecoScore . ')',
+                        'reason' => 'Daily Eco Score reward (Score: ' . $ecoScore . ')',
                         'created_at' => date('Y-m-d H:i:s'),
                     ]);
                 } elseif ($ecoScore < 30) {
@@ -620,7 +623,7 @@ class GameTick extends BaseCommand
                     $vReqs = \App\Controllers\VipGuests::VIP_TYPES[$vType]['requirements'] ?? [];
                     $satisfied = true;
                     if (!empty($vReqs['min_slopes']) && $openSlopes < $vReqs['min_slopes']) $satisfied = false;
-                    if (!empty($vReqs['min_staff']) && count($staff) < $vReqs['min_staff']) $satisfied = false;
+                    if (!empty($vReqs['min_staff']) && count($allStaff) < $vReqs['min_staff']) $satisfied = false;
                     if (!empty($vReqs['min_buildings']) && count($buildings) < $vReqs['min_buildings']) $satisfied = false;
                     if (!empty($vReqs['min_lifts']) && $openLifts < $vReqs['min_lifts']) $satisfied = false;
 
@@ -714,6 +717,7 @@ class GameTick extends BaseCommand
                 }
             } catch (\Throwable $e) {
                 $db->transRollback();
+                $db->resetTransStatus();
                 CLI::write("  ERROR processing user {$userId}: " . $e->getMessage(), "red");
                 log_message("error", "GameTick user {$userId} failed: " . $e->getMessage());
             }
