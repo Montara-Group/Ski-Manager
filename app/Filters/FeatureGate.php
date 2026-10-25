@@ -8,7 +8,8 @@ use CodeIgniter\HTTP\ResponseInterface;
 
 class FeatureGate implements FilterInterface
 {
-    private const ROUTE_FLAGS = [
+    /** First URL segment => feature flag. Also used to hide nav links and to describe flags in /admin/features. */
+    public const ROUTE_FLAGS = [
         'snowmaking' => 'snowmaking',
         'bank' => 'bank_loans',
         'night-skiing' => 'night_skiing',
@@ -39,21 +40,21 @@ class FeatureGate implements FilterInterface
         'ski-patrol' => 'ski_patrol',
     ];
 
+    /** The flag that gates a URL path, or null if none does */
+    public static function flagForPath(string $path): ?string
+    {
+        $segment = explode('/', trim($path, '/'))[0] ?? '';
+        return self::ROUTE_FLAGS[$segment] ?? null;
+    }
+
     public function before(RequestInterface $request, $arguments = null)
     {
-        if (auth()->id() === 1) return;
-
         helper('feature');
-        $path = trim($request->getUri()->getPath(), '/');
-        $segment = explode('/', $path)[0] ?? '';
+        $flag = self::flagForPath($request->getUri()->getPath());
 
-        foreach (self::ROUTE_FLAGS as $route => $flag) {
-            if ($segment === $route || str_starts_with($path, $route . '/')) {
-                if (!featureEnabled($flag)) {
-                    return redirect()->to('/dashboard')->with('error', 'This feature is currently unavailable.');
-                }
-                break;
-            }
+        // featureEnabled() already lets admins through "admins only" flags; fully off is off for everyone but admins too
+        if ($flag !== null && !featureEnabled($flag) && !featureViewerIsAdmin()) {
+            return redirect()->to('/dashboard')->with('error', 'This feature is currently unavailable.');
         }
     }
 

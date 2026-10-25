@@ -277,6 +277,10 @@ a.link:hover{opacity:0.8}
 
         $__navItem = function (array $it) use ($__isAdmin, $__bonusDue) {
             if (!empty($it['hide']) && function_exists('isPageHidden') && isPageHidden($it['hide'])) return '';
+            // Feature flags: players don't see switched-off features; admins see them faded so they can still test
+            $__flag = \App\Filters\FeatureGate::flagForPath($it['url']);
+            $flagOff = $__flag !== null && function_exists('featureEnabled') && !featureEnabled($__flag);
+            if ($flagOff && !$__isAdmin) return '';
             $locked = false;
             $href = $it['url'];
             if (!empty($it['feature'])) {
@@ -284,11 +288,12 @@ a.link:hover{opacity:0.8}
                 if (!$unlocked) { $locked = true; $href = '/achievements'; }
             }
             $ext = !empty($it['ext']);
-            $cls = $locked ? 'opacity-40' : '';
+            $cls = ($locked || $flagOff) ? 'opacity-40' : '';
             $badge = (!empty($it['badge']) && $it['badge'] === 'bonus' && $__bonusDue)
                 ? ' <span class="badge badge-warning badge-xs">!</span>' : '';
             $target = $ext ? ' target="_blank" rel="noopener noreferrer"' : '';
-            return '<li><a href="' . esc($href, 'attr') . '"' . $target . ' class="' . $cls . '">'
+            $title = $flagOff ? ' title="Switched off for players (feature flag)"' : '';
+            return '<li><a href="' . esc($href, 'attr') . '"' . $target . $title . ' class="' . $cls . '">'
                 . '<i class="fa-solid ' . esc($it['icon'], 'attr') . ' fa-fw mr-2"></i>' . esc($it['label']) . $badge . '</a></li>';
         };
     ?>

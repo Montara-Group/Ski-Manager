@@ -660,7 +660,48 @@ class Admin extends BaseController
     {
         if (!$this->checkAdmin()) return redirect()->to('/dashboard')->with('error', 'Unauthorized access.');
         $flags = db_connect()->table('feature_flags')->orderBy('name')->get()->getResultArray();
-        return view('admin/features', ['flags' => $flags]);
+        return view('admin/features', ['flags' => $flags, 'usage' => $this->featureFlagUsage()]);
+    }
+
+    /**
+     * Where each flag is actually used: pages it gates (FeatureGate) and code that checks it.
+     * Found by scanning the code so the page can point out flags that don't control anything.
+     */
+    private function featureFlagUsage(): array
+    {
+        $usage = [];
+        foreach (\App\Filters\FeatureGate::ROUTE_FLAGS as $route => $flag) {
+            $usage[$flag]['pages'][] = '/' . $route;
+        }
+        $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(APPPATH, \FilesystemIterator::SKIP_DOTS));
+        foreach ($it as $file) {
+            if ($file->getExtension() !== 'php' || str_contains($file->getFilename(), '.bak')) continue;
+            if (!preg_match_all('/featureEnabled\(\s*[\'"]([a-z0-9_]+)[\'"]\s*\)/', file_get_contents($file->getPathname()), $m)) continue;
+            $where = str_replace([APPPATH, '.php'], '', $file->getPathname());
+            foreach (array_unique($m[1]) as $flag) {
+                $usage[$flag]['code'][] = $where;
+            }
+        }
+        return $usage;
+    }
+
+    /** POST /admin/features/set/{id} with level 0 (off), 1 (admins only) or 2 (everyone) */
+    public function setFlag(int $id)
+    {
+        if (!$this->checkAdmin()) return redirect()->to('/admin/features')->with('error', 'Unauthorized access.');
+        $level = (int) $this->request->getPost('level');
+        if (!in_array($level, [0, 1, 2], true)) return redirect()->to('/admin/features')->with('error', 'Unknown level.');
+
+        $db = db_connect();
+        $flag = $db->table('feature_flags')->where('id', $id)->get()->getRowArray();
+        if (!$flag) return redirect()->to('/admin/features')->with('error', 'Flag not found.');
+
+        $labels = ['off', 'admins only', 'everyone'];
+        if ((int) $flag['enabled'] !== $level) {
+            $db->table('feature_flags')->where('id', $id)->update(['enabled' => $level]);
+            $this->auditLog('feature_flag', null, $flag['flag_key'] . ': ' . $labels[(int) $flag['enabled']] . ' -> ' . $labels[$level]);
+        }
+        return redirect()->to('/admin/features#flag-' . $id)->with('success', $flag['name'] . ' is now ' . $labels[$level] . '.');
     }
 
     public function toggleFlag(int $id)

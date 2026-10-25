@@ -22,6 +22,7 @@ $routes->post("/admin/changelogs/save", "Admin::saveChangelog");
 $routes->post("/admin/changelogs/delete/(:num)", "Admin::deleteChangelog/$1");
 $routes->get("/admin/features", "Admin::featureFlags");
 $routes->post("/admin/features/toggle/(:num)", "Admin::toggleFlag/$1");
+$routes->post("/admin/features/set/(:num)", "Admin::setFlag/$1");
 $routes->post("/admin/features/enable-all", "Admin::enableAllFlags");
 $routes->post("/admin/features/disable-all-beta", "Admin::disableAllBeta");
 $routes->get("/admin/suspicious", "Admin::suspiciousActivity");
