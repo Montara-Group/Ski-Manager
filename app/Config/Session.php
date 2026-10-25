@@ -41,7 +41,7 @@ class Session extends BaseConfig
      * The number of SECONDS you want the session to last.
      * Setting to 0 (zero) means expire when the browser is closed.
      */
-    public int $expiration = 7200;
+    public int $expiration = 14 * DAY;
 
     /**
      * --------------------------------------------------------------------------
@@ -90,7 +90,9 @@ class Session extends BaseConfig
      * when auto-regenerating the session ID. When set to FALSE, the data
      * will be later deleted by the garbage collector.
      */
-    public bool $regenerateDestroy = true;
+    // Must stay false: pages poll every 10-30s, and destroying the old session on each
+    // 5-minute ID rotation made an in-flight poll start an empty session and log people out
+    public bool $regenerateDestroy = false;
 
     /**
      * --------------------------------------------------------------------------

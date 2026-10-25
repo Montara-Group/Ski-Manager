@@ -42,7 +42,7 @@
                     </div>
                     <?php if (setting('Auth.sessionConfig')['allowRemembering']) : ?>
                         <label class="flex items-center gap-2 text-sm cursor-pointer w-fit">
-                            <input type="checkbox" name="remember" class="checkbox checkbox-primary checkbox-sm" <?= old('remember') ? 'checked' : '' ?>>
+                            <input type="checkbox" name="remember" class="checkbox checkbox-primary checkbox-sm" <?= old('remember', 'on') ? 'checked' : '' ?>>
                             Keep me logged in
                         </label>
                     <?php endif ?>
