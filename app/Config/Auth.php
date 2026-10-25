@@ -106,7 +106,8 @@ class Auth extends ShieldAuth
      * @var array<string, class-string<ActionInterface>|null>
      */
     public array $actions = [
-        'register' => \CodeIgniter\Shield\Authentication\Actions\EmailActivator::class,
+        // Our subclass: no 500 when the mail can't be sent, and no new email on every page load
+        'register' => \App\Authentication\Actions\EmailActivator::class,
         'login'    => null,
     ];
 

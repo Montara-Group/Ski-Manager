@@ -286,41 +286,7 @@ $routes->group('admin/support', ['filter' => 'group:admin'], function($routes) {
 $routes->get("api/notifications/live", "Notifications::getLatestAsync");
 
 
-// Custom Bulletproof Identity Verification Processor
-$routes->post("auth/activate-submit", function() {
-    $db = \Config\Database::connect();
-    $session = session();
-    $code = trim(request()->getPost("code") ?? "");
-
-    if (empty($code)) {
-        return redirect()->back()->with("error", "Please enter your verification token.");
-    }
-
-    // Verify the token directly against the database
-    $identity = $db->table("auth_identities")
-        ->where("secret", $code)
-        ->where("type", "email_activate")
-        ->get()->getRowArray();
-
-    if (!$identity) {
-        return redirect()->back()->with("error", "The code entered is invalid or has expired.");
-    }
-
-    $userId = $identity["user_id"];
-
-    // 1. Force the account status to active
-    $db->table("users")->where("id", $userId)->update(["active" => 1]);
-
-    // 2. Erase the single-use token from the database
-    $db->table("auth_identities")->where("id", $identity["id"])->delete();
-
-    // 3. WIPE out the stuck activation workflow variables completely
-    $session->destroy();
-    
-    // 4. Fire up a fresh, clean session context to safely carry our success message
-    $freshSession = session();
-
-    // 5. Explicitly redirect to login with a clear confirmation notice
-    return redirect()->to(site_url("login"))->with("message", "Your account has been successfully verified! Please log in below to access your resort.");
-});
+// Activation code form: tied to the account, expiring, rate-limited (Controllers/AuthActivation.php)
+$routes->get('auth/activate', 'AuthActivation::form');
+$routes->post('auth/activate-submit', 'AuthActivation::submit');
 
