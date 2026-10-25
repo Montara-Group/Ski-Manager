@@ -17,6 +17,28 @@
     $seasonLen = (int) getSeasonLength();
     $seasonProgressPct = min(100, max(0, (int) round(($seasonDay / max(1, $seasonLen)) * 100)));
     $daysRemaining = max(0, $seasonLen - $seasonDay);
+
+    // Season 2 launch: only once Sector 2 is actually released, with counts from the real map
+    $__s2 = $db->table('resort_sectors')->where('resort_map', 'ParkCity')->where('name', 'Sector 2')->get()->getRowArray();
+    $__s2Live = $currentSeasonNum >= 2 && $__s2 && (int) $__s2['released'] === 1;
+    $__s2Runs = $__s2Lifts = $__s2Steep = 0;
+    $__podium = [];
+    if ($__s2Live) {
+        foreach ($db->table('map_segments')->select('type, difficulty, COUNT(*) AS n')->where('sector', $__s2['id'])->where('active', 1)->groupBy('type, difficulty')->get()->getResultArray() as $__r) {
+            if ($__r['type'] === 'lift') { $__s2Lifts += (int) $__r['n']; continue; }
+            $__s2Runs += (int) $__r['n'];
+            if (in_array($__r['difficulty'], ['black', 'double_black'], true)) $__s2Steep += (int) $__r['n'];
+        }
+        if ($db->tableExists('season_leaderboard_archives')) {
+            // Demo accounts were ranked by the Season 1 rollover; keep them off the public podium
+            $__podium = $db->table('season_leaderboard_archives a')->select('a.username, a.resort_name, a.cash')
+                ->join('users u', 'u.id = a.user_id', 'left')
+                ->where('a.season_number', 1)
+                ->groupStart()->where('u.status IS NULL')->orWhere('u.status !=', 'demo')->groupEnd()
+                ->orderBy('a.rank_position', 'ASC')->limit(3)->get()->getResultArray();
+        }
+    }
+    $__s2JustOpened = $__s2Live && $currentSeasonNum === 2 && $seasonDay <= 14;
 ?>
 
 <?php
@@ -115,6 +137,37 @@
 .text-base-content\/75 { color: color-mix(in oklab, var(--color-base-content) 75%, transparent); }
 .underline-offset-4 { text-underline-offset: 4px; }
 
+/* Season 2 launch */
+.s2-tag { display: inline-block; font-family: var(--sign); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 9px 1px; border-radius: 3px; background: #7fb4ff; color: #0d1521; line-height: 1.4; white-space: nowrap; flex-shrink: 0; }
+.s2-pill { display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.3rem 0.85rem 0.3rem 0.3rem; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 0.8125rem; font-weight: 500; text-decoration: none; backdrop-filter: blur(4px); }
+.s2-pill:hover { background: rgba(255,255,255,0.18); color: #fff; }
+.s2-pill .s2-tag { border-radius: 999px; padding: 2px 10px 1px; }
+.s2-band { position: relative; isolation: isolate; overflow: hidden; color: #fff; background: #0f1620; border-bottom: 1px solid var(--color-base-300); }
+.s2-band::before { content: ''; position: absolute; inset: 0; z-index: -2; background-image: url('/img/ParkCity_med.jpg'), url('/img/ParkCity_low.jpg'); background-size: cover; background-position: center 8%; opacity: 0.55; filter: saturate(0.6); }
+.s2-band::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(8,12,18,0.95) 0%, rgba(8,12,18,0.82) 50%, rgba(8,12,18,0.5) 100%); }
+@media (max-width: 1023px) { .s2-band::after { background: rgba(8,12,18,0.86); } }
+.s2-title { font-family: var(--sign); font-weight: 700; font-size: clamp(2.5rem, 5vw, 3.75rem); line-height: 0.98; margin: 0.9rem 0 1rem; }
+.s2-title span { color: #7fb4ff; }
+.s2-lede { font-size: 1.0625rem; line-height: 1.6; color: rgba(255,255,255,0.8); max-width: 34rem; }
+.s2-stats { display: flex; flex-wrap: wrap; gap: 1rem 2.25rem; margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid rgba(255,255,255,0.16); }
+.s2-stats b { display: block; font-family: var(--sign); font-size: 2.5rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.s2-stats span { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8125rem; color: rgba(255,255,255,0.7); margin-top: 0.3rem; }
+.s2-stats .s2-diamond { width: 9px; height: 9px; margin: 0 2px; background: #fff; }
+.s2-band .ghost { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
+.s2-band .ghost:hover { background: rgba(255,255,255,0.22); color: #fff; }
+.s2-podium { list-style: none; margin: 0; padding: 0; }
+.s2-podium li { display: flex; align-items: center; gap: 0.85rem; padding: 0.75rem 1.1rem; border-top: 1px solid rgba(0,0,0,0.08); }
+.s2-podium li:first-child { border-top: 0; }
+.s2-rank { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-family: var(--sign); font-weight: 700; font-size: 1rem; color: #1d232b; background: #e4e1d8; }
+.s2-rank.r1 { background: #e9b949; }
+.s2-rank.r2 { background: #c9ced6; }
+.s2-rank.r3 { background: #d39a6a; }
+.s2-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.s2-name small { display: block; font-weight: 400; font-size: 0.75rem; color: #5b6470; overflow: hidden; text-overflow: ellipsis; }
+.s2-cash { font-family: var(--sign); font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.s2-foot { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.7rem 1.1rem 0.85rem; font-size: 0.75rem; color: #5b6470; background: #efece4; border-top: 1px solid rgba(0,0,0,0.08); }
+.s2-foot i { color: #c08a1e; }
+
 .home-cta { background: #1d232b; color: #f7f5f0; }
 .home-cta h2 { font-family: var(--sign); font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 700; line-height: 1.05; margin: 0; }
 </style>
@@ -123,9 +176,13 @@
 <section class="home-hero">
     <div class="max-w-6xl mx-auto px-4 py-14 md:py-20 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
         <div class="lg:col-span-7 space-y-6">
+            <?php if ($__s2JustOpened) : ?>
+            <a href="#season-2" class="s2-pill"><span class="s2-tag">Season 2</span>Sector 2 just opened: Advanced Peaks <i class="fa-solid fa-arrow-down text-[10px]" aria-hidden="true"></i></a>
+            <?php else : ?>
             <div class="text-sm" style="color:rgba(255,255,255,0.75)">
                 <span class="inline-block w-2 h-2 rounded-full bg-success mr-1.5 align-middle"></span>Season <?= $currentSeasonNum ?> is on · day <?= $seasonDay ?> of <?= $seasonLen ?>
             </div>
+            <?php endif ?>
             <h1>Design slopes.<br>Spin chairlifts.<br><span>Rule the mountain.</span></h1>
             <p class="lede">Start with an empty mountain and up to <?= currency(1000000) ?> in capital. Build lifts, lay out runs, hire staff, make snow and keep the resort profitable.</p>
             <div class="flex flex-wrap items-center gap-3">
@@ -174,6 +231,56 @@
         </div>
     </div>
 </section>
+
+<?php if ($__s2Live) : ?>
+<!-- Season 2 launch -->
+<section id="season-2" class="s2-band">
+    <div class="max-w-6xl mx-auto px-4 py-14 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+        <div class="lg:col-span-7">
+            <span class="s2-tag">Season 2 · Now open</span>
+            <h2 class="s2-title">Sector 2 is open.<br><span>Advanced Peaks.</span></h2>
+            <p class="s2-lede">The upper mountain at Park City: steep bowls, high ridges and the hardest terrain in the game. Your cash and everything you built in Season 1 carries over.</p>
+            <?php if ($__s2Runs + $__s2Lifts > 0) : ?>
+            <div class="s2-stats">
+                <div><b><?= number_format($__s2Runs) ?></b><span>new runs</span></div>
+                <div><b><?= number_format($__s2Steep) ?></b><span><span class="tsign black s2-diamond" aria-hidden="true"></span> black &amp; double-black</span></div>
+                <div><b><?= number_format($__s2Lifts) ?></b><span>new lifts</span></div>
+            </div>
+            <?php endif ?>
+            <div class="flex flex-wrap items-center gap-3 mt-7">
+                <?php if (auth()->loggedIn()) : ?>
+                <a href="/map" class="btn btn-primary px-6">Build in Sector 2</a>
+                <?php else : ?>
+                <a href="/register" class="btn btn-primary px-6">Start in Season 2</a>
+                <a href="/login" class="btn ghost">I played Season 1</a>
+                <?php endif ?>
+            </div>
+        </div>
+        <div class="lg:col-span-5">
+            <div class="report">
+                <div class="report-head">
+                    <h2>Season 1 podium</h2>
+                    <span>Final standings</span>
+                </div>
+                <?php if ($__podium) : ?>
+                <ol class="s2-podium">
+                    <?php foreach ($__podium as $__i => $__p) : ?>
+                    <li>
+                        <span class="s2-rank r<?= $__i + 1 ?>"><?= $__i + 1 ?></span>
+                        <span class="s2-name"><?= esc($__p['username']) ?><?php if (!empty($__p['resort_name'])) : ?><small><?= esc($__p['resort_name']) ?></small><?php endif ?></span>
+                        <span class="s2-cash"><?= currency((int) $__p['cash']) ?></span>
+                    </li>
+                    <?php endforeach ?>
+                </ol>
+                <?php else : ?>
+                <p class="px-4 py-6 text-sm" style="color:#5b6470">Final standings are being tallied.</p>
+                <?php endif ?>
+                <p class="s2-foot"><i class="fa-solid fa-medal" aria-hidden="true"></i> Everyone who played Season 1 earned the Pioneer badge. The top 10 got 50 Genepis.</p>
+            </div>
+        </div>
+    </div>
+</section>
+<?php endif ?>
 
 <!-- What you manage -->
 <section class="home-section bg-base-100 border-b border-base-300">
