@@ -6,7 +6,7 @@ use CodeIgniter\Shield\Models\UserModel;
 
 class Account extends BaseController
 {
-    public function index(): string
+    public function index()
     {
         return redirect()->to('/settings');
     }

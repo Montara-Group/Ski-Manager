@@ -332,7 +332,7 @@ class Vote extends BaseController
 
         if ($hasUpdatedAt) {
             $builder->select('resort_votes.updated_at')
-                    ->orderBy('COALESCE(resort_votes.updated_at, resort_votes.created_at)', 'DESC');
+                    ->orderBy('COALESCE(resort_votes.updated_at, resort_votes.created_at)', 'DESC', false);
         } else {
             $builder->orderBy('resort_votes.created_at', 'DESC');
         }

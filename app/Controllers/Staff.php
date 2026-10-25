@@ -27,7 +27,7 @@ class Staff extends BaseController
         return $roles;
     }
 
-    public function index(): string
+    public function index()
     {
         $userId = auth()->id();
         // Temporary Emergency Seeder

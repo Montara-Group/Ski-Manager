@@ -59,7 +59,7 @@ class ResortAnalysis extends BaseController
         return redirect()->to('/resort-analysis')->with('success', 'Report generated! Check the results below.');
     }
 
-    public function view(int $id): string
+    public function view(int $id)
     {
         $userId = auth()->id();
         $db = db_connect();
