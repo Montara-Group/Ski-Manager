@@ -743,12 +743,14 @@ class Admin extends BaseController
         $db = db_connect();
         $targetSeason = $db->table('seasons')->where('id', $id)->get()->getRowArray();
         if ($targetSeason && function_exists('triggerSeasonRollover')) {
-            triggerSeasonRollover((int) $targetSeason['season_number']);
-            $this->auditLog('activate_season', null, 'Season #' . $targetSeason['season_number']);
-            return redirect()->to('/admin/seasons')->with('success', "Season #{$targetSeason['season_number']} activated, leaderboard archived, and Sector 2 unlocked.");
+            $rolledOver = triggerSeasonRollover((int) $targetSeason['season_number'], true);
+            if ($rolledOver) {
+                $this->auditLog('activate_season', null, 'Season #' . $targetSeason['season_number']);
+                return redirect()->to('/admin/seasons')->with('success', "Season #{$targetSeason['season_number']} activated, leaderboard archived, and Sector 2 unlocked.");
+            }
         }
         $db->table('seasons')->update(['active' => 0]);
-        $db->table('seasons')->where('id', $id)->update(['active' => 1]);
+        $db->table('seasons')->where('id', $id)->update(['active' => 1, 'maintenance' => 0, 'maintenance_until' => null]);
         $this->auditLog('activate_season', null, 'Season #' . $id);
         return redirect()->to('/admin/seasons')->with('success', 'Season activated.');
     }

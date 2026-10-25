@@ -122,6 +122,13 @@ class Achievements extends BaseController
         ];
 
         foreach ($achievements as $a) {
+            // Milestone or one-time awarded achievements must not be overwritten
+            if ($a['achievement_key'] === 'season_1_pioneer') {
+                continue;
+            }
+            if ($a['claimed'] && $a['completed']) {
+                continue;
+            }
             $progress = $map[$a['achievement_key']] ?? 0;
             $completed = $progress >= (int) $a['target'] ? 1 : 0;
             $db->table('achievements')->where('id', $a['id'])->update(['progress' => min($progress, (int) $a['target']), 'completed' => $completed]);

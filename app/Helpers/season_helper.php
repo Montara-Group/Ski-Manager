@@ -205,10 +205,10 @@ function getDaysUntilNextSeason(): int
     return max(0, $len - $day);
 }
 
-function triggerSeasonRollover(?int $targetSeasonNumber = null): bool
+function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = false): bool
 {
-    // Prevent season rollover while maintenance mode is active
-    if (isMaintenanceMode()) {
+    // Prevent automated season rollover while maintenance mode is active, unless explicitly forced
+    if (!$force && isMaintenanceMode()) {
         log_message('notice', 'Season rollover blocked because maintenance mode is active.');
         return false;
     }
@@ -278,7 +278,7 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null): bool
 
                     // Award Genepis bonus to top 10 finishers
                     if ($rank <= 10 && $db->tableExists('genepis')) {
-                        $db->query("UPDATE genepis SET balance = balance + 50 WHERE user_id = ?", [$uId]);
+                        $db->query("UPDATE genepis SET balance = balance + 50, total_earned = total_earned + 50 WHERE user_id = ?", [$uId]);
                     }
 
                     $rank++;
@@ -296,16 +296,32 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null): bool
             $now = date('Y-m-d H:i:s');
             foreach ($allPlayers as $p) {
                 $pId = (int) $p['user_id'];
-                $hasBadge = $db->table('achievements')
+                $existingAch = $db->table('achievements')
                     ->where('user_id', $pId)
                     ->where('achievement_key', 'season_1_pioneer')
-                    ->countAllResults();
+                    ->get()
+                    ->getRowArray();
 
-                if ($hasBadge === 0) {
+                if ($existingAch) {
+                    $db->table('achievements')
+                        ->where('id', (int) $existingAch['id'])
+                        ->update([
+                            'progress'  => 1,
+                            'completed' => 1,
+                        ]);
+                } else {
                     $db->table('achievements')->insert([
                         'user_id'         => $pId,
                         'achievement_key' => 'season_1_pioneer',
-                        'unlocked_at'     => $now,
+                        'name'            => 'Season 1 Pioneer',
+                        'description'     => 'Participated as an active ski resort manager during inaugural Season 1 at Park City.',
+                        'icon'            => 'fa-solid fa-medal text-warning',
+                        'progress'        => 1,
+                        'target'          => 1,
+                        'reward_amount'   => 10000,
+                        'completed'       => 1,
+                        'claimed'         => 0,
+                        'created_at'      => $now,
                     ]);
                 }
             }
@@ -322,9 +338,13 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null): bool
                 ->update(['released' => 1, 'visible' => 1]);
         }
 
-        // 4. Deactivate Season 1, Activate Season 2
+        // 4. Deactivate Season 1, Activate Season 2, Clear maintenance
         $db->table('seasons')->update(['active' => 0]);
-        $db->table('seasons')->where('id', (int) $nextSeason['id'])->update(['active' => 1]);
+        $db->table('seasons')->where('id', (int) $nextSeason['id'])->update([
+            'active'            => 1,
+            'maintenance'       => 0,
+            'maintenance_until' => null,
+        ]);
 
         // 5. Broadcast in-game announcement
         if ($db->tableExists('activity_log')) {
