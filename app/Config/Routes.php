@@ -268,6 +268,7 @@ $routes->post('/settings/difficulty', 'Settings::difficulty');
 // Support chat
 $routes->get('/support', 'Support::index');
 $routes->post('/support/send', 'Support::send');
+$routes->get('/support/messages', 'Support::poll');
 $routes->get('/admin/support', 'Support::adminIndex');
 $routes->get('/admin/support/(:num)', 'Support::adminView/$1');
 $routes->post('/admin/support/(:num)/reply', 'Support::adminReply/$1');

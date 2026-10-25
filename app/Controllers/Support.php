@@ -4,6 +4,9 @@ namespace App\Controllers;
 
 class Support extends BaseController
 {
+    private const MAX_LENGTH = 1000;
+    private const MAX_PER_HOUR = 10;
+
     public function index(): string
     {
         $userId = auth()->id();
@@ -11,32 +14,84 @@ class Support extends BaseController
 
         $db->table('support_messages')->where('user_id', $userId)->where('sender', 'admin')->where('is_read', 0)->update(['is_read' => 1]);
 
-        $messages = $db->table('support_messages')->where('user_id', $userId)->orderBy('created_at', 'ASC')->limit(100)->get()->getResultArray();
+        // Newest 100, shown oldest first
+        $messages = array_reverse($db->table('support_messages')->where('user_id', $userId)->orderBy('id', 'DESC')->limit(100)->get()->getResultArray());
 
-        return view('support/index', ['messages' => $messages]);
+        return view('support/index', ['messages' => $messages, 'maxLength' => self::MAX_LENGTH]);
+    }
+
+    /** GET /support/messages?after={id}: new messages for the open chat (polled while the tab is visible) */
+    public function poll()
+    {
+        $userId = auth()->id();
+        $after = max(0, (int) $this->request->getGet('after'));
+        $db = db_connect();
+
+        $rows = $db->table('support_messages')->select('id, sender, message, created_at')
+            ->where('user_id', $userId)->where('id >', $after)->orderBy('id', 'ASC')->limit(50)->get()->getResultArray();
+        if ($rows) {
+            $db->table('support_messages')->where('user_id', $userId)->where('sender', 'admin')->where('is_read', 0)->update(['is_read' => 1]);
+        }
+
+        return $this->response->setJSON(array_map(fn($r) => [
+            'id'      => (int) $r['id'],
+            'sender'  => $r['sender'],
+            'message' => $r['message'],
+            'time'    => date('g:ia', strtotime($r['created_at'])),
+            'date'    => date('Y-m-d', strtotime($r['created_at'])),
+        ], $rows));
     }
 
     public function send()
     {
         $userId = auth()->id();
         $message = trim($this->request->getPost('message') ?? '');
+        $length = mb_strlen($message);
 
-        if (strlen($message) < 1 || strlen($message) > 1000) {
-            return redirect()->back()->with('error', 'Message must be 1-1000 characters.');
+        if ($length < 1 || $length > self::MAX_LENGTH) {
+            return redirect()->to('/support')->withInput()->with('error', 'Messages can be up to ' . self::MAX_LENGTH . ' characters.');
         }
 
-        db_connect()->table('support_messages')->insert([
+        $db = db_connect();
+        $recent = $db->table('support_messages')->where('user_id', $userId)->where('sender', 'player')
+            ->where('created_at >', date('Y-m-d H:i:s', strtotime('-1 hour')))->countAllResults();
+        if ($recent >= self::MAX_PER_HOUR) {
+            return redirect()->to('/support')->withInput()->with('error', "You've sent " . self::MAX_PER_HOUR . ' messages in the last hour. Please wait a little before sending more.');
+        }
+
+        $db->table('support_messages')->insert([
             'user_id' => $userId,
             'sender' => 'player',
             'message' => $message,
         ]);
 
-        return redirect()->to('/support')->with('success', 'Message sent! We\'ll reply soon.');
+        // Let admins know in-game instead of relying on them checking the inbox
+        $username = auth()->user()->username ?? ('Player #' . $userId);
+        foreach ($this->adminIds() as $adminId) {
+            if ($adminId === (int) $userId) continue;
+            notify($adminId, 'support', 'Support message from ' . $username, mb_strimwidth($message, 0, 80, '…'), 'fa-solid fa-headset', '/admin/support/' . $userId);
+        }
+
+        return redirect()->to('/support')->with('success', 'Sent. You\'ll get a notification when we reply.');
     }
 
-    public function adminIndex(): string
+    /** Same rule as AdminFilter: user #1 or anyone in the admin/superadmin groups */
+    private function isAdmin(): bool
     {
-        if (auth()->id() !== 1) return redirect()->to('/dashboard');
+        $user = auth()->user();
+        return auth()->id() === 1 || ($user && $user->inGroup('admin', 'superadmin'));
+    }
+
+    private function adminIds(): array
+    {
+        $ids = array_map('intval', array_column(db_connect()->table('auth_groups_users')->select('user_id')
+            ->whereIn('group', ['admin', 'superadmin'])->get()->getResultArray(), 'user_id'));
+        return array_values(array_unique(array_merge([1], $ids)));
+    }
+
+    public function adminIndex(): string|\CodeIgniter\HTTP\RedirectResponse
+    {
+        if (!$this->isAdmin()) return redirect()->to('/dashboard');
         $db = db_connect();
 
         $conversations = $db->query("
@@ -53,9 +108,9 @@ class Support extends BaseController
         return view('support/admin', ['conversations' => $conversations]);
     }
 
-    public function adminView(int $userId): string
+    public function adminView(int $userId): string|\CodeIgniter\HTTP\RedirectResponse
     {
-        if (auth()->id() !== 1) return redirect()->to('/dashboard');
+        if (!$this->isAdmin()) return redirect()->to('/dashboard');
         $db = db_connect();
 
         $db->table('support_messages')->where('user_id', $userId)->where('sender', 'player')->where('is_read', 0)->update(['is_read' => 1]);
@@ -68,10 +123,10 @@ class Support extends BaseController
 
     public function adminReply(int $userId)
     {
-        if (auth()->id() !== 1) return redirect()->to('/dashboard');
+        if (!$this->isAdmin()) return redirect()->to('/dashboard');
         $message = trim($this->request->getPost('message') ?? '');
 
-        if (strlen($message) < 1 || strlen($message) > 2000) return redirect()->back()->with('error', 'Message must be 1-2000 characters.');
+        if (mb_strlen($message) < 1 || mb_strlen($message) > 2000) return redirect()->back()->with('error', 'Message must be 1-2000 characters.');
 
         db_connect()->table('support_messages')->insert([
             'user_id' => $userId,
@@ -91,7 +146,7 @@ class Support extends BaseController
         }
 
         $message = trim($this->request->getPost('message') ?? '');
-        if (strlen($message) < 1 || strlen($message) > 2000) {
+        if (mb_strlen($message) < 1 || mb_strlen($message) > 2000) {
             return $this->response->setJSON(['success' => false, 'error' => 'Message length must be between 1 and 2000 characters.']);
         }
 
