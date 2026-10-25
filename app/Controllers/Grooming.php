@@ -2,182 +2,144 @@
 
 namespace App\Controllers;
 
-use App\Models\StaffModel;
-use App\Models\PlayerItemModel;
+use App\Libraries\Economy;
+use App\Libraries\Grooming as Rules;
 
+/**
+ * Slope grooming. The night shift grooms automatically in the game tick; this page shows
+ * condition, tonight's plan and the fleet, and sells paid daytime extra runs.
+ */
 class Grooming extends BaseController
 {
     public function index(): string
     {
         $locked = checkFeatureUnlock('grooming'); if ($locked) return $locked;
         $userId = auth()->id();
-        $staffModel = new StaffModel();
-        $itemModel = new PlayerItemModel();
+        $state = $this->state($userId);
         $db = db_connect();
 
-        $groomers = $staffModel->where('user_id', $userId)->where('role', 'groomer')->where('status !=', 'fired')->findAll();
-        $slopes = $itemModel->where('user_id', $userId)->whereIn('item_type', ['slope', 'downhill', 'crosscountry', 'snowpark', 'luge'])->findAll();
-        $equipment = $db->table('equipment')->where('user_id', $userId)->where('equipment_type', 'groomer')->get()->getResultArray();
+        $sectorNames = array_column($db->table('resort_sectors')->select('id, name')->get()->getResultArray(), 'name', 'id');
+        $weather = getCurrentWeather();
+        $weatherRow = ['temp' => $weather['base_temp'] ?? $weather['temp'], 'snowfall' => $weather['snowfall'] ?? 0];
+
+        $slopes = [];
+        foreach ($state['slopes'] as $s) {
+            $s['decay'] = Rules::decay($s, $weatherRow);
+            $s['draw_pct'] = (int) round(Economy::conditionFactor((int) $s['condition_pct']) * 100);
+            $s['groomed_today'] = (int) $s['groomed_day'] === $state['gameDay'];
+            $s['extra_cost'] = Rules::extraRunCost($s);
+            $s['sector_name'] = $sectorNames[(int) $s['sector']] ?? 'Other';
+            $slopes[] = $s;
+        }
+        usort($slopes, fn($a, $b) => (int) $a['condition_pct'] <=> (int) $b['condition_pct']);
 
         $sectors = [];
-        foreach ($slopes as $slope) {
-            $s = (int) ($slope['sector'] ?? 0);
-            if (!isset($sectors[$s])) $sectors[$s] = ['slopes' => [], 'groomers_needed' => 0, 'groomers_assigned' => 0, 'avg_condition' => 0];
-            $sectors[$s]['slopes'][] = $slope;
+        foreach ($slopes as $s) {
+            $sectors[$s['sector_name']][] = (int) $s['condition_pct'];
         }
+        $sectors = array_map(fn($c) => ['count' => count($c), 'avg' => (int) round(array_sum($c) / count($c)), 'worst' => min($c)], $sectors);
 
-        $sectorNames = [];
-        $sectorRows = $db->table('resort_sectors')->get()->getResultArray();
-        foreach ($sectorRows as $sr) { $sectorNames[(int)$sr['id']] = $sr['name']; }
+        $open = array_filter($slopes, fn($s) => $s['status'] === 'open');
+        $groomable = array_filter($slopes, [Rules::class, 'groomable']);
+        $avgDecay = $open ? array_sum(array_column($open, 'decay')) / count($open) : 0;
+        // Points the fleet restores per night, spread over all open slopes, against what they lose
+        $nightlyRestorePerSlope = $open ? $state['fleet']['capacity'] * $state['restore'] / count($open) : 0;
 
-        foreach ($sectors as $s => &$sector) {
-            $sector['name'] = $sectorNames[$s] ?? 'Unassigned';
-            $sector['groomers_needed'] = max(1, (int) ceil(count($sector['slopes']) / 3));
-            $conditions = array_column($sector['slopes'], 'condition_pct');
-            $sector['avg_condition'] = count($conditions) > 0 ? round(array_sum($conditions) / count($conditions)) : 0;
-        }
-
-        foreach ($groomers as $g) {
-            if ($g['assigned_to'] && preg_match('/^sector_(\d+)$/', $g['assigned_to'], $m)) {
-                $sNum = (int) $m[1];
-                if (isset($sectors[$sNum])) $sectors[$sNum]['groomers_assigned']++;
-            }
-        }
-
-        $totalNeeded = array_sum(array_column($sectors, 'groomers_needed'));
-        $totalAssigned = array_sum(array_column($sectors, 'groomers_assigned'));
-        $overallCondition = count($slopes) > 0 ? round(array_sum(array_column($slopes, 'condition_pct')) / count($slopes)) : 0;
-        $criticalSlopes = array_filter($slopes, fn($s) => (int) ($s['condition_pct'] ?? 100) < 40);
-
-        $activeEquipment = count(array_filter($equipment, fn($e) => $e['status'] === 'active'));
-        $brokenEquipment = count(array_filter($equipment, fn($e) => $e['status'] === 'broken'));
-
-        $groomBoost = $this->calcGroomBoost($userId, $activeEquipment);
-        $dailyDecay = count($slopes) > 0 ? 5 : 0;
-
-        $dailyFuelCost = array_sum(array_map(fn($e) => $e['status'] === 'active' ? (int)($e['daily_cost'] ?? 0) : 0, $equipment));
-        $crewSalaryCost = array_sum(array_column($groomers, 'salary'));
-
-        $weather = getCurrentWeather();
-        $weatherTemp = $weather['temp_formatted'];
-        $weatherDesc = $weather['condition'];
-
-        return view('grooming/index', [
-            'groomers' => $groomers,
-            'sectors' => $sectors,
-            'totalNeeded' => $totalNeeded,
-            'totalAssigned' => $totalAssigned,
-            'slopeCount' => count($slopes),
+        return view('grooming/index', array_merge($state, [
             'slopes' => $slopes,
-            'overallCondition' => $overallCondition,
-            'criticalSlopes' => $criticalSlopes,
-            'equipment' => $equipment,
-            'activeEquipment' => $activeEquipment,
-            'brokenEquipment' => $brokenEquipment,
-            'groomBoost' => $groomBoost,
-            'dailyDecay' => $dailyDecay,
-            'dailyFuelCost' => $dailyFuelCost,
-            'crewSalaryCost' => $crewSalaryCost,
+            'sectors' => $sectors,
             'weather' => $weather,
-            'weatherTemp' => $weatherTemp,
-            'weatherDesc' => $weatherDesc,
-        ]);
+            'avgCondition' => $open ? (int) round(array_sum(array_column($open, 'condition_pct')) / count($open)) : 0,
+            'avgDecay' => round($avgDecay, 1),
+            'nightlyRestorePerSlope' => round($nightlyRestorePerSlope, 1),
+            'tonight' => Rules::pick($groomable, $state['fleet']['capacity']),
+            'brokenSlopes' => count(array_filter($slopes, fn($s) => $s['status'] === 'broken')),
+            'fuelPerDay' => array_sum(array_map(fn($m) => $m['status'] === 'active' ? (int) $m['fuel_cost'] : 0, $state['machines'])),
+            'crewPerDay' => array_sum(array_column($state['operators'], 'salary')),
+        ]));
     }
 
-    public function assign()
-    {
-        $userId = auth()->id();
-        $groomerId = (int) $this->request->getPost('groomer_id');
-        $sector = $this->request->getPost('sector');
-
-        $staffModel = new StaffModel();
-        $groomer = $staffModel->where('id', $groomerId)->where('user_id', $userId)->where('role', 'groomer')->first();
-        if (!$groomer) return redirect()->back()->with('error', 'Groomer not found.');
-
-        $assignment = $sector !== '' ? 'sector_' . (int) $sector : null;
-        $staffModel->update($groomerId, ['assigned_to' => $assignment]);
-
-        $msg = $assignment ? $groomer['name'] . ' assigned to Sector ' . (int) $sector : $groomer['name'] . ' unassigned';
-        log_activity($userId, 'Grooming', $msg, 'fa-solid fa-tractor');
-        return redirect()->to('/grooming')->with('success', $msg);
-    }
-
-    public function groomAll()
-    {
-        return $this->doGroom('all');
-    }
-
+    /** Paid daytime run on one slope */
     public function groomSingle()
     {
-        return $this->doGroom('single', (int) $this->request->getPost('slope_id'));
+        return $this->extraRuns([(int) $this->request->getPost('slope_id')]);
     }
 
-    public function groomCritical()
+    /** Paid daytime runs on the worst slopes, as many as the fleet and cash allow */
+    public function groomAll()
     {
-        return $this->doGroom('critical');
+        return $this->extraRuns(null);
     }
 
-    public function groomSector()
-    {
-        return $this->doGroom('sector', 0, (int) $this->request->getPost('sector'));
-    }
-
-    private function doGroom(string $mode, int $slopeId = 0, int $sectorNum = 0)
+    private function extraRuns(?array $slopeIds)
     {
         $userId = auth()->id();
+        $state = $this->state($userId);
+        if ($state['fleet']['capacity'] === 0) {
+            return redirect()->to('/grooming')->with('error', $state['machines'] ? 'No machine can run: switch one on and make sure it has an operator.' : 'You need a grooming machine first.');
+        }
+        if ($state['runsLeft'] <= 0) {
+            return redirect()->to('/grooming')->with('error', 'Your fleet has no daytime runs left today. The night shift grooms again tonight.');
+        }
+
+        $due = array_filter($state['slopes'], fn($s) => Rules::groomable($s) && (int) $s['groomed_day'] !== $state['gameDay']);
+        if ($slopeIds !== null) {
+            $due = array_filter($due, fn($s) => in_array((int) $s['id'], $slopeIds, true));
+            if (!$due) return redirect()->to('/grooming')->with('error', 'That slope can\'t be groomed now: it\'s already at 100% or was groomed today.');
+        }
+        $pick = Rules::pick($due, $state['runsLeft']);
+        if (!$pick) return redirect()->to('/grooming')->with('error', 'Every open slope is at 100% or was already groomed today.');
+
         $db = db_connect();
-
-        $activeGroomers = $db->table('equipment')->where('user_id', $userId)->where('equipment_type', 'groomer')->where('status', 'active')->countAllResults();
-        if ($activeGroomers === 0) {
-            return redirect()->to('/grooming')->with('error', 'No active groomers. Turn on equipment or buy a groomer.');
+        $cash = (int) $db->table('player_finances')->select('cash')->where('user_id', $userId)->get()->getRow('cash');
+        $done = []; $spent = 0;
+        foreach ($pick as $s) {
+            $cost = Rules::extraRunCost($s);
+            if ($spent + $cost > $cash) break;
+            $spent += $cost;
+            $done[] = $s;
         }
+        if (!$done) return redirect()->to('/grooming')->with('error', 'Not enough cash for a grooming run (' . currency(Rules::extraRunCost($pick[0])) . ').');
 
-        $boost = $this->calcGroomBoost($userId, $activeGroomers);
-
-        $query = $db->table('player_items')->where('user_id', $userId)->whereIn('item_type', ['slope', 'downhill', 'crosscountry', 'snowpark', 'luge'])->where('condition_pct <', 100);
-
-        if ($mode === 'single') {
-            $query->where('id', $slopeId);
-            $boost += 5;
-        } elseif ($mode === 'critical') {
-            $query->where('condition_pct <', 40);
-            $boost += 3;
-        } elseif ($mode === 'sector') {
-            $query->where('sector', $sectorNum);
+        $db->transStart();
+        foreach ($done as $s) {
+            $db->table('player_items')->where('id', $s['id'])->where('user_id', $userId)->update([
+                'condition_pct' => min(100, (int) $s['condition_pct'] + $state['restore']), 'groomed_day' => $state['gameDay'], 'groomed_manual' => 1, 'status' => 'open',
+            ]);
         }
+        $db->table('player_finances')->where('user_id', $userId)->set('cash', 'cash - ' . $spent, false)->set('total_expenses', 'total_expenses + ' . $spent, false)->update();
+        $label = count($done) === 1 ? $done[0]['name'] : count($done) . ' slopes';
+        $db->table('financial_transactions')->insert([
+            'user_id' => $userId, 'game_day' => $state['gameDay'], 'category' => 'Grooming',
+            'description' => 'Daytime grooming: ' . $label, 'amount' => $spent, 'type' => 'expense', 'created_at' => date('Y-m-d H:i:s'),
+        ]);
+        $db->transComplete();
 
-        $slopes = $query->get()->getResultArray();
-        if (empty($slopes)) {
-            return redirect()->to('/grooming')->with('error', 'No slopes need grooming.');
-        }
-
-        foreach ($slopes as $slope) {
-            $newCond = min(100, (int) $slope['condition_pct'] + $boost);
-            $db->table('player_items')->where('id', $slope['id'])->update(['condition_pct' => $newCond]);
-        }
-
-        $label = match($mode) {
-            'single' => $slopes[0]['name'],
-            'critical' => count($slopes) . ' critical slope(s)',
-            'sector' => 'Sector ' . $sectorNum,
-            default => count($slopes) . ' slopes',
-        };
-
-        log_activity($userId, 'Grooming', 'Groomed ' . $label . ': +' . $boost . '%', 'fa-solid fa-tractor');
-        return redirect()->to('/grooming')->with('success', 'Groomed ' . $label . '! +' . $boost . '% condition.');
+        log_activity($userId, 'Grooming', 'Daytime grooming on ' . $label . ' (+' . $state['restore'] . '% each, ' . currency($spent) . ')', 'fa-solid fa-tractor');
+        $short = count($done) < count($pick) ? ' Ran out of cash after ' . count($done) . '.' : '';
+        return redirect()->to('/grooming')->with('success', 'Groomed ' . $label . ': +' . $state['restore'] . '% condition for ' . currency($spent) . '.' . $short);
     }
 
-    private function calcGroomBoost(int $userId, int $activeGroomers): int
+    /** Slopes, fleet and today's run budget for a player */
+    private function state(int $userId): array
     {
-        $staffModel = new StaffModel();
-        $groomers = $staffModel->where('user_id', $userId)->where('role', 'groomer')->where('status', 'active')->findAll();
+        $db = db_connect();
+        $slopes = $db->table('player_items')->where('user_id', $userId)->where('item_type', 'slope')->get()->getResultArray();
+        $machines = $db->table('equipment')->where('user_id', $userId)->where('equipment_type', 'groomer')->get()->getResultArray();
+        $operators = $db->table('staff')->where('user_id', $userId)->where('role', 'groomer')->where('status', 'active')->get()->getResultArray();
+        $fleet = Rules::fleet($machines, $operators);
+        $gameDay = getGameDay();
+        $runsUsed = count(array_filter($slopes, fn($s) => (int) $s['groomed_day'] === $gameDay && (int) $s['groomed_manual'] === 1));
 
-        $baseBoost = min($activeGroomers * 5, 20);
-        $crewBonus = 0;
-        foreach ($groomers as $g) {
-            if ($g['assigned_to']) $crewBonus += (int) $g['level'];
-        }
-
-        return min($baseBoost + $crewBonus, 30);
+        return [
+            'gameDay' => $gameDay,
+            'slopes' => $slopes,
+            'machines' => $machines,
+            'operators' => $operators,
+            'fleet' => $fleet,
+            'restore' => Rules::restore($operators),
+            'runsUsed' => $runsUsed,
+            'runsLeft' => max(0, $fleet['capacity'] - $runsUsed),
+        ];
     }
 }

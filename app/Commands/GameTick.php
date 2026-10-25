@@ -247,6 +247,10 @@ class GameTick extends BaseCommand
                 if ($item['item_type'] === 'lift' && $countAssigned('mechanic') > 0) {
                     $decay = max(0, $decay - 1);
                 }
+                // v2: slopes wear by difficulty and weather (App\Libraries\Grooming); groomers restore them below
+                if ($v2 && $item['item_type'] === 'slope') {
+                    $decay = \App\Libraries\Grooming::decay($item, $weather);
+                }
                 $newCond = max(0, (int) $item['condition_pct'] - $decay);
                 $db->table('player_items')->where('id', $item['id'])->update(['condition_pct' => $newCond]);
                 if ($newCond <= 0) {
@@ -256,6 +260,26 @@ class GameTick extends BaseCommand
 
             // ==============================
             $activeGroomers = count(array_filter($equipment, fn($e) => $e['equipment_type'] === 'groomer' && $e['status'] === 'active'));
+
+            // v2 NIGHTLY GROOMING: each machine with an operator grooms its capacity in slopes, worst first
+            $groomedToday = [];
+            if ($v2) {
+                $operators = array_values(array_filter($allStaff, fn($s) => $s['role'] === 'groomer'));
+                $fleet = \App\Libraries\Grooming::fleet(array_filter($equipment, fn($e) => $e['equipment_type'] === 'groomer'), $operators);
+                if ($fleet['capacity'] > 0) {
+                    $slopeRows = $db->table('player_items')->where('user_id', $userId)->where('item_type', 'slope')->whereIn('status', ['open', 'broken'])->get()->getResultArray();
+                    $restore = \App\Libraries\Grooming::restore($operators);
+                    foreach (\App\Libraries\Grooming::pick($slopeRows, $fleet['capacity']) as $sl) {
+                        $db->table('player_items')->where('id', $sl['id'])->update([
+                            'condition_pct' => min(100, (int) $sl['condition_pct'] + $restore), 'groomed_day' => $gameDay, 'groomed_manual' => 0, 'status' => 'open',
+                        ]);
+                        $groomedToday[(int) $sl['id']] = true;
+                    }
+                    if ($groomedToday) {
+                        log_activity($userId, 'Grooming', 'Night shift groomed ' . count($groomedToday) . ' slope' . (count($groomedToday) === 1 ? '' : 's') . ' (+' . $restore . '% each)', 'fa-solid fa-tractor');
+                    }
+                }
+            }
             // AUTO-GROOM PERK
             // ==============================
             $hasAutoGroom = in_array('auto_groom', $activeBoostTypes);
@@ -280,6 +304,12 @@ class GameTick extends BaseCommand
             foreach ($slopesForQuality as $sl) {
                 $q = "packed";
                 if (($weather["snowfall"] ?? 0) >= 10) { $q = "powder"; }
+                elseif ($v2) {
+                    // v2: only slopes the night shift actually groomed count as groomed
+                    if (isset($groomedToday[(int) $sl['id']])) { $q = "groomed"; }
+                    elseif (($weather["condition_name"] ?? "") === "Freezing Rain") { $q = "icy"; }
+                    elseif (($weather["condition_name"] ?? "") === "Sunny" && ($weather["temp"] ?? -5) >= 0) { $q = $hasSnowmaking ? "packed" : "bare"; }
+                }
                 elseif (($weather["snowfall"] ?? 0) >= 1) { $q = $activeGroomers > 0 ? "groomed" : "packed"; }
                 elseif (($weather["condition_name"] ?? "") === "Freezing Rain") { $q = "icy"; }
                 elseif (($weather["condition_name"] ?? "") === "Sunny" && ($weather["temp"] ?? -5) >= 0) { $q = $hasSnowmaking ? "packed" : "bare"; }

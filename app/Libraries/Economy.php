@@ -89,12 +89,15 @@ class Economy
         return ['demand' => $demand, 'per_visit' => $demand > 0 ? $revenue / $demand : 0.0, 'mix' => $mix];
     }
 
-    /** Skiers a slope draws per day before boosts: longer runs and a full spread of difficulties draw more */
+    /**
+     * Skiers the slopes draw per day before boosts: longer runs and a full spread of difficulties
+     * draw more, and a worn slope draws less (CONDITION_FLOOR of its skiers at 0%)
+     */
     public static function slopeDemand(array $slopes): float
     {
         $base = 0.0; $difficulties = [];
         foreach ($slopes as $s) {
-            $base += self::slopeDraw((int) ($s['length_meters'] ?? 0));
+            $base += self::slopeDraw((int) ($s['length_meters'] ?? 0)) * self::conditionFactor((int) ($s['condition_pct'] ?? 100));
             if (!empty($s['difficulty'])) $difficulties[$s['difficulty']] = true;
         }
         return $base * (1 + 0.05 * count($difficulties));
@@ -103,6 +106,14 @@ class Economy
     public static function slopeDraw(int $meters): float
     {
         return 30 + $meters / 40;
+    }
+
+    public const CONDITION_FLOOR = 0.6;
+
+    /** Share of a slope's skiers it keeps at this condition: 100% → all, 50% → 80%, 0% → 60% */
+    public static function conditionFactor(int $conditionPct): float
+    {
+        return self::CONDITION_FLOOR + (1 - self::CONDITION_FLOOR) * max(0, min(100, $conditionPct)) / 100;
     }
 
     public static function liftCapacityPerHour(string $type, int $seats): int
