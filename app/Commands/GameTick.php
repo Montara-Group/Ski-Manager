@@ -26,6 +26,7 @@ class GameTick extends BaseCommand
         $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
         $seasonDay = (($gameDay - 1) % max(1, getSeasonLength())) + 1;
         $isWinter = $seasonDay <= getWinterDays();
+        $seasonNum = function_exists('getSeasonNumber') ? (int) getSeasonNumber() : 1;
 
         CLI::write("Game Tick — Day {$gameDay} (Season day {$seasonDay}, " . ($isWinter ? 'Winter' : 'Summer') . ")", 'green');
 
@@ -47,7 +48,10 @@ class GameTick extends BaseCommand
             }
 
             $cash = (int) $finance['cash'];
-            $weather = $db->table('weather')->where('game_day', $gameDay)->get()->getRowArray() ?: [];
+            // Today's row is written by the previous tick; fall back to the latest one (e.g. right after a rollover)
+            $weather = $db->table('weather')->where('game_day', $gameDay)->get()->getRowArray()
+                ?: ($db->table('weather')->where('game_day <=', $gameDay)->orderBy('game_day', 'DESC')->limit(1)->get()->getRowArray() ?: []);
+            $resortOpen = (int) ($finance['resort_open'] ?? 1) === 1;
             $dayIncome = 0;
             $dayExpenses = 0;
 
@@ -63,6 +67,13 @@ class GameTick extends BaseCommand
             $inspChance = (int) ($diffConfig['inspection_chance'] ?? 5);
             $visMult = ((int) ($diffConfig['visitor_multiplier'] ?? 100)) / 100;
             $vipBonus = (int) ($diffConfig['vip_chance_bonus'] ?? 0);
+
+            // Active Génépis perks, loaded before any revenue so the revenue boost applies to all of it
+            $activeBoostRows = $db->table('player_boosts')->where('user_id', $userId)->where('expires_at >', date('Y-m-d H:i:s'))->get()->getResultArray();
+            $activeBoostTypes = array_column($activeBoostRows, 'boost_type');
+            if (in_array('revenue_boost', $activeBoostTypes)) {
+                $revMult *= 1.25;
+            }
 
             // ==============================
             // STAFF ASSIGNMENT INDEX
@@ -109,7 +120,7 @@ class GameTick extends BaseCommand
                 if ($type === 'hotel') $revenue = (int) round($revenue * (1 + $countAssigned('receptionist') * 0.15));
                 if ($type === 'restaurant') $revenue = (int) round($revenue * (1 + $countAssigned('chef') * 0.10));
 
-                $dayIncome += (int) round($revenue * $revMult);
+                if ($resortOpen) $dayIncome += (int) round($revenue * $revMult); // closed resort: no guests, upkeep still due
                 $dayExpenses += (int) round($b['upkeep_per_day'] * $costMult);
                 $newCondition = max(0, (int) $b['condition_pct'] - (int) round(rand(0, 2) * $decayMult));
                 $db->table('buildings')->where('id', $b['id'])->update(['condition_pct' => $newCondition]);
@@ -209,7 +220,7 @@ class GameTick extends BaseCommand
             // ==============================
             $loans = $db->table('loans')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
             foreach ($loans as $loan) {
-                $payment = (int) $loan['daily_payment'];
+                $payment = min((int) $loan['daily_payment'], max(0, (int) $loan['remaining']));
                 $dayExpenses += $payment;
                 $remaining = max(0, (int) $loan['remaining'] - $payment);
                 $daysLeft = max(0, (int) $loan['days_remaining'] - 1);
@@ -238,15 +249,9 @@ class GameTick extends BaseCommand
 
             // ==============================
             $activeGroomers = count(array_filter($equipment, fn($e) => $e['equipment_type'] === 'groomer' && $e['status'] === 'active'));
-            // ACTIVE TIMED BOOSTS (Génépis perks)
+            // AUTO-GROOM PERK
             // ==============================
-            $activeBoostRows = $db->table('player_boosts')->where('user_id', $userId)->where('expires_at >', date('Y-m-d H:i:s'))->get()->getResultArray();
-            $activeBoostTypes = array_column($activeBoostRows, 'boost_type');
-
             $hasAutoGroom = in_array('auto_groom', $activeBoostTypes);
-            if (in_array('revenue_boost', $activeBoostTypes)) {
-                $revMult *= 1.25;
-            }
 
             if ($hasAutoGroom && $activeGroomers > 0) {
                 $lowSlopes = $db->table('player_items')->where('user_id', $userId)->whereIn('item_type', ['slope', 'downhill', 'crosscountry', 'snowpark', 'luge'])->where('condition_pct <', 50)->get()->getResultArray();
@@ -264,6 +269,7 @@ class GameTick extends BaseCommand
             // ==============================
             $hasSnowmaking = count($activeSnowmakers) > 0;
             $slopesForQuality = $db->table("player_items")->where("user_id", $userId)->where("item_type", "slope")->where("status", "open")->get()->getResultArray();
+            $todayQualities = [];
             foreach ($slopesForQuality as $sl) {
                 $q = "packed";
                 if (($weather["snowfall"] ?? 0) >= 10) { $q = "powder"; }
@@ -272,6 +278,7 @@ class GameTick extends BaseCommand
                 elseif (($weather["condition_name"] ?? "") === "Sunny" && ($weather["temp"] ?? -5) >= 0) { $q = $hasSnowmaking ? "packed" : "bare"; }
                 elseif ($activeGroomers > 0) { $q = "groomed"; }
                 $db->table("player_items")->where("id", $sl["id"])->update(["snow_quality" => $q]);
+                $todayQualities[] = $q;
             }
 
             // ==============================
@@ -291,7 +298,7 @@ class GameTick extends BaseCommand
             // Patrol boost: safety reputation
             $patrolBoost = $countAssigned('ski_patrol') * 2;
 
-            $snowQualityBonus = 0; foreach ($slopesForQuality as $sq) { $snowQualityBonus += match($sq["snow_quality"] ?? "packed") { "powder" => 3, "groomed" => 2, "packed" => 0, "icy" => -2, "bare" => -5, default => 0 }; }
+            $snowQualityBonus = 0; foreach ($todayQualities as $sq) { $snowQualityBonus += match($sq) { "powder" => 3, "groomed" => 2, "packed" => 0, "icy" => -2, "bare" => -5, default => 0 }; }
 
             // Alliance Multi-Pass & Sister Resort synergy
             $allianceBonus = 0;
@@ -371,6 +378,9 @@ class GameTick extends BaseCommand
             // Summer reduction
             if (!$isWinter) $visitors = (int) round($visitors * 0.15);
 
+            // A resort its owner has closed gets no guests (so no tickets, lessons, parking or VIPs); costs still apply
+            if (!$resortOpen) $visitors = 0;
+
             $ticketRevenue = (int) round($visitors * $avgPrice * 0.6);
             $dayIncome += (int) round($ticketRevenue * $revMult);
 
@@ -405,7 +415,7 @@ class GameTick extends BaseCommand
                 $liftRev = !$isWinter ? $baseRev : (int) round($baseRev * 0.3);
                 $scenicTotalIncome += (int) round($liftRev * $revMult);
             }
-            if ($scenicTotalIncome > 0) {
+            if ($scenicTotalIncome > 0 && $resortOpen) {
                 $dayIncome += $scenicTotalIncome;
             }
 
@@ -573,9 +583,10 @@ class GameTick extends BaseCommand
             // VIP GUEST ARRIVALS
             // ==============================
             $ratingData = function_exists('resortRating') ? resortRating($userId) : ['score' => 2];
-            $resortRating = (int) ($ratingData['score'] ?? $ratingData['stars'] ?? 2);
+            // Stars (1-5). The 0-200 'score' made the chance 100% and every VIP type possible for nearly everyone
+            $resortRating = (int) ($ratingData['stars'] ?? 2);
             $vipMagnetBonus = in_array('vip_magnet', $activeBoostTypes) ? 100 : 0;
-            $vipChance = min(100, ($resortRating * 8) + $vipBonus + $vipMagnetBonus + ($visitors > 200 ? 10 : 0) + ($countTotal('manager') * 3));
+            $vipChance = $resortOpen ? min(100, ($resortRating * 8) + $vipBonus + $vipMagnetBonus + ($visitors > 200 ? 10 : 0) + ($countTotal('manager') * 3)) : 0;
             if (rand(1, 100) <= $vipChance) {
                 $vipTypes = [
                     ['type' => 'celebrity', 'name' => 'Celebrity Guest', 'icon' => 'fa-solid fa-star', 'cash_min' => 5000, 'cash_max' => 20000, 'rep' => 5],
@@ -630,6 +641,7 @@ class GameTick extends BaseCommand
                     $finalStatus = $satisfied ? 'satisfied' : 'disappointed';
                     $db->table('vip_guests')->where('id', $vg['id'])->update(['status' => $finalStatus, 'days_remaining' => 0]);
                     if ($satisfied) {
+                        $db->table('player_finances')->where('user_id', $userId)->set('reputation', 'reputation + ' . (int) $vg['reputation_bonus'], false)->update();
                         log_activity($userId, 'vip_satisfied', $vg['name'] . ' departed thoroughly satisfied with your resort! +' . (int)$vg['reputation_bonus'] . ' Reputation', 'fa-solid fa-star');
                     } else {
                         log_activity($userId, 'vip_departure', $vg['name'] . ' departed disappointed — resort lacked requested amenities.', 'fa-solid fa-plane-departure');
@@ -730,7 +742,7 @@ class GameTick extends BaseCommand
         $weatherExists = $db->table('weather')->where('game_day', $tomorrow)->countAllResults();
         if (!$weatherExists) {
             CLI::write("Generating weather for day {$tomorrow}...", 'cyan');
-            $seed = crc32('skimanager-weather-day-' . $tomorrow);
+            $seed = crc32('skimanager-weather-s' . $seasonNum . '-day-' . $tomorrow);
             mt_srand($seed);
 
             $tomorrowSeasonDay = (($tomorrow - 1) % getSeasonLength()) + 1;
@@ -771,7 +783,7 @@ class GameTick extends BaseCommand
                 $fDay = $tomorrow + $d;
                 $fSeasonDay = (($fDay - 1) % getSeasonLength()) + 1;
                 $fIsSummer = $fSeasonDay > getWinterDays();
-                mt_srand(crc32('skimanager-weather-day-' . $fDay));
+                mt_srand(crc32('skimanager-weather-s' . $seasonNum . '-day-' . $fDay));
                 if ($fIsSummer) {
                     $fTemp = mt_rand(18, 25);
                     $fConds = ['Sunny', 'Partly Cloudy', 'Cloudy'];
