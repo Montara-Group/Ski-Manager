@@ -4,7 +4,8 @@
 <?php
 $seasonLength   = max(1, (int) getSeasonLength());
 $seasonProgress = min($gameDay, $seasonLength);
-$seasonNum      = (int) ceil($gameDay / $seasonLength);
+// Game days restart at 1 each season, so the season number can't be derived from the day
+$seasonNum      = (int) getSeasonNumber();
 $seasonPct      = (int) round($seasonProgress / $seasonLength * 100);
 $resortOpen     = (bool) ($finance['resort_open'] ?? 1);
 $cashBalance    = (int) ($finance['cash'] ?? 0);
@@ -52,9 +53,15 @@ $cf = $cashflow ?? [
     'equipment_cost'  => 0,
     'marketing_cost'  => 0,
     'loan_payments'   => 0,
+    'building_upkeep' => 0,
+    'insurance_cost'  => 0,
+    'running_costs'   => 0,
     'total_expenses'  => 0,
     'daily_profit'    => $dailyProfit ?? 0,
 ];
+// Signed money without a stray "−0" / "+0"
+$__plus  = fn(int $v) => $v > 0 ? '+' . currency($v) : currency(0);
+$__minus = fn(int $v) => $v > 0 ? '−' . currency($v) : currency(0);
 ?>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -131,7 +138,7 @@ $cf = $cashflow ?? [
 .edit-mode-active .edit-mode-banner { display: flex; }
 
 /* Widget grid */
-.widget-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+.widget-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; grid-auto-flow: row dense; }
 @media (max-width: 1024px) { .widget-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 640px) { .widget-grid { grid-template-columns: 1fr; } }
 .widget-small { grid-column: span 1; }
@@ -357,17 +364,17 @@ $__inPct    = ($cf['total_income'] + $cf['total_expenses']) > 0 ? round($cf['tot
                     <a href="/finances" class="widget-link">Ledger →</a>
                 </div>
                 <div class="cq-compact my-auto">
-                    <div class="dash-row"><span class="flex-1 muted">Revenue</span><b class="num text-success">+<?= currency($cf['total_income']) ?></b></div>
-                    <div class="dash-row"><span class="flex-1 muted">Expenses</span><b class="num text-error">−<?= currency($cf['total_expenses']) ?></b></div>
+                    <div class="dash-row"><span class="flex-1 muted">Revenue</span><b class="num text-success"><?= $__plus((int) $cf['total_income']) ?></b></div>
+                    <div class="dash-row"><span class="flex-1 muted">Expenses</span><b class="num text-error"><?= $__minus((int) $cf['total_expenses']) ?></b></div>
                 </div>
                 <div class="cq-expanded">
                     <div class="cq-stats-grid">
-                        <div class="stat"><div class="stat-label">Tickets</div><div class="stat-value">+<?= currency($cf['ticket_income']) ?></div></div>
-                        <div class="stat"><div class="stat-label">Buildings &amp; food</div><div class="stat-value">+<?= currency($cf['building_income']) ?></div></div>
-                        <div class="stat"><div class="stat-label">Payroll</div><div class="stat-value">−<?= currency($cf['salaries']) ?></div></div>
-                        <div class="stat"><div class="stat-label">Equipment &amp; marketing</div><div class="stat-value">−<?= currency($cf['equipment_cost'] + $cf['marketing_cost']) ?></div></div>
-                        <div class="stat cq-large-only"><div class="stat-label">All-time income</div><div class="stat-value"><?= currency($finance['total_income'] ?? 0) ?></div></div>
-                        <div class="stat cq-large-only"><div class="stat-label">All-time costs</div><div class="stat-value"><?= currency($finance['total_expenses'] ?? 0) ?></div></div>
+                        <div class="stat"><div class="stat-label">Tickets</div><div class="stat-value"><?= $__plus((int) $cf['ticket_income']) ?></div></div>
+                        <div class="stat"><div class="stat-label">Buildings &amp; food</div><div class="stat-value"><?= $__plus((int) $cf['building_income']) ?></div></div>
+                        <div class="stat"><div class="stat-label">Payroll</div><div class="stat-value"><?= $__minus((int) $cf['salaries']) ?></div></div>
+                        <div class="stat" title="Building upkeep <?= currency($cf['building_upkeep']) ?>, equipment <?= currency($cf['equipment_cost']) ?>, insurance <?= currency($cf['insurance_cost']) ?>, marketing <?= currency($cf['marketing_cost']) ?>"><div class="stat-label">Upkeep &amp; running</div><div class="stat-value"><?= $__minus((int) $cf['running_costs']) ?></div></div>
+                        <div class="stat"><div class="stat-label">Loan payments</div><div class="stat-value"><?= $__minus((int) $cf['loan_payments']) ?></div></div>
+                        <div class="stat cq-large-only"><div class="stat-label">Net per day</div><div class="stat-value <?= $cf['daily_profit'] < 0 ? 'text-error' : 'text-success' ?>"><?= $cf['daily_profit'] < 0 ? $__minus((int) -$cf['daily_profit']) : $__plus((int) $cf['daily_profit']) ?></div></div>
                     </div>
                 </div>
             <?php endif ?>

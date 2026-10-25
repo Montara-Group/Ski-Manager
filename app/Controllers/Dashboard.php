@@ -105,7 +105,7 @@ class Dashboard extends BaseController
         $dailyVisitors = (int)($finance['daily_visitors'] ?? 0);
         $netProfit = ($finance['total_income'] ?? 0) - ($finance['total_expenses'] ?? 0);
 
-        $cashflow = $this->calcCashflowBreakdown($userId, $dailyVisitors, $staffAll, $equipment, $loans, $marketing, $buildingsAll);
+        $cashflow = $this->calcCashflowBreakdown($userId, $dailyVisitors, $staffAll, $equipment, $loans, $marketing, $buildingsAll, $insurance, $finance['difficulty'] ?? 'standard');
         $resortMapKey = $finance['resort_map'] ?? 'ParkCity';
         $resortNames = ResortMap::getResortMapNames();
         $resortMapName = $resortNames[$resortMapKey] ?? 'Park City';
@@ -224,23 +224,29 @@ class Dashboard extends BaseController
         array $equip,
         array $loans,
         array $marketing,
-        array $buildings
+        array $buildings,
+        array $insurance = [],
+        string $difficulty = 'standard'
     ): array {
         $db = db_connect();
+
+        // Same multipliers the nightly tick applies (Commands/GameTick.php)
+        $mult = array_column($db->table('difficulty_config')->where('difficulty', $difficulty)->get()->getResultArray(), 'config_value', 'config_key');
+        $revMult  = ((int) ($mult['revenue_multiplier'] ?? 100)) / 100;
+        $costMult = ((int) ($mult['cost_multiplier'] ?? 100)) / 100;
 
         $salaries = (int) array_sum(array_column($staff, 'salary'));
 
         $activeEquip = array_filter($equip, fn($e) => ($e['status'] ?? '') === 'active');
-        $equipCost = (int) array_sum(array_map(
-            fn($e) => (int)($e['fuel_cost'] ?? $e['energy_cost'] ?? $e['daily_cost'] ?? 0),
-            $activeEquip
-        ));
+        $equipCost = (int) array_sum(array_map(fn($e) => (int) round((int) ($e['fuel_cost'] ?? 0) * $costMult), $activeEquip));
 
         $loanPay = (int) array_sum(array_map(fn($l) => (int)($l['daily_payment'] ?? 0), $loans));
-        $marketingCost = (int) array_sum(array_map(fn($m) => (int)($m['daily_cost'] ?? 0), $marketing));
+        $marketingCost = (int) array_sum(array_map(fn($m) => (int) round((int) ($m['daily_cost'] ?? 0) * $costMult), $marketing));
+        $insuranceCost = (int) array_sum(array_map(fn($i) => (int) ($i['premium_per_day'] ?? 0), array_filter($insurance, fn($i) => (int) ($i['active'] ?? 0) === 1)));
 
         $openBuildings = array_filter($buildings, fn($b) => ($b['status'] ?? 'open') === 'open');
-        $buildingIncome = (int) array_sum(array_map(fn($b) => (int)($b['revenue_per_day'] ?? 0), $openBuildings));
+        $buildingIncome = (int) array_sum(array_map(fn($b) => (int) round((int) ($b['revenue_per_day'] ?? 0) * $revMult), $openBuildings));
+        $buildingUpkeep = (int) array_sum(array_map(fn($b) => (int) round((int) ($b['upkeep_per_day'] ?? 0) * $costMult), $openBuildings));
 
         $tickets = $db->table('lift_tickets')
             ->where('user_id', $userId)
@@ -248,11 +254,12 @@ class Dashboard extends BaseController
             ->where('ticket_type', 'full_day')
             ->get()->getRowArray();
         $ticketPrice = $tickets ? (int)$tickets['price'] : 0;
-        $effectiveVisitors = $dailyVisitors > 0 ? $dailyVisitors : ($ticketPrice > 0 ? 84 : 0);
-        $ticketIncome = $ticketPrice * $effectiveVisitors;
+        // Yesterday's real visitors only; no made-up fallback when there were none
+        $ticketIncome = $ticketPrice * max(0, $dailyVisitors);
 
+        $runningCosts = $buildingUpkeep + $equipCost + $marketingCost + $insuranceCost;
         $totalIncome = $ticketIncome + $buildingIncome;
-        $totalExpenses = $salaries + $equipCost + $loanPay + $marketingCost;
+        $totalExpenses = $salaries + $runningCosts + $loanPay;
 
         return [
             'ticket_price'    => $ticketPrice,
@@ -260,8 +267,11 @@ class Dashboard extends BaseController
             'building_income' => $buildingIncome,
             'total_income'    => $totalIncome,
             'salaries'        => $salaries,
+            'building_upkeep' => $buildingUpkeep,
             'equipment_cost'  => $equipCost,
             'marketing_cost'  => $marketingCost,
+            'insurance_cost'  => $insuranceCost,
+            'running_costs'   => $runningCosts,
             'loan_payments'   => $loanPay,
             'total_expenses'  => $totalExpenses,
             'daily_profit'    => $totalIncome - $totalExpenses,
