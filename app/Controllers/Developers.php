@@ -42,6 +42,61 @@ class Developers extends BaseController
             ->setBody(json_encode($this->spec(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
     }
 
+    /**
+     * GET|HEAD /auth.md — Auth.md for agents. Ski Manager has no OAuth server or agent
+     * registration, so this is the self-contained form and says so plainly.
+     */
+    public function authMd(): ResponseInterface
+    {
+        $base = rtrim(base_url(), '/');
+        $md = <<<MD
+# Ski Manager auth.md
+
+How AI agents and other automated clients can access Ski Manager ({$base}).
+
+## Summary
+
+- **No credentials are needed.** The public API is read-only and open to everyone.
+- **There is no agent registration.** Ski Manager has no OAuth authorization server, no client registration and no API keys, so there is nothing to sign up for.
+- **Accounts are for people.** A human creates an account at {$base}/register and plays in a browser.
+
+## Who this is for
+
+Agents, crawlers and scripts that want to read Ski Manager game data, for example the trail map, the current season, the weather or the leaderboard.
+
+## Access without credentials
+
+Send plain HTTPS requests. Responses are JSON and cross-origin requests are allowed.
+
+| Method | Endpoint | What it returns |
+| --- | --- | --- |
+| GET | {$base}/api/resort-data | Trail map segments and sectors, current season and weather |
+| GET | {$base}/api/leaderboard | Top 50 resorts |
+| GET | {$base}/health | Service health |
+
+Full description: {$base}/openapi.json (OpenAPI 3.1). Human docs: {$base}/developers. API catalog: {$base}/.well-known/api-catalog.
+
+## What not to rely on
+
+- `POST /api/auth` is a demo endpoint for the mobile apps. It returns a random token without checking anything, and no endpoint accepts that token. It is not a way to authenticate.
+- `POST /api/sync` echoes back what you send and saves nothing.
+
+## Acting for a person
+
+Player-specific data (a resort's finances, lifts and buildings) is only returned to a person's own signed-in browser session. Agents must not create accounts, and must not sign in with someone's email and password on their behalf. If a person wants to share their resort data, they should sign in themselves.
+
+## Limits and contact
+
+Keep requests to one every few seconds. Game state only changes once a day, when the nightly update runs. Questions: {$base}/contact
+MD;
+
+        return $this->response
+            ->setHeader('Content-Type', 'text/markdown; charset=UTF-8')
+            ->setHeader('Access-Control-Allow-Origin', '*')
+            ->setHeader('Cache-Control', 'public, max-age=3600')
+            ->setBody($md);
+    }
+
     /** GET /developers */
     public function index(): string
     {

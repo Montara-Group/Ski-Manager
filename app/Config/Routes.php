@@ -119,6 +119,7 @@ $routes->match(['get', 'head'], '/health', 'Health::index');
 $routes->match(['get', 'head'], '/.well-known/api-catalog', 'Developers::apiCatalog');
 $routes->get('/openapi.json', 'Developers::openapi');
 $routes->get('/developers', 'Developers::index');
+$routes->match(['get', 'head'], '/auth.md', 'Developers::authMd');
 $routes->get('/maintenance', 'Home::maintenance');
 $routes->get('/api/resort-data', 'Api::resortData');
 $routes->options('/api/resort-data', 'Api::resortData');
