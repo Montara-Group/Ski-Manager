@@ -809,6 +809,9 @@ class GameTick extends BaseCommand
         try {
             $db->table('activity_log')->where('created_at <', date('Y-m-d H:i:s', strtotime('-90 days')))->delete();
             $db->table('financial_transactions')->where('created_at <', date('Y-m-d H:i:s', strtotime('-180 days')))->delete();
+            // Notifications: read ones after 30 days, everything after 90
+            $db->table('notifications')->where('is_read', 1)->where('created_at <', date('Y-m-d H:i:s', strtotime('-30 days')))->delete();
+            $db->table('notifications')->where('created_at <', date('Y-m-d H:i:s', strtotime('-90 days')))->delete();
         } catch (\Throwable $e) {
             // Non-blocking maintenance cleanup
         }

@@ -396,7 +396,7 @@ a.link:hover{opacity:0.8}
                             <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-base-100">
                                 <span class="font-semibold text-sm">Notifications</span>
                                 <?php if ($__notifCount > 0) : ?>
-                                    <a href="/notifications/read-all" class="link link-primary text-xs no-underline ">Mark all read</a>
+                                    <form action="/notifications/read-all" method="post"><?= csrf_field() ?><button class="link link-primary text-xs no-underline">Mark all read</button></form>
                                 <?php endif ?>
                             </div>
                             <div id="navbarNotifTargetList" class="space-y-1 max-h-64 overflow-y-auto">
@@ -419,7 +419,7 @@ a.link:hover{opacity:0.8}
                                                 else { $iconColor = "text-primary"; $bgAccent = "bg-primary/10"; }
                                             }
                                         ?>
-                                        <a href="<?= esc($__n["link"] ?? "/notifications") ?>" class="flex items-start gap-2.5 p-2 rounded-xl hover:bg-base-200/70 transition-all <?= $isRead ? "opacity-60" : "font-medium" ?>">
+                                        <a href="/notifications/open/<?= (int) $__n["id"] ?>" class="flex items-start gap-2.5 p-2 rounded-xl hover:bg-base-200/70 transition-all <?= $isRead ? "opacity-60" : "font-medium" ?>">
                                             <div class="w-7 h-7 rounded-lg <?= $bgAccent ?> shrink-0 flex items-center justify-center">
                                                 <i class="<?= esc($__n["icon"] ?? "fa-solid fa-bell") ?> text-[11px] <?= $iconColor ?>"></i>
                                             </div>
@@ -791,7 +791,8 @@ function fetchLiveResortAlerts() {
                 }
             }
 
-            if (!res.list || res.list.length === 0) return;
+            // Only the very first poll is silent; returning before this left toasts off forever for empty inboxes
+            if (!res.list || res.list.length === 0) { skipInitialToasts = false; return; }
 
             res.list.forEach(alert => {
                 if (alert.is_read == 1 || processedAlertIds.has(alert.id)) return;
@@ -815,15 +816,24 @@ function fetchLiveResortAlerts() {
                 else if (iconStr.includes("trophy") || iconStr.includes("medal")) accentColor = "text-accent bg-accent/10";
                 else if (iconStr.includes("exclamation") || iconStr.includes("triangle")) accentColor = "text-error bg-error/10";
 
-                toast.innerHTML = `
-                    <div class="w-8 h-8 rounded-lg ${accentColor} flex items-center justify-center shrink-0">
-                        <i class="${alert.icon || "fa-solid fa-bell"} text-xs"></i>
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="text-xs font-bold text-base-content truncate">${alert.title}</div>
-                        <p class="text-[11px] text-base-content/60 truncate mt-0.5">${alert.message}</p>
-                    </div>
-                `;
+                // Built with textContent: titles/messages can contain player-written text (usernames, support messages)
+                const safeIcon = /^[a-z0-9 -]+$/i.test(alert.icon || "") ? alert.icon : "fa-solid fa-bell";
+                const iconWrap = document.createElement("div");
+                iconWrap.className = `w-8 h-8 rounded-lg ${accentColor} flex items-center justify-center shrink-0`;
+                const iconEl = document.createElement("i");
+                iconEl.className = safeIcon + " text-xs";
+                iconWrap.appendChild(iconEl);
+                const body = document.createElement("a");
+                body.className = "flex-1 min-w-0 no-underline text-current";
+                body.href = "/notifications/open/" + parseInt(alert.id, 10);
+                const titleEl = document.createElement("div");
+                titleEl.className = "text-xs font-bold text-base-content truncate";
+                titleEl.textContent = alert.title || "";
+                const msgEl = document.createElement("p");
+                msgEl.className = "text-[11px] text-base-content/60 truncate mt-0.5";
+                msgEl.textContent = alert.message || "";
+                body.append(titleEl, msgEl);
+                toast.append(iconWrap, body);
 
                 const stack = document.getElementById("liveAppAlertToastStack");
                 if (stack) {
@@ -842,7 +852,9 @@ function fetchLiveResortAlerts() {
 
 document.addEventListener("DOMContentLoaded", () => {
     fetchLiveResortAlerts();
-    setInterval(fetchLiveResortAlerts, 10000);
+    // Every 30s, and not at all while the tab is in the background
+    setInterval(() => { if (!document.hidden) fetchLiveResortAlerts(); }, 30000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) fetchLiveResortAlerts(); });
 });
 </script>
 

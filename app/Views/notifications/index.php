@@ -18,7 +18,11 @@
                     <i class="fa-solid fa-sliders"></i> Bulk Actions <i class="fa-solid fa-chevron-down text-xs"></i>
                 </div>
                 <ul tabindex="0" class="dropdown-content menu p-2 shadow-lg bg-base-100 rounded-box w-52 z-10 border border-base-200">
-                    <li><a href="/notifications/read-all" class="text-sm"><i class="fa-solid fa-check-double text-success w-4"></i>Mark all read</a></li>
+                    <li>
+                        <form action="/notifications/read-all" method="post" class="w-full">
+                            <?= csrf_field() ?><button class="w-full text-left flex items-center gap-2 text-sm"><i class="fa-solid fa-check-double text-success w-4"></i>Mark all read</button>
+                        </form>
+                    </li>
                     <li>
                         <form action="/notifications/delete-read" method="post" data-confirm="Clear all read notifications from your logs?" class="w-full">
                             <?= csrf_field() ?><button class="w-full text-left flex items-center gap-2"><i class="fa-solid fa-broom text-warning w-4"></i>Clear read</button>
@@ -86,7 +90,7 @@
             ?>
                 <div class="card bg-base-100 border border-base-200 border-l-4 <?= $borderAccent ?> shadow-sm hover:shadow transition-all group relative <?= $isRead ? 'opacity-65' : '' ?>">
                     <div class="card-body p-4 flex flex-row items-start gap-4 justify-between">
-                        <a href="<?= esc($n['link'] ?? '/notifications') ?>" class="flex gap-4 items-start flex-1 min-w-0 no-underline text-current">
+                        <a href="/notifications/open/<?= (int) $n['id'] ?>" class="flex gap-4 items-start flex-1 min-w-0 no-underline text-current">
                             <div class="w-10 h-10 rounded-xl bg-base-200/60 shrink-0 flex items-center justify-center group-hover:bg-base-200 transition-colors">
                                 <i class="<?= esc($n['icon'] ?? 'fa-solid fa-bell') ?> text-base <?= $iconColor ?>"></i>
                             </div>
@@ -131,12 +135,9 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: new FormData(form),
                 headers: { "X-Requested-With": "XMLHttpRequest" }
             })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    window.location.reload();
-                }
-            });
+            .then(res => res.ok ? res.json() : Promise.reject())
+            .then(data => { if (data.success) window.location.reload(); })
+            .catch(() => form.submit());
         });
     });
 });
