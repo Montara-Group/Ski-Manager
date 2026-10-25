@@ -6,6 +6,14 @@ class Home extends BaseController
 {
     public function index(): string
     {
+        // Agent discovery (RFC 8288 Link headers, RFC 9727 section 3)
+        $this->response->setHeader('Link', implode(', ', [
+            '</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json"',
+            '</openapi.json>; rel="service-desc"; type="application/vnd.oai.openapi+json"',
+            '</developers>; rel="service-doc"; type="text/html"',
+            '</sitemap.xml>; rel="describedby"; type="text/xml"',
+        ]));
+
         return view('home');
     }
 
