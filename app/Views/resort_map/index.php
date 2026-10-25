@@ -708,6 +708,7 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
                             <p style="font-size:10px;color:#94a3b8;font-weight:700">Construction Cost</p>
                             <p style="font-size:20px;font-weight:600;letter-spacing:-0.02em;font-family:var(--sign);font-variant-numeric:tabular-nums;line-height:1.2" id="selSegCost">-</p>
                             <p style="font-size:10px;color:#64748b;font-family:monospace" id="selSegAfterCash"></p>
+                            <p style="font-size:10px;color:#94a3b8;margin-top:2px" id="selSegRunInfo" hidden></p>
                         </div>
                         <button type="button" id="btnBuild" class="btn btn-success btn-sm gap-1.5 font-bold shadow-lg px-4" style="height:36px">
                             <i class="fa-solid fa-hammer"></i> Construct
@@ -863,6 +864,12 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
     var COST_PER_METER = {button:80, chair_fixed:150, chair_detach:250, gondola:400, cable_car:600};
     var SEAT_MULT      = {1:0.7, 2:1.0, 3:1.15, 4:1.3, 6:1.6, 8:2.0, 10:2.5, 20:4.0, 30:5.0};
     var SEAT_OPTIONS   = {button:[1,2], chair_fixed:[2,3,4], chair_detach:[4,6,8], gondola:[6,8,10], cable_car:[20,30]};
+    // Economy v2: what a lift carries and what lifts/slopes cost to run (App\Libraries\Economy)
+    var ECONOMY_V2 = <?= json_encode(featureEnabled('economy_v2') ? [
+        'capacity' => \App\Libraries\Economy::LIFT_CAPACITY, 'maxSeats' => \App\Libraries\Economy::LIFT_MAX_SEATS,
+        'liftRun' => \App\Libraries\Economy::LIFT_RUN_PER_M, 'slopeRun' => \App\Libraries\Economy::SLOPE_RUN_PER_M,
+        'perDay' => \App\Libraries\Economy::LIFT_HOURS / \App\Libraries\Economy::RIDES_PER_SKIER,
+    ] : null) ?>;
 
     var map, mapBounds;
     var segmentLayers = {};
@@ -1583,6 +1590,20 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
         }
         var roundedCost = Math.round(cost);
         var canAfford = USER_CASH >= roundedCost;
+        var runEl = document.getElementById('selSegRunInfo');
+        if (runEl && ECONOMY_V2) {
+            var info;
+            if (seg.type === 'lift') {
+                var ltv = (document.querySelector('input[name="liftType"]:checked') || {}).value || 'chair_fixed';
+                var stv = parseInt((document.querySelector('input[name="seats"]:checked') || {}).value || 4, 10);
+                var perHour = Math.round((ECONOMY_V2.capacity[ltv] || 2400) * Math.min(1, stv / (ECONOMY_V2.maxSeats[ltv] || 4)));
+                info = 'Carries ~' + Math.round(perHour * ECONOMY_V2.perDay).toLocaleString() + ' skiers/day · runs $' + Math.round(m * (ECONOMY_V2.liftRun[ltv] || 0.8)).toLocaleString() + '/day';
+            } else {
+                info = 'Draws ~' + Math.round(30 + m / 40) + ' skiers/day · upkeep $' + Math.round(m * ECONOMY_V2.slopeRun).toLocaleString() + '/day';
+            }
+            runEl.textContent = info;
+            runEl.hidden = false;
+        }
         var costEl = document.getElementById('selSegCost');
         if (costEl) {
             costEl.textContent = '$' + roundedCost.toLocaleString();

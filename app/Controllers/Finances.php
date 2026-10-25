@@ -71,6 +71,16 @@ class Finances extends BaseController
         $rentals = $db->table('buildings')->where('user_id', $userId)->where('building_type', 'rental')->where('status', 'open')->get()->getResultArray();
         foreach ($rentals as $r) { $rentalIncome += (int) ($r['revenue_per_day'] ?? 0); }
 
+        // Economy v2: last tick's real ticket revenue, and buildings earn by how full they were
+        $lastTick = featureEnabled('economy_v2') ? json_decode((string) ($visitors['last_tick'] ?? ''), true) : null;
+        if ($lastTick) {
+            $ticketIncome = (int) ($lastTick['tickets'] ?? 0);
+            $occ = $lastTick['occupancy'] ?? [];
+            $hotelIncome = (int) round($hotelIncome * ($occ['hotel'] ?? 0));
+            $restaurantIncome = (int) round($restaurantIncome * ($occ['restaurant'] ?? 0));
+            $rentalIncome = (int) round($rentalIncome * ($occ['rental'] ?? 0));
+        }
+
         $loanPayments = 0;
         $loans = $db->table('loans')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
         foreach ($loans as $l) { $loanPayments += (int) ($l['daily_payment'] ?? 0); }
@@ -97,6 +107,7 @@ class Finances extends BaseController
             'estimatedIncome' => $estimatedIncome,
             'loanPayments' => $loanPayments,
             'equipmentCost' => $equipmentCost,
+            'lastTick' => $lastTick,
         ]);
     }
 }

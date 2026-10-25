@@ -294,6 +294,10 @@ class ResortMap extends BaseController
         }
         $seats     = (int) ($data['seats'] ?? 4);
         $slopeType = $data['slope_type'] ?? null;
+        // Same choices as the build menu; anything else would get a cheap default multiplier
+        $seatOptions = ['button' => [1, 2], 'chair_fixed' => [2, 3, 4], 'chair_detach' => [4, 6, 8], 'gondola' => [6, 8, 10], 'cable_car' => [20, 30]];
+        if (!isset($seatOptions[$liftType])) $liftType = 'chair_fixed';
+        if (!in_array($seats, $seatOptions[$liftType], true)) $seats = $seatOptions[$liftType][0];
 
         if (!$segmentId) {
             return $this->response->setStatusCode(400)->setJSON(['error' => 'Missing segment', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
@@ -338,7 +342,8 @@ class ResortMap extends BaseController
             'subtype'       => $segment['type'] === 'lift' ? $liftType : ($slopeType ?? $segment['type']),
             'name'          => $segment['name'] ?? 'Unnamed',
             'length_meters' => (int) ($segment['length_meters'] ?? 0),
-            'capacity'      => match($segment['type'] === 'lift' ? $liftType : '') { 'button' => 1000, 'chair_fixed' => 2400, 'chair_detach' => 3400, 'gondola' => 3500, 'cable_car' => 4000, default => 0 },
+            'capacity'      => $segment['type'] === 'lift' ? \App\Libraries\Economy::liftCapacityPerHour($liftType, $seats) : 0,
+            'seats'         => $segment['type'] === 'lift' ? $seats : 0,
             'difficulty'    => $segment['difficulty'] ?: null,
             'sector'        => (int) ($segment['sector'] ?? 0),
             'created_at'    => date('Y-m-d H:i:s'),
@@ -422,20 +427,26 @@ class ResortMap extends BaseController
         ]);
     }
 
-    /**
-     * 25% of what the item cost to build. Seats aren't stored, so this prices the cheapest
-     * carrier for its lift type: the refund can come out lower than 25%, never higher.
-     */
+    /** 25% of what the item cost to build */
     public static function salvageValue(array $item): int
+    {
+        return (int) round(self::buildCost($item) * 0.25);
+    }
+
+    /**
+     * What a built lift or slope cost. Lifts built before seats were stored are priced at the
+     * cheapest carrier for their type, so this can come out low, never high.
+     */
+    public static function buildCost(array $item): int
     {
         $meters = (float) ($item['length_meters'] ?? 0);
         if (($item['item_type'] ?? '') !== 'lift') {
-            return (int) round($meters * 50 * 0.25);
+            return self::calcCost('slope', null, 0, $meters);
         }
-        $minSeats = match ($item['subtype'] ?? '') {
+        $seats = (int) ($item['seats'] ?? 0) ?: match ($item['subtype'] ?? '') {
             'button' => 1, 'chair_detach' => 4, 'gondola' => 6, 'cable_car' => 20, default => 2,
         };
-        return (int) round(self::calcCost('lift', $item['subtype'] ?? 'chair_fixed', $minSeats, $meters) * 0.25);
+        return self::calcCost('lift', $item['subtype'] ?? 'chair_fixed', $seats, $meters);
     }
 
     private static function calcCost(string $type, ?string $liftType, int $seats, float $meters): int

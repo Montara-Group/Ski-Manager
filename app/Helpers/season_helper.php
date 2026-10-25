@@ -239,6 +239,8 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
         $db->query("CREATE TABLE IF NOT EXISTS `{$weatherArchive}` LIKE `weather`");
     }
 
+    $economyV2 = function_exists('featureLevel') && featureLevel('economy_v2') === 2;
+
     try {
         $db->transStart();
 
@@ -274,7 +276,8 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
                     ->where('users.id !=', 1)
                     // Demo accounts (status 'demo') shouldn't take podium/top-10 rewards; normal users have NULL status
                     ->groupStart()->where('users.status IS NULL')->orWhere('users.status !=', 'demo')->groupEnd()
-                    ->orderBy('player_finances.cash', 'DESC')
+                    // Economy v2 ranks the season's profit (resorts restart every season), not total cash
+                    ->orderBy($economyV2 ? 'CAST(player_finances.total_income AS SIGNED) - CAST(player_finances.total_expenses AS SIGNED)' : 'player_finances.cash', 'DESC', false)
                     ->limit(100)
                     ->get()->getResultArray();
 
@@ -372,6 +375,11 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
             'maintenance_until' => null,
         ]);
 
+        // 4b. Economy v2: every resort starts the new season over, with a legacy bonus
+        if ($economyV2) {
+            \App\Libraries\SeasonReset::apply((int) $nextSeason['season_number'], $nextSeason['name'] ?? ('Season ' . $nextSeason['season_number']));
+        }
+
         // 5. Broadcast in-game announcement
         if ($db->tableExists('activity_log')) {
             $now = date('Y-m-d H:i:s');
@@ -395,6 +403,7 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
         $db->transComplete();
         return true;
     } catch (\Throwable $e) {
+        $db->transRollback();
         log_message('error', 'Season rollover error: ' . $e->getMessage());
         return false;
     }

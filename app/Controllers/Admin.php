@@ -676,7 +676,7 @@ class Admin extends BaseController
         $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(APPPATH, \FilesystemIterator::SKIP_DOTS));
         foreach ($it as $file) {
             if ($file->getExtension() !== 'php' || str_contains($file->getFilename(), '.bak')) continue;
-            if (!preg_match_all('/featureEnabled\(\s*[\'"]([a-z0-9_]+)[\'"]\s*\)/', file_get_contents($file->getPathname()), $m)) continue;
+            if (!preg_match_all('/featureEnabled(?:For)?\(\s*[\'"]([a-z0-9_]+)[\'"]\s*[,)]/', file_get_contents($file->getPathname()), $m)) continue;
             $where = str_replace([APPPATH, '.php'], '', $file->getPathname());
             foreach (array_unique($m[1]) as $flag) {
                 $usage[$flag]['code'][] = $where;

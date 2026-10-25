@@ -59,12 +59,15 @@
                         <div class="min-w-0">
                             <div class="font-semibold text-sm"><?= $label['name'] ?></div>
                             <div class="text-xs text-base-content/50"><?= $label['desc'] ?></div>
+                            <?php if ($v2 && isset(\App\Libraries\Economy::TICKET_REFERENCE[$ticket['ticket_type']])) : ?>
+                            <div class="text-xs mt-0.5 text-base-content/70">Normal price <?= currency(\App\Libraries\Economy::TICKET_REFERENCE[$ticket['ticket_type']]) ?> · <?= round(\App\Libraries\Economy::TICKET_MIX[$ticket['ticket_type']] * 100) ?>% of skiers want this ticket · demand at your price <b class="ticket-demand"><?= round(\App\Libraries\Economy::priceDemand($ticket['ticket_type'], (float) $ticket['price']) * 100) ?>%</b></div>
+                            <?php endif ?>
                         </div>
                     </div>
 
                     <div class="flex items-center gap-3">
                         <div class="flex items-center gap-1">
-                            <input type="number" name="price" value="<?= $ticket['price'] ?>" min="0" max="9999" class="input input-bordered input-sm w-24 text-right font-mono">
+                            <input type="number" name="price" value="<?= $ticket['price'] ?>" min="0" max="9999" class="input input-bordered input-sm w-24 text-right font-mono" <?= $v2 && isset(\App\Libraries\Economy::TICKET_REFERENCE[$ticket['ticket_type']]) ? 'data-ref="' . \App\Libraries\Economy::TICKET_REFERENCE[$ticket['ticket_type']] . '"' : '' ?>>
                             <span class="text-sm"><?= currencySymbol() ?></span>
                         </div>
 
@@ -81,6 +84,33 @@
         </div>
     </div>
 
+    <?php if ($v2) : ?>
+    <div class="card bg-base-100 shadow-sm">
+        <div class="card-body">
+            <h2 class="card-title text-base mb-2"><i class="fa-solid fa-lightbulb mr-2 text-warning"></i>How pricing works</h2>
+            <ul class="text-sm space-y-1.5 list-disc pl-5">
+                <li>Each skier buys one ticket. Charging more than the normal price scares some of them away: at double the price, about 4 in 10 still come. Charging less brings more, up to 1.5×.</li>
+                <li>Revenue usually peaks close to the normal price. Watch the demand figure next to each ticket.</li>
+                <li>Multi-day passes earn per day used: a weekly pass covers 6 ski days, a season pass about 25.</li>
+                <li>Taking a ticket off sale loses skiers: only half of those who wanted it buy a different one.</li>
+                <li>Skiers can't exceed what your open lifts carry each day. When they do, extra demand is lost: build more or bigger lifts.</li>
+                <?php if ($lastTick) : ?>
+                <li>Last tick: <?= number_format($lastTick['visitors'] ?? 0) ?> skiers, <?= currency((int) round($lastTick['per_visit'] ?? 0)) ?> per skier, prices kept <?= round(($lastTick['price_demand'] ?? 1) * 100) ?>% of demand<?= !empty($lastTick['turned_away']) ? ', ' . number_format($lastTick['turned_away']) . ' turned away by lift capacity' : '' ?>.</li>
+                <?php endif ?>
+            </ul>
+        </div>
+    </div>
+    <script>
+    document.querySelectorAll('input[name="price"][data-ref]').forEach(function (el) {
+        el.addEventListener('input', function () {
+            var p = parseFloat(el.value) || 0, ref = parseFloat(el.dataset.ref);
+            var d = Math.min(<?= \App\Libraries\Economy::MAX_DEMAND ?>, Math.exp(-<?= \App\Libraries\Economy::PRICE_ELASTICITY ?> * (p / ref - 1)));
+            var out = el.closest('form').querySelector('.ticket-demand');
+            if (out) out.textContent = Math.round(d * 100) + '%';
+        });
+    });
+    </script>
+    <?php else : ?>
     <!-- Pricing Tips -->
     <div class="card bg-base-100 shadow-sm">
         <div class="card-body">
@@ -125,6 +155,7 @@
             </div>
         </div>
     </div>
+    <?php endif ?>
 
 </div>
 <?= $this->endSection() ?>

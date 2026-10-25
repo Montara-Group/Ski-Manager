@@ -13,6 +13,14 @@
     <?php
         $totalEstIncome = $ticketIncome + $hotelIncome + $restaurantIncome + $rentalIncome;
         $totalEstExpenses = $totalDailyExpenses + $equipmentCost + $loanPayments;
+        // Economy v2: the last tick's real totals, with what the rows above don't cover shown as "other"
+        if (!empty($lastTick)) {
+            $otherIncome = max(0, (int) $lastTick['income'] - $totalEstIncome);
+            $totalEstIncome = (int) $lastTick['income'];
+            $liftSlopeRunning = (int) ($lastTick['lift_slope_running'] ?? 0);
+            $otherCosts = max(0, (int) $lastTick['expenses'] - $totalEstExpenses - $liftSlopeRunning);
+            $totalEstExpenses = (int) $lastTick['expenses'];
+        }
         $dailyProfit = $totalEstIncome - $totalEstExpenses;
         $lifetimeProfit = (int) $finance['total_income'] - (int) $finance['total_expenses'];
     ?>
@@ -47,12 +55,15 @@
     <!-- Income / Expenses Breakdown -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
-            <h2 class="font-semibold text-sm text-success mb-3"><i class="fa-solid fa-arrow-trend-up mr-1"></i>Daily Income (estimated)</h2>
+            <h2 class="font-semibold text-sm text-success mb-3"><i class="fa-solid fa-arrow-trend-up mr-1"></i>Daily Income <?= !empty($lastTick) ? '(last tick)' : '(estimated)' ?></h2>
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between"><span class="text-base-content/60">Lift Tickets</span><span class="font-mono text-success">+<?= currency($ticketIncome) ?></span></div>
                 <div class="flex justify-between"><span class="text-base-content/60">Restaurants</span><span class="font-mono text-success">+<?= currency($restaurantIncome) ?></span></div>
                 <div class="flex justify-between"><span class="text-base-content/60">Hotels</span><span class="font-mono text-success">+<?= currency($hotelIncome) ?></span></div>
                 <div class="flex justify-between"><span class="text-base-content/60">Rentals</span><span class="font-mono text-success">+<?= currency($rentalIncome) ?></span></div>
+                <?php if (!empty($lastTick)) : ?>
+                <div class="flex justify-between"><span class="text-base-content/60">Other (shops, transport, ski school, parking, VIPs)</span><span class="font-mono text-success">+<?= currency($otherIncome) ?></span></div>
+                <?php endif ?>
                 <div class="divider my-1"></div>
                 <div class="flex justify-between font-semibold"><span>Total</span><span class="text-success">+<?= currency($totalEstIncome) ?></span></div>
             </div>
@@ -67,6 +78,10 @@
                 <div class="flex justify-between"><span class="text-base-content/60"><i class="fa-solid fa-bullhorn mr-1"></i>Marketing</span><span class="font-mono text-error">-<?= currency($dailyMarketing) ?></span></div>
                 <div class="flex justify-between"><span class="text-base-content/60"><i class="fa-solid fa-snowflake mr-1"></i>Snowmaking</span><span class="font-mono text-error">-<?= currency($dailyCannons) ?></span></div>
                 <div class="flex justify-between"><span class="text-base-content/60"><i class="fa-solid fa-moon mr-1"></i>Night Skiing</span><span class="font-mono text-error">-<?= currency($dailyLights) ?></span></div>
+                <?php if (!empty($lastTick)) : ?>
+                <div class="flex justify-between"><span class="text-base-content/60"><i class="fa-solid fa-elevator mr-1"></i>Lifts &amp; slopes running</span><span class="font-mono text-error">-<?= currency($liftSlopeRunning) ?></span></div>
+                <div class="flex justify-between"><span class="text-base-content/60"><i class="fa-solid fa-receipt mr-1"></i>Other (upkeep, utilities, insurance, fines)</span><span class="font-mono text-error">-<?= currency($otherCosts) ?></span></div>
+                <?php endif ?>
                 <div class="divider my-1"></div>
                 <div class="flex justify-between font-semibold"><span>Total</span><span class="text-error">-<?= currency($totalEstExpenses) ?></span></div>
             </div>

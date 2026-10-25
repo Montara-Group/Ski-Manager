@@ -7,9 +7,17 @@
         <a href="/dashboard" class="btn btn-ghost btn-sm btn-circle"><i class="fa-solid fa-chevron-left"></i></a>
         <div>
             <h1 class="text-2xl font-bold"><i class="fa-solid fa-trophy text-warning mr-2"></i>Leaderboard</h1>
-            <p class="text-sm text-base-content/50"><?= count($players) ?> resort managers competing</p>
+            <p class="text-sm text-base-content/50"><?= count($players) ?> resort managers competing<?= $v2 ? ' · ranked by profit this season' : '' ?></p>
         </div>
     </div>
+
+    <?php if ($v2) : ?>
+    <div role="tablist" class="tabs tabs-boxed mb-4 w-fit">
+        <?php foreach (['easy' => 'Easy', 'standard' => 'Standard', 'hard' => 'Hard', 'all' => 'All'] as $key => $label) : ?>
+        <a role="tab" href="/leaderboard?difficulty=<?= $key ?>" class="tab <?= $difficulty === $key ? 'tab-active' : '' ?>" <?= $difficulty === $key ? 'aria-selected="true"' : '' ?>><?= $label ?></a>
+        <?php endforeach ?>
+    </div>
+    <?php endif ?>
 
     <!-- Top 3 Podium -->
     <?php if (count($players) >= 3) : ?>
@@ -17,14 +25,14 @@
         <div class="card bg-base-100 shadow-sm mt-8"><div class="card-body p-4 text-center">
             <div class="text-3xl mb-1">🥈</div>
             <div class="font-bold"><?= esc($players[1]['username']) ?></div>
-            <div class="text-lg font-bold text-success"><?= currency((int)$players[1]['cash']) ?></div>
+            <div class="text-lg font-bold text-success"><?= currency((int)($v2 ? $players[1]['net_profit'] : $players[1]['cash'])) ?></div>
             <div class="text-xs text-base-content/50"><?= $players[1]['slope_count'] ?> slopes · <?= $players[1]['lift_count'] ?> lifts</div>
         </div></div>
         <div class="aura aura-gold rounded-2xl w-full">
             <div class="card bg-base-100 border border-base-200 shadow-sm w-full"><div class="card-body p-4 text-center">
                 <div class="text-4xl mb-1">🥇</div>
                 <div class="font-bold text-lg"><?= esc($players[0]['username']) ?></div>
-                <div class="text-xl font-bold text-success"><?= currency((int)$players[0]['cash']) ?></div>
+                <div class="text-xl font-bold text-success"><?= currency((int)($v2 ? $players[0]['net_profit'] : $players[0]['cash'])) ?></div>
                 <div class="text-xs text-base-content/50"><?= $players[0]['slope_count'] ?> slopes · <?= $players[0]['lift_count'] ?> lifts</div>
                 <div class="badge badge-warning badge-sm mt-1 mx-auto">Champion</div>
             </div></div>
@@ -32,7 +40,7 @@
         <div class="card bg-base-100 shadow-sm mt-8"><div class="card-body p-4 text-center">
             <div class="text-3xl mb-1">🥉</div>
             <div class="font-bold"><?= esc($players[2]['username']) ?></div>
-            <div class="text-lg font-bold text-success"><?= currency((int)$players[2]['cash']) ?></div>
+            <div class="text-lg font-bold text-success"><?= currency((int)($v2 ? $players[2]['net_profit'] : $players[2]['cash'])) ?></div>
             <div class="text-xs text-base-content/50"><?= $players[2]['slope_count'] ?> slopes · <?= $players[2]['lift_count'] ?> lifts</div>
         </div></div>
     </div>
@@ -46,9 +54,9 @@
                     <th>Rank</th>
                     <th>Player</th>
                     <th>Cash</th>
-                    <th>Net Profit</th>
+                    <th><?= $v2 ? 'Season Profit' : 'Net Profit' ?></th>
                     <th>Resort</th>
-                    <th>Score</th>
+                    <?php if (!$v2) : ?><th>Score</th><?php endif ?>
                     <th>Difficulty</th>
                 </tr>
             </thead>
@@ -85,7 +93,7 @@
                             <span class="ml-1"><?= $player['staff_count'] ?>👥</span>
                         </div>
                     </td>
-                    <td><span class="font-bold"><?= number_format((int)($player['score'] ?? 0)) ?></span></td>
+                    <?php if (!$v2) : ?><td><span class="font-bold"><?= number_format((int)($player['score'] ?? 0)) ?></span></td><?php endif ?>
                     <td><span class="badge <?= $diffBadge ?> badge-xs"><?= ucfirst($player['difficulty'] ?? 'standard') ?></span></td>
                 </tr>
             <?php endforeach ?>

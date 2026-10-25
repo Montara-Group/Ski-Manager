@@ -67,6 +67,9 @@ class GameTick extends BaseCommand
             $inspChance = (int) ($diffConfig['inspection_chance'] ?? 5);
             $visMult = ((int) ($diffConfig['visitor_multiplier'] ?? 100)) / 100;
             $vipBonus = (int) ($diffConfig['vip_chance_bonus'] ?? 0);
+            // Economy v2 (App\Libraries\Economy): demand-priced tickets, lift capacity and running costs, building occupancy
+            $v2 = featureEnabledFor('economy_v2', $userId);
+            $breakdown = [];
 
             // Active Génépis perks, loaded before any revenue so the revenue boost applies to all of it
             $activeBoostRows = $db->table('player_boosts')->where('user_id', $userId)->where('expires_at >', date('Y-m-d H:i:s'))->get()->getResultArray();
@@ -96,6 +99,7 @@ class GameTick extends BaseCommand
             // ==============================
             $staffCost = array_sum(array_column($allStaff, 'salary'));
             $dayExpenses += (int) round($staffCost * $costMult);
+            $breakdown['salaries'] = (int) round($staffCost * $costMult);
 
             foreach ($allStaff as $s) {
                 $moraleChange = -$moraleDec;
@@ -112,6 +116,7 @@ class GameTick extends BaseCommand
             // BUILDING REVENUE + UPKEEP (staff bonuses)
             // ==============================
             $buildings = $db->table('buildings')->where('user_id', $userId)->where('status', 'open')->get()->getResultArray();
+            $breakdown['building_upkeep'] = 0;
             foreach ($buildings as $b) {
                 $revenue = (int) $b['revenue_per_day'];
                 $type = $b['building_type'];
@@ -120,8 +125,10 @@ class GameTick extends BaseCommand
                 if ($type === 'hotel') $revenue = (int) round($revenue * (1 + $countAssigned('receptionist') * 0.15));
                 if ($type === 'restaurant') $revenue = (int) round($revenue * (1 + $countAssigned('chef') * 0.10));
 
-                if ($resortOpen) $dayIncome += (int) round($revenue * $revMult); // closed resort: no guests, upkeep still due
+                // v2 pays building revenue after visitors are known (it depends on how full they are)
+                if ($resortOpen && !$v2) $dayIncome += (int) round($revenue * $revMult); // closed resort: no guests, upkeep still due
                 $dayExpenses += (int) round($b['upkeep_per_day'] * $costMult);
+                $breakdown['building_upkeep'] += (int) round($b['upkeep_per_day'] * $costMult);
                 $newCondition = max(0, (int) $b['condition_pct'] - (int) round(rand(0, 2) * $decayMult));
                 $db->table('buildings')->where('id', $b['id'])->update(['condition_pct' => $newCondition]);
                 if ($newCondition <= 0) {
@@ -368,6 +375,61 @@ class GameTick extends BaseCommand
             }
 
             $totalBoost = $marketingBoost + $managerBoost + $instructorBoost + $patrolBoost + $snowQualityBonus + $allianceBonus + $ecoBonus;
+            if ($v2) {
+                // Demand comes from the slopes, is damped by ticket prices and the regional market,
+                // and can't exceed what the open lifts carry
+                $demand = \App\Libraries\Economy::slopeDemand($slopesForQuality) * (1 + $totalBoost / 100) * $visMult;
+                if (in_array('visitor_boost', $activeBoostTypes)) $demand *= 1.5;
+                $demand = \App\Libraries\Economy::marketCap($demand);
+                $allTickets = $db->table('lift_tickets')->where('user_id', $userId)->get()->getResultArray();
+                $ticketTerms = \App\Libraries\Economy::ticketTerms($allTickets);
+                $summerTourists = $isWinter ? 0 : (int) round($demand * \App\Libraries\Economy::SUMMER_TOURIST_SHARE);
+                $visitors = (int) round($demand * $ticketTerms['demand'] * ($isWinter ? 1 : 0.15)) + $tournamentVisitors;
+                $liftRows = $db->table('player_items')->where('user_id', $userId)->where('item_type', 'lift')->where('status', 'open')->get()->getResultArray();
+                $liftCapacity = \App\Libraries\Economy::liftDailyCapacity($liftRows);
+                $turnedAwayByLifts = max(0, $visitors - $liftCapacity);
+                $visitors = min($visitors, $liftCapacity);
+                if (!$resortOpen) { $visitors = 0; $summerTourists = 0; }
+                if ($turnedAwayByLifts > 0 && $resortOpen) {
+                    log_activity($userId, 'lift_capacity', number_format($turnedAwayByLifts) . ' skiers stayed away: your lifts carry about ' . number_format($liftCapacity) . ' a day.', 'fa-solid fa-elevator');
+                }
+
+                $ticketRevenue = (int) round($visitors * $ticketTerms['per_visit']);
+                $dayIncome += (int) round($ticketRevenue * $revMult);
+                $breakdown += ['tickets' => (int) round($ticketRevenue * $revMult), 'demand' => (int) round($demand), 'price_demand' => round($ticketTerms['demand'], 3),
+                    'per_visit' => round($ticketTerms['per_visit'], 2), 'lift_capacity' => $liftCapacity, 'turned_away' => $turnedAwayByLifts];
+                if ($visitors > 0) {
+                    $prices = array_column($allTickets, 'price', 'ticket_type') ?: \App\Libraries\Economy::TICKET_REFERENCE;
+                    $sales = [];
+                    foreach ($ticketTerms['mix'] as $type => $share) {
+                        $skiers = (int) round($visitors * $share);
+                        if ($skiers <= 0) continue;
+                        $sales[] = ['user_id' => $userId, 'game_day' => $gameDay, 'ticket_type' => $type, 'quantity' => $skiers,
+                            'revenue' => (int) round($skiers * $prices[$type] / (\App\Libraries\Economy::TICKET_VISITS[$type] ?? 1) * $revMult),
+                            'created_at' => date('Y-m-d H:i:s')];
+                    }
+                    if ($sales) $db->table('ticket_sales')->insertBatch($sales);
+                }
+
+                // Buildings earn in proportion to how full they are; a staffed one earns the staff bonus
+                $util = \App\Libraries\Economy::buildingUtilization($buildings, $visitors, $summerTourists);
+                $perType = array_count_values(array_column($buildings, 'building_type'));
+                $buildingRevenue = 0;
+                foreach ($buildings as $b) {
+                    $t = $b['building_type'];
+                    $buildingRevenue += (int) $b['revenue_per_day'] * ($util[$t] ?? 0) * \App\Libraries\Economy::staffBonus($t, $perType[$t] ?? 0, $assignedByRole);
+                }
+                $buildingRevenue = $resortOpen ? (int) round($buildingRevenue * $revMult) : 0;
+                $dayIncome += $buildingRevenue;
+                $breakdown['buildings'] = $buildingRevenue;
+                $breakdown['occupancy'] = array_map(fn($u) => round($u, 3), $util);
+
+                // Lifts and slopes cost money to run
+                $allItems = $db->table('player_items')->where('user_id', $userId)->get()->getResultArray();
+                $runningCost = (int) round(\App\Libraries\Economy::runningCost($allItems) * $costMult);
+                $dayExpenses += $runningCost;
+                $breakdown['lift_slope_running'] = $runningCost;
+            } else {
             $visitors = (int) round($baseVisitors * (1 + $totalBoost / 100) * $visMult) + $tournamentVisitors;
 
             // Apply Génépi visitor boost perk
@@ -383,6 +445,7 @@ class GameTick extends BaseCommand
 
             $ticketRevenue = (int) round($visitors * $avgPrice * 0.6);
             $dayIncome += (int) round($ticketRevenue * $revMult);
+            }
 
             // ==============================
             // SKI LESSONS / SKI SCHOOL REVENUE
@@ -601,7 +664,8 @@ class GameTick extends BaseCommand
                 // Higher rating = chance of rarer VIPs
                 $maxIndex = min(count($vipTypes) - 1, (int) floor($resortRating * 1.5));
                 $vip = $vipTypes[rand(0, $maxIndex)];
-                $vipCash = rand($vip['cash_min'], $vip['cash_max']);
+                $vipCash = $v2 ? \App\Libraries\Economy::vipReward((int) round($ticketRevenue * $revMult), $vip['cash_max']) : rand($vip['cash_min'], $vip['cash_max']);
+                $breakdown['vip'] = $vipCash;
 
                 $vipNames = ['Von Schneider', 'Beaumont', 'Larsson', 'Tanaka', 'De Rossi', 'Petrov', 'Ashworth', 'Magnusson', 'Dubois', 'Van den Berg'];
                 $vipFirstNames = ['Alexander', 'Isabella', 'Viktor', 'Sophia', 'Marcus', 'Elena', 'James', 'Yuki', 'Charlotte', 'Erik'];
@@ -688,13 +752,22 @@ class GameTick extends BaseCommand
             // UPDATE FINANCES
             // ==============================
             $newCash = $cash + $dayIncome - $dayExpenses;
-            $db->table('player_finances')->where('user_id', $userId)->update([
+            $financeUpdate = [
                 'cash' => $newCash,
                 'total_income' => (int) $finance['total_income'] + $dayIncome,
                 'total_expenses' => (int) $finance['total_expenses'] + $dayExpenses,
                 'daily_visitors' => $visitors,
                 'updated_at' => date('Y-m-d H:i:s'),
-            ]);
+            ];
+            if ($v2) {
+                $known = ($breakdown['tickets'] ?? 0) + ($breakdown['buildings'] ?? 0) + ($breakdown['vip'] ?? 0);
+                $knownCost = ($breakdown['salaries'] ?? 0) + ($breakdown['building_upkeep'] ?? 0) + ($breakdown['lift_slope_running'] ?? 0);
+                $financeUpdate['last_tick'] = json_encode($breakdown + [
+                    'game_day' => $gameDay, 'visitors' => $visitors, 'income' => $dayIncome, 'expenses' => $dayExpenses,
+                    'other_income' => $dayIncome - $known, 'other_costs' => $dayExpenses - $knownCost,
+                ]);
+            }
+            $db->table('player_finances')->where('user_id', $userId)->update($financeUpdate);
 
             // ==============================
             // FINANCIAL TRANSACTIONS LOG
@@ -809,6 +882,7 @@ class GameTick extends BaseCommand
         try {
             $db->table('activity_log')->where('created_at <', date('Y-m-d H:i:s', strtotime('-90 days')))->delete();
             $db->table('financial_transactions')->where('created_at <', date('Y-m-d H:i:s', strtotime('-180 days')))->delete();
+            $db->table('ticket_sales')->where('created_at <', date('Y-m-d H:i:s', strtotime('-180 days')))->delete();
             // Notifications: read ones after 30 days, everything after 90
             $db->table('notifications')->where('is_read', 1)->where('created_at <', date('Y-m-d H:i:s', strtotime('-30 days')))->delete();
             $db->table('notifications')->where('created_at <', date('Y-m-d H:i:s', strtotime('-90 days')))->delete();

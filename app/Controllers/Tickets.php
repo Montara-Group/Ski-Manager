@@ -53,7 +53,11 @@ class Tickets extends BaseController
             'group' => ['name' => 'Group (10+)', 'icon' => 'fa-solid fa-people-group', 'desc' => 'Per-person rate for groups of 10+'],
         ];
 
+        $finance = db_connect()->table('player_finances')->select('last_tick')->where('user_id', $userId)->get()->getRowArray();
+
         return view('tickets/index', [
+            'v2' => featureEnabled('economy_v2'),
+            'lastTick' => json_decode($finance['last_tick'] ?? '', true) ?: null,
             'tickets' => $tickets,
             'ticketLabels' => $ticketLabels,
             'recentSales' => $recentSales,
