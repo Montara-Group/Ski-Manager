@@ -36,8 +36,8 @@ class Tickets extends BaseController
         $today = date('Y-m-d');
         $gameDay = max(1, (int) ((strtotime($today) - strtotime($startDate)) / 86400) + 1);
 
-        $recentSales = $salesModel->where('user_id', $userId)->orderBy('game_day', 'DESC')->limit(7)->findAll();
-        $todaySales = $salesModel->where('user_id', $userId)->where('game_day', $gameDay)->findAll();
+        $recentSales = $salesModel->where('user_id', $userId)->orderBy('created_at', 'DESC')->limit(7)->findAll();
+        $todaySales = $salesModel->where('user_id', $userId)->where('game_day', $gameDay)->where('created_at >=', getSeasonStartDate() . ' 00:00:00')->findAll();
 
         $todayRevenue = array_sum(array_column($todaySales, 'revenue'));
         $todayCount = array_sum(array_column($todaySales, 'quantity'));

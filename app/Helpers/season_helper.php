@@ -231,8 +231,32 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
         return false;
     }
 
+    // Weather rows are keyed only by game_day, which restarts at 1 each season. Without this,
+    // the new season would read last season's rows and the tick would skip days that "exist".
+    // DDL commits implicitly in MySQL, so the archive table is created before the transaction.
+    $weatherArchive = 'weather_season_' . $currSeasonNumber;
+    if ($db->tableExists('weather')) {
+        $db->query("CREATE TABLE IF NOT EXISTS `{$weatherArchive}` LIKE `weather`");
+    }
+
     try {
         $db->transStart();
+
+        // 0. Archive last season's weather and start the new season on day 1 with the latest conditions
+        if ($db->tableExists('weather')) {
+            $latest = $db->table('weather')->orderBy('game_day', 'DESC')->limit(1)->get()->getRowArray();
+            if ($db->table($weatherArchive)->countAllResults() === 0) {
+                $db->query("INSERT INTO `{$weatherArchive}` SELECT * FROM `weather`");
+            }
+            $db->table('weather')->emptyTable();
+            if ($latest) {
+                unset($latest['id']);
+                $latest['game_day']   = 1;
+                $latest['created_at'] = date('Y-m-d H:i:s');
+                if (array_key_exists('updated_at', $latest)) $latest['updated_at'] = null;
+                $db->table('weather')->insert($latest);
+            }
+        }
 
         // 1. Snapshot current leaderboard standings into archives
         if ($db->tableExists('season_leaderboard_archives')) {
@@ -248,6 +272,8 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
                     ->select('player_finances.user_id, player_finances.cash, player_finances.reputation, users.username' . $resortNameCol)
                     ->join('users', 'users.id = player_finances.user_id')
                     ->where('users.id !=', 1)
+                    // Demo accounts (status 'demo') shouldn't take podium/top-10 rewards; normal users have NULL status
+                    ->groupStart()->where('users.status IS NULL')->orWhere('users.status !=', 'demo')->groupEnd()
                     ->orderBy('player_finances.cash', 'DESC')
                     ->limit(100)
                     ->get()->getResultArray();

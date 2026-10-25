@@ -47,8 +47,8 @@ class Finances extends BaseController
         $gameDay = max(1, (int) ((strtotime($today) - strtotime($startDate)) / 86400) + 1);
 
         $db = db_connect();
-        $lastIncome = $db->table('financial_transactions')->where('user_id', $userId)->where('type', 'income')->where('game_day', $gameDay)->selectSum('amount')->get()->getRowArray();
-        $prevIncome = $db->table('financial_transactions')->where('user_id', $userId)->where('type', 'income')->where('game_day', max(1, $gameDay - 1))->selectSum('amount')->get()->getRowArray();
+        $lastIncome = $db->table('financial_transactions')->where('user_id', $userId)->where('type', 'income')->where('game_day', $gameDay)->where('created_at >=', getSeasonStartDate() . ' 00:00:00')->selectSum('amount')->get()->getRowArray();
+        $prevIncome = $db->table('financial_transactions')->where('user_id', $userId)->where('type', 'income')->where('game_day', max(1, $gameDay - 1))->where('created_at >=', getSeasonStartDate() . ' 00:00:00')->selectSum('amount')->get()->getRowArray();
         $estimatedIncome = (int) ($lastIncome['amount'] ?? $prevIncome['amount'] ?? 0);
 
         $ticketIncome = 0;
