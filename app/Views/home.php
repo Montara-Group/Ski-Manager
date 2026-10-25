@@ -7,22 +7,19 @@
     $playerCount = $db->table('users')->where('id !=', 1)->countAllResults(false);
     $totalSlopes = $db->table('player_items')->where('item_type', 'slope')->countAllResults(false);
     $topPlayer = $db->query("SELECT u.username, pf.cash FROM player_finances pf JOIN users u ON u.id = pf.user_id WHERE u.id != 1 ORDER BY pf.cash DESC LIMIT 1")->getRowArray();
-    $recentPlayer = $db->table('users')->where('id !=', 1)->orderBy('created_at', 'DESC')->limit(1)->get()->getRowArray();
-    $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime(getSeasonStartDate())) / 86400) + 1);
     $weather = getCurrentWeather();
-    $playersLabel = $playerCount >= 10 ? number_format($playerCount) . '+ active managers' : 'Be one of the first managers';
 
     $currentSeasonNum = (int) getSeasonNumber();
     $seasonDay = (int) getSeasonDay();
     $seasonLen = (int) getSeasonLength();
-    $seasonProgressPct = min(100, max(0, (int) round(($seasonDay / max(1, $seasonLen)) * 100)));
     $daysRemaining = max(0, $seasonLen - $seasonDay);
+    $seasonStart = strtotime(getSeasonStartDate());
 
-    // Season 2 launch: only once Sector 2 is actually released, with counts from the real map
+    // Season 2 note: only once Sector 2 is actually released, with counts from the real map
     $__s2 = $db->table('resort_sectors')->where('resort_map', 'ParkCity')->where('name', 'Sector 2')->get()->getRowArray();
     $__s2Live = $currentSeasonNum >= 2 && $__s2 && (int) $__s2['released'] === 1;
     $__s2Runs = $__s2Lifts = $__s2Steep = 0;
-    $__podium = [];
+    $__standings = [];
     if ($__s2Live) {
         foreach ($db->table('map_segments')->select('type, difficulty, COUNT(*) AS n')->where('sector', $__s2['id'])->where('active', 1)->groupBy('type, difficulty')->get()->getResultArray() as $__r) {
             if ($__r['type'] === 'lift') { $__s2Lifts += (int) $__r['n']; continue; }
@@ -30,25 +27,31 @@
             if (in_array($__r['difficulty'], ['black', 'double_black'], true)) $__s2Steep += (int) $__r['n'];
         }
         if ($db->tableExists('season_leaderboard_archives')) {
-            // Demo accounts were ranked by the Season 1 rollover; keep them off the public podium
-            $__podium = $db->table('season_leaderboard_archives a')->select('a.username, a.resort_name, a.cash')
+            // Demo accounts were ranked by the Season 1 rollover; keep them off the public standings
+            $__standings = $db->table('season_leaderboard_archives a')->select('a.username, a.resort_name, a.cash, a.total_lifts, a.total_slopes')
                 ->join('users u', 'u.id = a.user_id', 'left')
                 ->where('a.season_number', 1)
                 ->groupStart()->where('u.status IS NULL')->orWhere('u.status !=', 'demo')->groupEnd()
-                ->orderBy('a.rank_position', 'ASC')->limit(3)->get()->getResultArray();
+                ->orderBy('a.rank_position', 'ASC')->limit(5)->get()->getResultArray();
         }
     }
     $__s2JustOpened = $__s2Live && $currentSeasonNum === 2 && $seasonDay <= 14;
-?>
 
-<?php
-    $__wCond   = $weather ? ($weather['condition_name'] ?? $weather['condition'] ?? '') : '';
-    $__wFresh  = $weather ? (int) ($weather['snowfall'] ?? 0) : 0;
+    // What people built lately (real players only)
+    $__recent = $db->table('player_items pi')->select('pi.name, pi.item_type, pi.difficulty, pi.created_at, u.username')
+        ->join('users u', 'u.id = pi.user_id')
+        ->where('u.id !=', 1)
+        ->groupStart()->where('u.status IS NULL')->orWhere('u.status !=', 'demo')->groupEnd()
+        ->orderBy('pi.id', 'DESC')->limit(6)->get()->getResultArray();
+
+    $__wCond  = $weather ? ($weather['condition_name'] ?? $weather['condition'] ?? '') : '';
+    $__wFresh = $weather ? (int) ($weather['snowfall'] ?? 0) : 0;
     $__seasons = [
-        1 => ['title' => 'Park City base', 'text' => 'Beginner and intermediate terrain. Build the first lifts, set up ski patrol and keep the books balanced.', 'items' => ['Green and blue runs', 'Snowmaking and grooming', 'Staying solvent']],
-        2 => ['title' => 'Advanced peaks', 'text' => 'Steep bowls and high ridges open up. Your cash and everything you built carries over.', 'items' => ['Black and double-black terrain', 'Express gondolas', 'Storm operations']],
-        3 => ['title' => 'Beyond Park City', 'text' => 'Backcountry, terrain parks and tournaments between resorts, with players voting on the next mountain.', 'items' => ['Backcountry and parks', 'Player-chosen resorts', 'Inter-resort tournaments']],
+        1 => ['Park City base', 'Green and blue terrain. The first lifts, ski patrol, and not going broke.'],
+        2 => ['Advanced Peaks', 'The upper mountain: steep bowls, high ridges, black and double-black runs.'],
+        3 => ['Beyond Park City', 'Backcountry, terrain parks, and a new mountain chosen by player vote.'],
     ];
+    $__diffClass = ['green' => 'green', 'blue' => 'blue', 'black' => 'black', 'double_black' => 'black'];
 ?>
 <style>
 .home-hero { position: relative; isolation: isolate; overflow: hidden; color: #fff; background: #141b24; }
@@ -62,11 +65,11 @@
     background: linear-gradient(90deg, rgba(10,14,20,0.92) 0%, rgba(10,14,20,0.78) 45%, rgba(10,14,20,0.35) 100%);
 }
 @media (max-width: 1023px) { .home-hero::after { background: rgba(10,14,20,0.82); } }
-.home-hero h1 { font-family: var(--sign); font-weight: 700; font-size: clamp(2.75rem, 6vw, 4.5rem); line-height: 0.98; letter-spacing: 0.005em; margin: 0; }
-.home-hero h1 span { color: #7fb4ff; }
-.home-hero .lede { font-size: 1.0625rem; line-height: 1.6; color: rgba(255,255,255,0.82); max-width: 34rem; }
-.home-hero .facts { display: flex; flex-wrap: wrap; gap: 0.35rem 1.25rem; font-size: 0.8125rem; color: rgba(255,255,255,0.7); }
-.home-hero .facts b { color: #fff; font-weight: 600; }
+.home-hero h1 { font-family: var(--sign); font-weight: 700; font-size: clamp(2.5rem, 5.2vw, 4rem); line-height: 1; letter-spacing: 0.005em; margin: 0; max-width: 17ch; }
+.home-hero .lede { font-size: 1.0625rem; line-height: 1.65; color: rgba(255,255,255,0.82); max-width: 33rem; }
+.home-hero .note { display: inline-block; font-size: 0.875rem; color: rgba(255,255,255,0.85); text-decoration: underline; text-decoration-color: rgba(255,255,255,0.35); text-underline-offset: 4px; }
+.home-hero .note:hover { color: #fff; text-decoration-color: #fff; }
+.home-hero .small { font-size: 0.8125rem; color: rgba(255,255,255,0.62); }
 .home-hero .ghost { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
 .home-hero .ghost:hover { background: rgba(255,255,255,0.22); color: #fff; }
 
@@ -80,96 +83,57 @@
 .report-big > div + div { border-left: 1px solid rgba(0,0,0,0.1); }
 .report-label { font-size: 0.75rem; color: #5b6470; }
 .report-num { font-family: var(--sign); font-size: 2.5rem; font-weight: 600; line-height: 1; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
-.report-num small { font-size: 1rem; font-weight: 500; color: #5b6470; margin-left: 4px; }
 .report-rows > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 1.1rem; font-size: 0.875rem; border-top: 1px solid rgba(0,0,0,0.08); }
 .report-rows > div:first-child { border-top: 0; }
 .report-rows dt { color: #5b6470; }
 .report-rows dd { font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.home-section { padding: 4.5rem 0; }
-.home-section h2.sign { font-family: var(--sign); font-size: 2.25rem; font-weight: 700; line-height: 1.05; margin: 0; }
-.home-kicker { font-size: 0.8125rem; font-weight: 600; color: var(--color-primary); margin-bottom: 0.35rem; }
-.pillar h3 { font-family: var(--sign); font-size: 1.5rem; font-weight: 600; line-height: 1.1; margin: 0.75rem 0 0.5rem; }
-.pillar p { font-size: 0.9375rem; line-height: 1.6; color: color-mix(in oklab, var(--color-base-content) 75%, transparent); }
-.pillar-mark { display: flex; align-items: center; gap: 0.4rem; height: 1.25rem; }
-.tsign { display: inline-block; width: 14px; height: 14px; }
+/* Plain sections */
+.home-section { padding: 4rem 0; }
+.home-section h2 { font-family: var(--sign); font-size: 2.25rem; font-weight: 700; line-height: 1.05; margin: 0; }
+.prose-home p { font-size: 1rem; line-height: 1.7; color: color-mix(in oklab, var(--color-base-content) 80%, transparent); max-width: 38rem; }
+.prose-home p + p { margin-top: 0.9rem; }
+.muted { color: color-mix(in oklab, var(--color-base-content) 58%, transparent); }
+.textlink { color: var(--color-primary); font-weight: 600; text-decoration: none; }
+.textlink:hover { text-decoration: underline; text-underline-offset: 3px; }
+.tsign { display: inline-block; width: 11px; height: 11px; flex-shrink: 0; }
 .tsign.green { border-radius: 50%; background: #23a55a; }
 .tsign.blue { background: #2f6fd6; }
-.tsign.black { width: 12px; height: 12px; background: var(--color-base-content); transform: rotate(45deg); margin: 0 2px; }
+.tsign.black { width: 9px; height: 9px; margin: 0 1px; background: var(--color-base-content); transform: rotate(45deg); }
 
-.resort-list { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; font-size: 0.9375rem; }
-.resort-list li { display: flex; align-items: center; gap: 0.45rem; }
-.resort-list li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: color-mix(in oklab, var(--color-base-content) 35%, transparent); }
-.map-frame { display: block; border-radius: 8px; overflow: hidden; border: 1px solid var(--color-base-300); box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
-.map-frame img { display: block; width: 100%; height: auto; transition: transform .4s ease; }
-.map-frame:hover img { transform: scale(1.02); }
+/* Season 1 standings */
+.standings { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }
+.standings th { text-align: left; font-size: 0.75rem; font-weight: 500; padding: 0 0 0.5rem; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
+.standings td { padding: 0.6rem 0; border-top: 1px solid var(--color-base-300); vertical-align: top; }
+.standings .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.standings .pos { width: 2rem; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); font-variant-numeric: tabular-nums; }
+.standings small { display: block; font-size: 0.75rem; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
 
-/* Season timeline drawn like a lift line */
-.seasons { position: relative; display: grid; grid-template-columns: 1fr; gap: 2rem; }
-@media (min-width: 768px) {
-    .seasons { grid-template-columns: repeat(3, 1fr); gap: 2.5rem; }
-    .seasons::before { content: ''; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: var(--color-base-300); }
-}
-.season { position: relative; }
-.season-dot { position: relative; width: 16px; height: 16px; border-radius: 50%; background: var(--color-base-100); border: 2px solid var(--color-base-300); margin-bottom: 1rem; }
-.season.is-done .season-dot { background: var(--color-base-content); border-color: var(--color-base-content); opacity: 0.45; }
-.season.is-now .season-dot { background: var(--color-primary); border-color: var(--color-primary); box-shadow: 0 0 0 5px color-mix(in oklab, var(--color-primary) 22%, transparent); }
-.season-tag { font-size: 0.75rem; font-weight: 600; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
-.season.is-now .season-tag { color: var(--color-primary); }
-.season h3 { font-family: var(--sign); font-size: 1.625rem; font-weight: 600; line-height: 1.1; margin: 0.15rem 0 0.45rem; }
-.season p { font-size: 0.9rem; line-height: 1.55; color: color-mix(in oklab, var(--color-base-content) 72%, transparent); }
-.season ul { margin-top: 0.75rem; font-size: 0.875rem; }
-.season li { padding: 0.3rem 0; border-top: 1px solid var(--color-base-300); }
+/* How a season goes */
+.steps { counter-reset: step; list-style: none; margin: 0; padding: 0; }
+.steps li { counter-increment: step; position: relative; padding: 0 0 1.1rem 2.25rem; font-size: 0.9875rem; line-height: 1.6; color: color-mix(in oklab, var(--color-base-content) 80%, transparent); }
+.steps li::before { content: counter(step); position: absolute; left: 0; top: 0.05rem; font-family: var(--sign); font-weight: 700; font-size: 1.25rem; line-height: 1.2; color: var(--color-base-content); }
+.steps b { color: var(--color-base-content); font-weight: 600; }
+.map-frame { display: block; border-radius: 6px; overflow: hidden; border: 1px solid var(--color-base-300); }
+.map-frame img { display: block; width: 100%; height: auto; }
 
-.feature-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem 2rem; }
-@media (min-width: 1024px) { .feature-list { grid-template-columns: repeat(4, 1fr); } }
-.feature-list div { font-size: 0.875rem; color: color-mix(in oklab, var(--color-base-content) 68%, transparent); }
-.feature-list b { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9375rem; color: var(--color-base-content); font-weight: 600; margin-bottom: 0.15rem; }
-.feature-list b i { color: var(--color-primary); font-size: 0.875rem; width: 1rem; text-align: center; }
+/* Recently built */
+.recent { list-style: none; margin: 0; padding: 0; }
+.recent li { display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0; border-top: 1px solid var(--color-base-300); font-size: 0.9375rem; }
+.recent li:first-child { border-top: 0; }
+.recent .when { margin-left: auto; font-size: 0.8125rem; white-space: nowrap; }
 
-/* Utilities not in the compiled Tailwind build */
-.align-middle { vertical-align: middle; }
-.gap-10 { gap: 2.5rem; }
-.mb-12 { margin-bottom: 3rem; }
-.py-14 { padding-top: 3.5rem; padding-bottom: 3.5rem; }
-@media (min-width: 768px) { .md\:py-20 { padding-top: 5rem; padding-bottom: 5rem; } }
-.text-base-content\/55 { color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
-.text-base-content\/75 { color: color-mix(in oklab, var(--color-base-content) 75%, transparent); }
-.underline-offset-4 { text-underline-offset: 4px; }
-
-/* Season 2 launch */
-.s2-tag { display: inline-block; font-family: var(--sign); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 9px 1px; border-radius: 3px; background: #7fb4ff; color: #0d1521; line-height: 1.4; white-space: nowrap; flex-shrink: 0; }
-.s2-pill { display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.3rem 0.85rem 0.3rem 0.3rem; border-radius: 999px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 0.8125rem; font-weight: 500; text-decoration: none; backdrop-filter: blur(4px); }
-.s2-pill:hover { background: rgba(255,255,255,0.18); color: #fff; }
-.s2-pill .s2-tag { border-radius: 999px; padding: 2px 10px 1px; }
-.s2-band { position: relative; isolation: isolate; overflow: hidden; color: #fff; background: #0f1620; border-bottom: 1px solid var(--color-base-300); }
-.s2-band::before { content: ''; position: absolute; inset: 0; z-index: -2; background-image: url('/img/ParkCity_med.jpg'), url('/img/ParkCity_low.jpg'); background-size: cover; background-position: center 8%; opacity: 0.55; filter: saturate(0.6); }
-.s2-band::after { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(8,12,18,0.95) 0%, rgba(8,12,18,0.82) 50%, rgba(8,12,18,0.5) 100%); }
-@media (max-width: 1023px) { .s2-band::after { background: rgba(8,12,18,0.86); } }
-.s2-title { font-family: var(--sign); font-weight: 700; font-size: clamp(2.5rem, 5vw, 3.75rem); line-height: 0.98; margin: 0.9rem 0 1rem; }
-.s2-title span { color: #7fb4ff; }
-.s2-lede { font-size: 1.0625rem; line-height: 1.6; color: rgba(255,255,255,0.8); max-width: 34rem; }
-.s2-stats { display: flex; flex-wrap: wrap; gap: 1rem 2.25rem; margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid rgba(255,255,255,0.16); }
-.s2-stats b { display: block; font-family: var(--sign); font-size: 2.5rem; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
-.s2-stats span { display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8125rem; color: rgba(255,255,255,0.7); margin-top: 0.3rem; }
-.s2-stats .s2-diamond { width: 9px; height: 9px; margin: 0 2px; background: #fff; }
-.s2-band .ghost { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.3); color: #fff; }
-.s2-band .ghost:hover { background: rgba(255,255,255,0.22); color: #fff; }
-.s2-podium { list-style: none; margin: 0; padding: 0; }
-.s2-podium li { display: flex; align-items: center; gap: 0.85rem; padding: 0.75rem 1.1rem; border-top: 1px solid rgba(0,0,0,0.08); }
-.s2-podium li:first-child { border-top: 0; }
-.s2-rank { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-family: var(--sign); font-weight: 700; font-size: 1rem; color: #1d232b; background: #e4e1d8; }
-.s2-rank.r1 { background: #e9b949; }
-.s2-rank.r2 { background: #c9ced6; }
-.s2-rank.r3 { background: #d39a6a; }
-.s2-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.s2-name small { display: block; font-weight: 400; font-size: 0.75rem; color: #5b6470; overflow: hidden; text-overflow: ellipsis; }
-.s2-cash { font-family: var(--sign); font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.s2-foot { display: flex; gap: 0.5rem; align-items: baseline; padding: 0.7rem 1.1rem 0.85rem; font-size: 0.75rem; color: #5b6470; background: #efece4; border-top: 1px solid rgba(0,0,0,0.08); }
-.s2-foot i { color: #c08a1e; }
+/* Seasons */
+.season-list { list-style: none; margin: 0; padding: 0; }
+.season-list li { display: grid; grid-template-columns: 6.5rem 1fr; gap: 0.25rem 1.25rem; padding: 0.85rem 0; border-top: 1px solid var(--color-base-300); }
+.season-list li:first-child { border-top: 0; }
+.season-list .when { font-size: 0.8125rem; padding-top: 0.15rem; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
+.season-list .now .when { color: var(--color-primary); font-weight: 600; }
+.season-list b { font-weight: 600; }
+.season-list p { font-size: 0.9375rem; line-height: 1.55; margin-top: 0.15rem; color: color-mix(in oklab, var(--color-base-content) 72%, transparent); }
 
 .home-cta { background: #1d232b; color: #f7f5f0; }
-.home-cta h2 { font-family: var(--sign); font-size: clamp(2rem, 4vw, 2.75rem); font-weight: 700; line-height: 1.05; margin: 0; }
+.home-cta p { font-size: 1.0625rem; color: rgba(247,245,240,0.82); }
 </style>
 
 <!-- Hero -->
@@ -177,29 +141,23 @@
     <div class="max-w-6xl mx-auto px-4 py-14 md:py-20 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
         <div class="lg:col-span-7 space-y-6">
             <?php if ($__s2JustOpened) : ?>
-            <a href="#season-2" class="s2-pill"><span class="s2-tag">Season 2</span>Sector 2 just opened: Advanced Peaks <i class="fa-solid fa-arrow-down text-[10px]" aria-hidden="true"></i></a>
+            <a href="#season-2" class="note">Season 2 opened on <?= date('F j', $seasonStart) ?>. What's new →</a>
             <?php else : ?>
-            <div class="text-sm" style="color:rgba(255,255,255,0.75)">
-                <span class="inline-block w-2 h-2 rounded-full bg-success mr-1.5 align-middle"></span>Season <?= $currentSeasonNum ?> is on · day <?= $seasonDay ?> of <?= $seasonLen ?>
-            </div>
+            <div class="small">Season <?= $currentSeasonNum ?>, day <?= $seasonDay ?> of <?= $seasonLen ?></div>
             <?php endif ?>
-            <h1>Design slopes.<br>Spin chairlifts.<br><span>Rule the mountain.</span></h1>
-            <p class="lede">Start with an empty mountain and up to <?= currency(1000000) ?> in capital. Build lifts, lay out runs, hire staff, make snow and keep the resort profitable.</p>
+            <h1>Run a ski resort on a real mountain.</h1>
+            <p class="lede">Ski Manager is a free management game that runs in your browser. You start with the Park City trail map, up to <?= currency(1000000) ?> depending on difficulty, and a <?= $seasonLen ?>-day season to make it pay.</p>
             <div class="flex flex-wrap items-center gap-3">
                 <?php if (!auth()->loggedIn()) : ?>
                 <a href="/register" class="btn btn-primary px-6">Play free</a>
-                <a href="/demo" class="btn ghost">Try the demo mountain</a>
+                <a href="/demo" class="btn ghost">Try a demo mountain</a>
                 <a href="/login" class="text-sm underline underline-offset-4 ml-1" style="color:rgba(255,255,255,0.8)">Sign in</a>
                 <?php else : ?>
                 <a href="/dashboard" class="btn btn-primary px-6">Go to your resort</a>
-                <a href="/map" class="btn ghost">Open trail map</a>
+                <a href="/map" class="btn ghost">Open the trail map</a>
                 <?php endif ?>
             </div>
-            <div class="facts">
-                <span><?= $playersLabel ?></span>
-                <span>Plays in your browser</span>
-                <span>Nothing to download</span>
-            </div>
+            <p class="small"><?= number_format($playerCount) ?> players so far, <?= number_format($totalSlopes) ?> runs built.</p>
         </div>
 
         <div class="lg:col-span-5">
@@ -233,168 +191,125 @@
 </section>
 
 <?php if ($__s2Live) : ?>
-<!-- Season 2 launch -->
-<section id="season-2" class="s2-band">
-    <div class="max-w-6xl mx-auto px-4 py-14 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-        <div class="lg:col-span-7">
-            <span class="s2-tag">Season 2 · Now open</span>
-            <h2 class="s2-title">Sector 2 is open.<br><span>Advanced Peaks.</span></h2>
-            <p class="s2-lede">The upper mountain at Park City: steep bowls, high ridges and the hardest terrain in the game. Your cash and everything you built in Season 1 carries over.</p>
-            <?php if ($__s2Runs + $__s2Lifts > 0) : ?>
-            <div class="s2-stats">
-                <div><b><?= number_format($__s2Runs) ?></b><span>new runs</span></div>
-                <div><b><?= number_format($__s2Steep) ?></b><span><span class="tsign black s2-diamond" aria-hidden="true"></span> black &amp; double-black</span></div>
-                <div><b><?= number_format($__s2Lifts) ?></b><span>new lifts</span></div>
-            </div>
-            <?php endif ?>
-            <div class="flex flex-wrap items-center gap-3 mt-7">
-                <?php if (auth()->loggedIn()) : ?>
-                <a href="/map" class="btn btn-primary px-6">Build in Sector 2</a>
-                <?php else : ?>
-                <a href="/register" class="btn btn-primary px-6">Start in Season 2</a>
-                <a href="/login" class="btn ghost">I played Season 1</a>
-                <?php endif ?>
-            </div>
+<!-- Season 2 note -->
+<section id="season-2" class="home-section bg-base-100 border-b border-base-300">
+    <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div class="lg:col-span-7 prose-home">
+            <div class="text-sm muted mb-2"><?= date('F j, Y', $seasonStart) ?></div>
+            <h2 class="mb-5">Season 2 is open</h2>
+            <p>Sector 2, the upper part of Park City, is now on the trail map.<?php if ($__s2Runs) : ?> It has <?= number_format($__s2Runs) ?> runs and <?= number_format($__s2Lifts) ?> lift<?= $__s2Lifts === 1 ? '' : 's' ?>, and most of it is steep: <?= number_format($__s2Steep) ?> of those runs are black or double black.<?php endif ?></p>
+            <p>Everything you built in Season 1 is still there, and so is your cash. The final Season 1 standings have been saved, everyone who played got the Season 1 Pioneer badge, and the top ten got 50 Genepis each.</p>
+            <p class="pt-1"><a href="<?= auth()->loggedIn() ? '/map' : '/register' ?>" class="textlink"><?= auth()->loggedIn() ? 'Open the trail map' : 'Start a resort' ?> →</a></p>
         </div>
+        <?php if ($__standings) : ?>
         <div class="lg:col-span-5">
-            <div class="report">
-                <div class="report-head">
-                    <h2>Season 1 podium</h2>
-                    <span>Final standings</span>
-                </div>
-                <?php if ($__podium) : ?>
-                <ol class="s2-podium">
-                    <?php foreach ($__podium as $__i => $__p) : ?>
-                    <li>
-                        <span class="s2-rank r<?= $__i + 1 ?>"><?= $__i + 1 ?></span>
-                        <span class="s2-name"><?= esc($__p['username']) ?><?php if (!empty($__p['resort_name'])) : ?><small><?= esc($__p['resort_name']) ?></small><?php endif ?></span>
-                        <span class="s2-cash"><?= currency((int) $__p['cash']) ?></span>
-                    </li>
-                    <?php endforeach ?>
-                </ol>
-                <?php else : ?>
-                <p class="px-4 py-6 text-sm" style="color:#5b6470">Final standings are being tallied.</p>
-                <?php endif ?>
-                <p class="s2-foot"><i class="fa-solid fa-medal" aria-hidden="true"></i> Everyone who played Season 1 earned the Pioneer badge. The top 10 got 50 Genepis.</p>
-            </div>
+            <h3 class="font-semibold mb-3">How Season 1 ended</h3>
+            <table class="standings">
+                <thead><tr><th></th><th>Player</th><th class="num">Cash</th></tr></thead>
+                <tbody>
+                <?php foreach ($__standings as $__i => $__p) : ?>
+                    <tr>
+                        <td class="pos"><?= $__i + 1 ?></td>
+                        <td><?= esc($__p['username']) ?><?php if ((int) $__p['total_lifts'] + (int) $__p['total_slopes'] > 0) : ?><small><?= (int) $__p['total_lifts'] ?> lift<?= (int) $__p['total_lifts'] === 1 ? '' : 's' ?>, <?= (int) $__p['total_slopes'] ?> run<?= (int) $__p['total_slopes'] === 1 ? '' : 's' ?></small><?php endif ?></td>
+                        <td class="num"><?= currency((int) $__p['cash']) ?></td>
+                    </tr>
+                <?php endforeach ?>
+                </tbody>
+            </table>
+            <p class="text-sm mt-3"><a href="/leaderboard" class="textlink">Full leaderboard</a></p>
+        </div>
+        <?php endif ?>
+    </div>
+</section>
+<?php endif ?>
+
+<!-- How a season goes -->
+<section class="home-section bg-base-200 border-b border-base-300">
+    <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        <div class="lg:col-span-5">
+            <h2 class="mb-6">How a season goes</h2>
+            <ol class="steps">
+                <li><b>Build a lift.</b> Pick one of the lift lines on the trail map. A 1.6 km fixed-grip chair runs about <?= currency(240000) ?>; a gondola on the same line costs a lot more.</li>
+                <li><b>Lay out runs under it.</b> They follow the real fall lines of the mountain, graded green through double black.</li>
+                <li><b>Hire people.</b> Ski patrol, groomers, lift mechanics, instructors. Nothing runs without staff.</li>
+                <li><b>Set ticket prices.</b> Charge too much and fewer people come.</li>
+                <li><b>Watch the weather.</b> Make snow when it's cold enough, groom overnight, and try to still have money on day <?= $seasonLen ?>.</li>
+            </ol>
+            <p class="text-sm muted leading-relaxed">There's more once you're going: hotels and restaurants, loans and insurance, terrain parks, night skiing, energy and water bills, and a leaderboard.</p>
+        </div>
+        <div class="lg:col-span-7">
+            <a href="<?= auth()->loggedIn() ? '/map' : '/register' ?>" class="map-frame">
+                <img src="/img/ParkCity_low.jpg" alt="The Park City trail map the game is played on" width="600" height="340" loading="lazy" decoding="async">
+            </a>
+            <p class="text-xs muted mt-2">The Park City trail map you build on. Map by <a href="https://skimap.com" target="_blank" rel="noopener noreferrer" class="underline">Mapsynergy</a>.</p>
+        </div>
+    </div>
+</section>
+
+<?php if ($__recent) : ?>
+<!-- Recently built -->
+<section class="home-section bg-base-100 border-b border-base-300">
+    <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div class="lg:col-span-5">
+            <h2 class="mb-3">Recently built</h2>
+            <p class="muted">What other players have been putting on their mountains.</p>
+        </div>
+        <div class="lg:col-span-7">
+            <ul class="recent">
+                <?php foreach ($__recent as $__b) : ?>
+                <li>
+                    <?php if ($__b['item_type'] === 'lift') : ?>
+                        <i class="fa-solid fa-cable-car muted text-sm w-3 text-center" aria-hidden="true"></i>
+                    <?php else : ?>
+                        <span class="tsign <?= $__diffClass[$__b['difficulty'] ?? ''] ?? 'blue' ?>" aria-hidden="true"></span>
+                    <?php endif ?>
+                    <span class="min-w-0 truncate"><b class="font-semibold"><?= esc($__b['username']) ?></b> built <?= esc($__b['name']) ?></span>
+                    <span class="when muted"><?= timeAgo($__b['created_at']) ?></span>
+                </li>
+                <?php endforeach ?>
+            </ul>
         </div>
     </div>
 </section>
 <?php endif ?>
 
-<!-- What you manage -->
-<section class="home-section bg-base-100 border-b border-base-300">
-    <div class="max-w-6xl mx-auto px-4">
-        <div class="home-kicker">What you're running</div>
-        <h2 class="sign mb-10">Three things keep a resort open.</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
-            <div class="pillar">
-                <div class="pillar-mark" aria-hidden="true"><i class="tsign green"></i><i class="tsign blue"></i><i class="tsign black"></i></div>
-                <h3>Runs and lifts</h3>
-                <p>Draw runs along the real fall lines of the mountain, grade them from green to double black, and choose lifts that keep the lines short. Players have built <b class="text-base-content"><?= number_format($totalSlopes) ?></b> runs so far.</p>
-            </div>
-            <div class="pillar">
-                <div class="pillar-mark" aria-hidden="true"><i class="fa-solid fa-ticket text-lg text-warning"></i></div>
-                <h3>Money</h3>
-                <p>Set ticket prices, build lodges, restaurants, rentals and parking, borrow when you have to, and try not to run dry before the season ends.</p>
-            </div>
-            <div class="pillar">
-                <div class="pillar-mark" aria-hidden="true"><i class="fa-solid fa-snowflake text-lg text-info"></i></div>
-                <h3>Snow</h3>
-                <p>Watch the forecast, fire up the snow guns when it's cold enough, and send groomers out overnight so the runs are in shape by morning.</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Real maps -->
+<!-- Seasons -->
 <section class="home-section bg-base-200 border-b border-base-300">
-    <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-        <div class="lg:col-span-5 space-y-4">
-            <div class="home-kicker">Real mountains</div>
-            <h2 class="sign">Built on real trail maps.</h2>
-            <p class="text-base-content/75 leading-relaxed">You build on the actual terrain of well-known resorts, following their ridges, bowls and base areas.</p>
-            <ul class="resort-list pt-1">
-                <li>Park City</li><li>Deer Valley</li><li>Vail</li><li>Aspen</li><li>Big Sky</li><li>Palisades Tahoe</li>
-            </ul>
-            <p class="text-xs text-base-content/55 pt-2">Maps by <a href="https://skimap.com" target="_blank" rel="noopener noreferrer" class="underline">Mapsynergy</a></p>
+    <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-12">
+        <div class="lg:col-span-5">
+            <h2 class="mb-3">Seasons</h2>
+            <p class="muted">Each season opens more of the mountain. What you built carries over.</p>
         </div>
         <div class="lg:col-span-7">
-            <a href="<?= auth()->loggedIn() ? '/map' : '/register' ?>" class="map-frame">
-                <img src="/img/ParkCity_low.jpg" alt="Park City trail map" width="600" height="340" loading="lazy" decoding="async">
-            </a>
-        </div>
-    </div>
-</section>
-
-<!-- Seasons -->
-<section class="home-section bg-base-100 border-b border-base-300">
-    <div class="max-w-6xl mx-auto px-4">
-        <div class="home-kicker">Seasons</div>
-        <h2 class="sign mb-12">The mountain opens up a sector at a time.</h2>
-        <div class="seasons">
-            <?php foreach ($__seasons as $__n => $__s) :
-                $__isNow  = $__n === 3 ? $currentSeasonNum >= 3 : $__n === $currentSeasonNum;
-                $__isDone = $__n < $currentSeasonNum && !$__isNow;
-                $__state  = $__isNow ? 'is-now' : ($__isDone ? 'is-done' : '');
-            ?>
-            <div class="season <?= $__state ?>">
-                <div class="season-dot"></div>
-                <div class="season-tag">Season <?= $__n ?><?= $__n === 3 ? '+' : '' ?> · <?= $__isNow ? 'Now playing' : ($__isDone ? 'Finished' : 'Coming up') ?></div>
-                <h3><?= esc($__s['title']) ?></h3>
-                <p><?= esc($__s['text']) ?></p>
-                <?php if ($__isNow) : ?>
-                <div class="mt-3">
-                    <progress class="progress progress-primary w-full h-1.5" value="<?= $seasonDay ?>" max="<?= max(1, $seasonLen) ?>"></progress>
-                    <div class="flex justify-between text-xs text-base-content/60 mt-1"><span>Day <?= $seasonDay ?> of <?= $seasonLen ?></span><span><?= $daysRemaining ?> days left</span></div>
-                </div>
-                <?php endif ?>
-                <ul>
-                    <?php foreach ($__s['items'] as $__it) : ?><li><?= esc($__it) ?></li><?php endforeach ?>
-                </ul>
-                <?php if ($__n === 3) : ?>
-                <a href="<?= auth()->loggedIn() ? '/vote' : '/register' ?>" class="inline-block text-sm font-semibold text-primary mt-3">Vote on the next mountain →</a>
-                <?php endif ?>
-            </div>
-            <?php endforeach ?>
-        </div>
-    </div>
-</section>
-
-<!-- Everything else -->
-<section class="home-section bg-base-200 border-b border-base-300">
-    <div class="max-w-6xl mx-auto px-4">
-        <h2 class="sign mb-10">Also in the game</h2>
-        <div class="feature-list">
-            <div><b><i class="fa-solid fa-users"></i>Ten staff roles</b>Patrol, groomers, instructors, chefs and more.</div>
-            <div><b><i class="fa-solid fa-cloud-sun"></i>Changing weather</b>Temperatures move through the day.</div>
-            <div><b><i class="fa-solid fa-building-columns"></i>Loans and insurance</b>Borrow to grow, insure against bad luck.</div>
-            <div><b><i class="fa-solid fa-truck-monster"></i>Real equipment</b>PistenBully groomers, TechnoAlpin guns.</div>
-            <div><b><i class="fa-solid fa-person-snowboarding"></i>Terrain parks</b>Halfpipes, jumps and rail gardens.</div>
-            <div><b><i class="fa-solid fa-ranking-star"></i>Leaderboard</b>See how your resort stacks up each season.</div>
-            <div><b><i class="fa-solid fa-bolt"></i>Energy and water</b>Lifts and snow guns need both.</div>
-            <div><b><i class="fa-solid fa-hotel"></i>Lodging and food</b>Hotels, restaurants, rentals and retail.</div>
+            <ul class="season-list">
+                <?php foreach ($__seasons as $__n => [$__title, $__text]) :
+                    $__isNow = $__n === 3 ? $currentSeasonNum >= 3 : $__n === $currentSeasonNum;
+                    $__when  = $__isNow ? 'Now, day ' . $seasonDay : ($__n < $currentSeasonNum ? 'Finished' : 'Later');
+                ?>
+                <li class="<?= $__isNow ? 'now' : '' ?>">
+                    <div class="when">Season <?= $__n ?><?= $__n === 3 ? '+' : '' ?><br><?= $__when ?></div>
+                    <div>
+                        <b><?= esc($__title) ?></b>
+                        <p><?= esc($__text) ?><?php if ($__n === 3) : ?> <a href="<?= auth()->loggedIn() ? '/vote' : '/register' ?>" class="textlink">Vote on it</a><?php endif ?></p>
+                    </div>
+                </li>
+                <?php endforeach ?>
+            </ul>
         </div>
     </div>
 </section>
 
 <!-- Call to action -->
 <section class="home-cta">
-    <div class="max-w-6xl mx-auto px-4 py-14 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+    <div class="max-w-6xl mx-auto px-4 py-12 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
         <?php if (auth()->loggedIn()) : ?>
-        <div>
-            <h2>Your lifts are still turning.</h2>
-            <p class="mt-2" style="color:rgba(247,245,240,0.7)">The season keeps going while you're away.</p>
-        </div>
+        <p>Season <?= $currentSeasonNum ?> has <?= $daysRemaining ?> days left.</p>
         <a href="/dashboard" class="btn btn-primary px-8">Go to your resort</a>
         <?php else : ?>
-        <div>
-            <h2>The mountain's empty. Go build it.</h2>
-            <p class="mt-2" style="color:rgba(247,245,240,0.7)">Free, in your browser, with up to <?= currency(1000000) ?> to start.</p>
-        </div>
+        <p>It's free, and you can try a demo mountain without making an account.</p>
         <div class="flex items-center gap-4">
             <a href="/register" class="btn btn-primary px-8">Play free</a>
-            <a href="/login" class="text-sm underline underline-offset-4" style="color:rgba(247,245,240,0.8)">I already play</a>
+            <a href="/demo" class="text-sm underline underline-offset-4" style="color:rgba(247,245,240,0.8)">Try the demo</a>
         </div>
         <?php endif ?>
     </div>
