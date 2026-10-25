@@ -54,7 +54,7 @@
     <script defer src="https://js.sentry-cdn.com/67d62e71889bb1702e60a6c3130aff40.min.js" crossorigin="anonymous"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="preconnect" href="https://kit.fontawesome.com" crossorigin>
     <link rel="preconnect" href="https://ka-f.fontawesome.com" crossorigin>
     <script async src="https://kit.fontawesome.com/e8108d3d5f.js" crossorigin="anonymous"></script>
@@ -115,24 +115,25 @@ dialog::backdrop {
 }
 
 /* Shared identity: condensed trail-sign type */
-:root { --sign: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; }
+:root { --sign: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif; }
+body { font-family: var(--sign); }
 
 /* Navbar */
 .site-nav { min-height: 3.5rem; padding-top: 0.25rem; padding-bottom: 0.25rem; }
 .brand { display: inline-flex; align-items: center; gap: 0.55rem; padding: 0 0.5rem; color: inherit; text-decoration: none; }
 .brand-mark { width: 30px; height: 30px; flex-shrink: 0; }
-.brand-name { font-family: var(--sign); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.01em; line-height: 1; white-space: nowrap; }
+.brand-name { font-family: var(--sign); font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1; white-space: nowrap; }
 /* Keep brand + Log in + Play free on one line without overflowing small phones */
 @media (max-width: 420px) {
     .site-nav .navbar-end { gap: 0.25rem; }
     .site-nav .navbar-end > .btn-sm:not(.btn-circle) { padding-left: 0.625rem; padding-right: 0.625rem; }
     .site-nav .brand { padding: 0 0.25rem; }
-    .brand-name { font-size: 1.25rem; }
+    .brand-name { font-size: 1.125rem; }
 }
 @media (max-width: 380px) {
     .site-nav { padding-left: 0.25rem; padding-right: 0.25rem; }
     .site-nav .brand { gap: 0.4rem; }
-    .brand-name { font-size: 1.0625rem; }
+    .brand-name { font-size: 1rem; }
 }
 .site-nav .menu-horizontal > li > a,
 .site-nav .menu-horizontal > li > details > summary { font-weight: 500; border-radius: 6px; }

@@ -16,7 +16,6 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
 
 <link rel="stylesheet" href="/css/leaflet.css" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="preload" href="<?= esc(str_replace('.jpg', '_med.jpg', $mapConfig['image'])) ?>" as="image" fetchpriority="high">
 
 <style>
@@ -28,7 +27,6 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     z-index: 0;
     user-select: none;
 }
-:root { --sign: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; }
 /* Legend styled like the key on a printed trail map */
 .map-legend {
     position: absolute; bottom: 14px; left: 14px; z-index: 800;
@@ -36,7 +34,7 @@ $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
     padding: 9px 12px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 5px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
-.map-legend-title { font-family: var(--sign); font-size: 14px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 1px; }
+.map-legend-title { font-family: var(--sign); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 1px; }
 .map-legend-item { display: flex; align-items: center; gap: 8px; }
 .map-legend-item .legend-sign { width: 26px; display: inline-flex; justify-content: center; }
 .map-legend-item span.legend-swatch { width: 20px; height: 4px; border-radius: 2px; display: inline-block; }
@@ -221,7 +219,7 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
     padding: 14px 14px 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
     display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-shrink: 0;
 }
-.drawer-header h2 { font-family: var(--sign); font-size: 22px !important; font-weight: 600 !important; line-height: 1.1 !important; color: #fff !important; }
+.drawer-header h2 { font-family: var(--sign); font-size: 18px !important; font-weight: 600 !important; line-height: 1.2 !important; letter-spacing: -0.02em; color: #fff !important; }
 .drawer-header-icon { display: none; }
 .drawer-cash-pill { color: #e6e9ee; font-weight: 600; font-size: 12px; font-variant-numeric: tabular-nums; }
 .drawer-close-btn {
@@ -272,7 +270,7 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
 .build-diff-pill { font-size: 11px; font-weight: 500; color: #8b95a3; flex-shrink: 0; }
 .build-item-meta { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #8b95a3; font-variant-numeric: tabular-nums; }
 .build-item-price-col { text-align: right; flex-shrink: 0; }
-.build-item-price { font-family: var(--sign); font-size: 17px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.build-item-price { font-family: var(--sign); font-size: 14px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .build-item-cta { font-size: 11px; color: #8b95a3; margin-top: 1px; }
 
 /* Trail signs, as printed on real trail maps */
@@ -313,7 +311,7 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
 .seat-pill-btn.is-checked { background: color-mix(in oklab, var(--color-primary) 14%, transparent); border-color: var(--color-primary); color: #fff; }
 
 /* Top bar */
-.map-title { font-family: var(--sign); font-size: 24px; font-weight: 700; line-height: 1.05; margin: 0; }
+.map-title { font-family: var(--sign); font-size: 20px; font-weight: 700; line-height: 1.15; letter-spacing: -0.02em; margin: 0; }
 .map-title span { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; font-weight: 500; margin-left: 6px; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
 .map-counts { display: flex; gap: 12px; margin-top: 2px; font-size: 12px; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
 .map-counts b { color: var(--color-base-content); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -708,7 +706,7 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
                     <div class="build-footer flex items-center justify-between pt-3" style="border-top:1px solid rgba(255,255,255,0.08)">
                         <div>
                             <p style="font-size:10px;color:#94a3b8;font-weight:700">Construction Cost</p>
-                            <p style="font-size:24px;font-weight:600;font-family:var(--sign);font-variant-numeric:tabular-nums;line-height:1.2" id="selSegCost">-</p>
+                            <p style="font-size:20px;font-weight:600;letter-spacing:-0.02em;font-family:var(--sign);font-variant-numeric:tabular-nums;line-height:1.2" id="selSegCost">-</p>
                             <p style="font-size:10px;color:#64748b;font-family:monospace" id="selSegAfterCash"></p>
                         </div>
                         <button type="button" id="btnBuild" class="btn btn-success btn-sm gap-1.5 font-bold shadow-lg px-4" style="height:36px">

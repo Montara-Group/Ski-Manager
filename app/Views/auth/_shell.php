@@ -23,8 +23,8 @@ $__players = db_connect()->table('users')->where('id !=', 1)->countAllResults();
 @media (min-width: 1024px) { .auth-side { padding: 2.25rem; min-height: 38rem; } }
 .auth-brand { display: inline-flex; align-items: center; gap: 0.55rem; color: #fff; text-decoration: none; }
 .auth-brand svg { width: 30px; height: 30px; }
-.auth-brand span { font-family: var(--sign); font-size: 1.5rem; font-weight: 700; line-height: 1; }
-.auth-side h2 { font-family: var(--sign); font-weight: 700; font-size: 2.75rem; line-height: 0.98; margin: 0 0 0.75rem; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
+.auth-brand span { font-family: var(--sign); font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+.auth-side h2 { font-family: var(--sign); font-weight: 700; font-size: 2.125rem; letter-spacing: -0.03em; line-height: 1.08; margin: 0 0 0.75rem; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }
 .auth-side h2 em { font-style: normal; color: #7fb4ff; }
 .auth-points { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.6rem; font-size: 0.9375rem; color: rgba(255,255,255,0.88); }
 .auth-points li { display: flex; align-items: center; gap: 0.7rem; }
@@ -40,7 +40,7 @@ $__players = db_connect()->table('users')->where('id !=', 1)->countAllResults();
 .auth-form { padding: 1.75rem 1.5rem 2rem; }
 @media (min-width: 640px) { .auth-form { padding: 2.25rem 2.5rem 2.5rem; } }
 .auth-form-inner { max-width: 24rem; margin: 0 auto; }
-.auth-form h1 { font-family: var(--sign); font-weight: 700; font-size: 2.25rem; line-height: 1; margin: 0; }
+.auth-form h1 { font-family: var(--sign); font-weight: 700; font-size: 1.75rem; letter-spacing: -0.025em; line-height: 1.15; margin: 0; }
 .auth-sub { font-size: 0.875rem; margin: 0.4rem 0 1.5rem; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
 .auth-field { display: block; }
 .auth-field > span { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8125rem; font-weight: 500; margin-bottom: 0.35rem; }
@@ -61,7 +61,7 @@ $__players = db_connect()->table('users')->where('id !=', 1)->countAllResults();
 .diff .opt { border: 1.5px solid var(--color-base-300); border-radius: 0.6rem; padding: 0.6rem 0.4rem; text-align: center; transition: border-color .15s, background-color .15s; height: 100%; }
 .diff .opt:hover { border-color: color-mix(in oklab, var(--color-base-content) 35%, transparent); }
 .diff .opt b { display: flex; align-items: center; justify-content: center; gap: 0.4rem; font-size: 0.8125rem; }
-.diff .opt .cash { font-family: var(--sign); font-size: 1.125rem; font-weight: 600; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
+.diff .opt .cash { font-family: var(--sign); font-size: 0.9375rem; font-weight: 600; margin-top: 0.2rem; font-variant-numeric: tabular-nums; }
 .diff .opt small { display: block; font-size: 0.6875rem; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
 .diff input:checked + .opt { border-color: var(--color-primary); background: color-mix(in oklab, var(--color-primary) 12%, transparent); }
 .diff input:focus-visible + .opt { outline: 2px solid var(--color-primary); outline-offset: 2px; }

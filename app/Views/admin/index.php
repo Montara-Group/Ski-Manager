@@ -45,17 +45,16 @@
 ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
 /* Same visual language as /dashboard */
-.adm { --sign: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif; max-width: 1240px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+.adm { max-width: 1240px; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
 @media (min-width: 1024px) { .adm { padding: 1.75rem 2rem 3rem; } }
 .adm .muted { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
 .adm .num { font-variant-numeric: tabular-nums; }
 
 .adm-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-.adm-head h1 { font-family: var(--sign); font-size: 2.25rem; font-weight: 700; line-height: 1; margin: 0; }
-.adm-tag { font-family: var(--sign); font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 1px 8px 0; border-radius: 3px; line-height: 1.5; }
+.adm-head h1 { font-family: var(--sign); font-size: 1.75rem; font-weight: 700; letter-spacing: -0.025em; line-height: 1.1; margin: 0; }
+.adm-tag { font-family: var(--sign); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 1px 8px 0; border-radius: 3px; line-height: 1.5; }
 .adm-tag.staging { background: var(--color-warning); color: var(--color-warning-content); }
 .adm-tag.prod { background: var(--color-error); color: var(--color-error-content); }
 .adm-tag.maint { color: var(--color-error); box-shadow: inset 0 0 0 1px var(--color-error); }
@@ -66,7 +65,7 @@
 .panel { background: var(--color-base-100); border: 1px solid var(--color-base-300); border-radius: 10px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); min-width: 0; }
 .panel-body { padding: 0.9rem 1.25rem 1.1rem; }
 .panel-header { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding: 0.8rem 1.25rem 0.7rem; border-bottom: 1px solid var(--color-base-300); }
-.panel-title { font-family: var(--sign); font-size: 1.1875rem; font-weight: 600; line-height: 1.2; margin: 0; }
+.panel-title { font-family: var(--sign); font-size: 1rem; font-weight: 600; line-height: 1.2; margin: 0; }
 .panel-title .aside { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 0.75rem; font-weight: 400; margin-left: 0.5em; color: color-mix(in oklab, var(--color-base-content) 55%, transparent); }
 .panel-link { font-size: 0.75rem; font-weight: 500; white-space: nowrap; text-decoration: none; color: var(--color-primary); }
 .panel-link:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -94,8 +93,8 @@
     .kpi:not(:nth-child(4n+1)) { border-left: 1px solid var(--color-base-300); }
 }
 .kpi-label { font-size: 0.75rem; font-weight: 500; display: flex; align-items: center; gap: 0.4rem; color: color-mix(in oklab, var(--color-base-content) 62%, transparent); }
-.kpi-value { font-family: var(--sign); font-size: 2.125rem; font-weight: 600; line-height: 1.1; margin-top: 0.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 640px) { .kpi { padding: 0.8rem 0.9rem 0.9rem; } .kpi-value { font-size: 1.625rem; } }
+.kpi-value { font-family: var(--sign); font-size: 1.625rem; font-weight: 600; letter-spacing: -0.025em; line-height: 1.2; margin-top: 0.1rem; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .kpi { padding: 0.8rem 0.9rem 0.9rem; } .kpi-value { font-size: 1.375rem; } }
 .kpi-sub { font-size: 0.75rem; margin-top: 0.3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: color-mix(in oklab, var(--color-base-content) 62%, transparent); }
 
 .adm-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }

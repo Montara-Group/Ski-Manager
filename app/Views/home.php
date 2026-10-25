@@ -65,7 +65,7 @@
     background: linear-gradient(90deg, rgba(10,14,20,0.92) 0%, rgba(10,14,20,0.78) 45%, rgba(10,14,20,0.35) 100%);
 }
 @media (max-width: 1023px) { .home-hero::after { background: rgba(10,14,20,0.82); } }
-.home-hero h1 { font-family: var(--sign); font-weight: 700; font-size: clamp(2.5rem, 5.2vw, 4rem); line-height: 1; letter-spacing: 0.005em; margin: 0; max-width: 17ch; }
+.home-hero h1 { font-family: var(--sign); font-weight: 700; font-size: clamp(2.125rem, 4.2vw, 3.25rem); line-height: 1.08; letter-spacing: -0.03em; margin: 0; max-width: 17ch; }
 .home-hero .lede { font-size: 1.0625rem; line-height: 1.65; color: rgba(255,255,255,0.82); max-width: 33rem; }
 .home-hero .note { display: inline-block; font-size: 0.875rem; color: rgba(255,255,255,0.85); text-decoration: underline; text-decoration-color: rgba(255,255,255,0.35); text-underline-offset: 4px; }
 .home-hero .note:hover { color: #fff; text-decoration-color: #fff; }
@@ -76,13 +76,13 @@
 /* Snow report board */
 .report { background: #f7f5f0; color: #1d232b; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); overflow: hidden; }
 .report-head { display: flex; align-items: baseline; justify-content: space-between; padding: 0.85rem 1.1rem 0.7rem; background: #1d232b; color: #f7f5f0; }
-.report-head h2 { font-family: var(--sign); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1; margin: 0; }
+.report-head h2 { font-family: var(--sign); font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1; margin: 0; }
 .report-head span { font-size: 0.75rem; opacity: 0.7; }
 .report-big { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid rgba(0,0,0,0.1); }
 .report-big > div { padding: 0.9rem 1.1rem; }
 .report-big > div + div { border-left: 1px solid rgba(0,0,0,0.1); }
 .report-label { font-size: 0.75rem; color: #5b6470; }
-.report-num { font-family: var(--sign); font-size: 2.5rem; font-weight: 600; line-height: 1; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
+.report-num { font-family: var(--sign); font-size: 2rem; font-weight: 600; letter-spacing: -0.03em; line-height: 1; margin-top: 0.15rem; font-variant-numeric: tabular-nums; }
 .report-rows > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 1.1rem; font-size: 0.875rem; border-top: 1px solid rgba(0,0,0,0.08); }
 .report-rows > div:first-child { border-top: 0; }
 .report-rows dt { color: #5b6470; }
@@ -90,7 +90,7 @@
 
 /* Plain sections */
 .home-section { padding: 4rem 0; }
-.home-section h2 { font-family: var(--sign); font-size: 2.25rem; font-weight: 700; line-height: 1.05; margin: 0; }
+.home-section h2 { font-family: var(--sign); font-size: 1.75rem; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; margin: 0; }
 .prose-home p { font-size: 1rem; line-height: 1.7; color: color-mix(in oklab, var(--color-base-content) 80%, transparent); max-width: 38rem; }
 .prose-home p + p { margin-top: 0.9rem; }
 .muted { color: color-mix(in oklab, var(--color-base-content) 58%, transparent); }
@@ -112,7 +112,7 @@
 /* How a season goes */
 .steps { counter-reset: step; list-style: none; margin: 0; padding: 0; }
 .steps li { counter-increment: step; position: relative; padding: 0 0 1.1rem 2.25rem; font-size: 0.9875rem; line-height: 1.6; color: color-mix(in oklab, var(--color-base-content) 80%, transparent); }
-.steps li::before { content: counter(step); position: absolute; left: 0; top: 0.05rem; font-family: var(--sign); font-weight: 700; font-size: 1.25rem; line-height: 1.2; color: var(--color-base-content); }
+.steps li::before { content: counter(step); position: absolute; left: 0; top: 0.05rem; font-family: var(--sign); font-weight: 700; font-size: 1rem; line-height: 1.6; color: var(--color-base-content); }
 .steps b { color: var(--color-base-content); font-weight: 600; }
 .map-frame { display: block; border-radius: 6px; overflow: hidden; border: 1px solid var(--color-base-300); }
 .map-frame img { display: block; width: 100%; height: auto; }
