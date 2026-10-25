@@ -607,14 +607,8 @@ class GameTick extends BaseCommand
             // ==============================
             // ENERGY & WATER CONSTRUCTION + DECAY + GRID TARIFFS
             // ==============================
-            $energyConfig = [
-                'solar' => ['upkeep' => 20], 'wind' => ['upkeep' => 40], 'hydro' => ['upkeep' => 150],
-                'geothermal' => ['upkeep' => 300], 'biomass' => ['upkeep' => 100], 'substation' => ['upkeep' => 50],
-            ];
-            $waterConfig = [
-                'snow_melt' => ['upkeep' => 15], 'reservoir' => ['upkeep' => 50], 'well' => ['upkeep' => 80],
-                'lake_intake' => ['upkeep' => 120], 'recycle' => ['upkeep' => 70], 'tank' => ['upkeep' => 30],
-            ];
+            // Source types, upkeep and wear come from resource_types (App\Libraries\Utilities), same as the pages
+            $resourceConfig = ['energy' => \App\Libraries\Utilities::config('energy'), 'water' => \App\Libraries\Utilities::config('water')];
 
             $totalEnergyOutput = 0;
             $totalWaterOutput = 0;
@@ -636,14 +630,14 @@ class GameTick extends BaseCommand
                     if ($res['status'] !== 'active') continue;
 
                     // Bill facility upkeep
-                    $upkeepCfg = $resType === 'energy' ? ($energyConfig[$res['source_type']]['upkeep'] ?? 25) : ($waterConfig[$res['source_type']]['upkeep'] ?? 25);
-                    $dayExpenses += $upkeepCfg;
+                    $resCfg = $resourceConfig[$resType][$res['source_type']] ?? ['upkeep' => (int) $res['cost_per_day'], 'decay' => 0.2];
+                    $dayExpenses += (int) round($resCfg['upkeep'] * $costMult);
 
                     // Track active generation
                     if ($resType === 'energy') $totalEnergyOutput += (int) ($res['output_kwh'] ?? 0);
                     if ($resType === 'water') $totalWaterOutput += (int) ($res['output_liters'] ?? 0);
 
-                    $resDecay = $resType === 'energy' ? 0.3 : 0.2;
+                    $resDecay = $resCfg['decay'] * $decayMult;
                     $resNewCond = max(0, $res['condition_pct'] - $resDecay);
                     if ($resNewCond <= 0) {
                         $db->table($resTable)->where('id', $res['id'])->update(['condition_pct' => 0, 'status' => 'broken']);
@@ -654,11 +648,13 @@ class GameTick extends BaseCommand
                 }
             }
 
-            // Energy demand vs output: grid import if deficit
-            $totalEnergyDemand = $snowmakingEnergy + (count($lights) * 80) + ($openLifts * 30) + (count($buildings) * 20);
-            if ($totalEnergyDemand > $totalEnergyOutput && $totalEnergyOutput >= 0) {
+            // Energy demand vs output: grid import if deficit. Difficulties that hide the energy/water
+            // pages (easy) can't build sources, so they aren't billed for imports either.
+            $hiddenPages = array_map('trim', explode(',', (string) ($diffConfig['hidden_pages'] ?? '')));
+            $totalEnergyDemand = \App\Libraries\Utilities::energyDemand($activeSnowmakers, count($lights), $openLifts, count($buildings))['total'];
+            if ($totalEnergyDemand > $totalEnergyOutput && !in_array('energy', $hiddenPages, true)) {
                 $energyDeficit = $totalEnergyDemand - $totalEnergyOutput;
-                $gridTariff = (int) round($energyDeficit * 0.15); // €0.15 / kWh
+                $gridTariff = \App\Libraries\Utilities::importCost('energy', $energyDeficit);
                 $dayExpenses += $gridTariff;
                 if ($gridTariff >= 250) {
                     log_activity($userId, 'energy_grid', 'Grid Import: Drew ' . number_format($energyDeficit) . ' kWh from municipal grid (' . currency($gridTariff) . ')', 'fa-solid fa-bolt');
@@ -666,10 +662,9 @@ class GameTick extends BaseCommand
             }
 
             // Water demand vs output: municipal reservoir import if deficit
-            if ($snowmakingWater > $totalWaterOutput && $totalWaterOutput >= 0) {
+            if ($snowmakingWater > $totalWaterOutput && !in_array('water', $hiddenPages, true)) {
                 $waterDeficit = $snowmakingWater - $totalWaterOutput;
-                $waterTariff = (int) round($waterDeficit * 0.002); // €0.002 / Liter
-                $dayExpenses += $waterTariff;
+                $dayExpenses += \App\Libraries\Utilities::importCost('water', $waterDeficit);
             }
 
             // ==============================
