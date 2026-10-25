@@ -115,6 +115,10 @@ $routes->get('/tournaments', 'Tournaments::index');
 $routes->get('/transportation', 'Buildings::show/transportation');
 $routes->get('/updates', 'Updates::index');
 $routes->match(['get', 'head'], '/health', 'Health::index');
+// API discovery (RFC 9727 catalog, OpenAPI description, human docs)
+$routes->match(['get', 'head'], '/.well-known/api-catalog', 'Developers::apiCatalog');
+$routes->get('/openapi.json', 'Developers::openapi');
+$routes->get('/developers', 'Developers::index');
 $routes->get('/maintenance', 'Home::maintenance');
 $routes->get('/api/resort-data', 'Api::resortData');
 $routes->options('/api/resort-data', 'Api::resortData');
