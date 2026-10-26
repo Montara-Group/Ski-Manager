@@ -46,10 +46,6 @@ class ResortMap extends BaseController
         if (!$userId) return redirect()->to('/login');
 
         $map = $this->request->getPost('map') ?? $this->request->getPost('resort_map');
-        if (!$map && stripos($this->request->getHeaderLine('Content-Type'), 'application/json') !== false) {
-            $json = $this->request->getJSON(true) ?? [];
-            $map = $json['map'] ?? ($json['resort_map'] ?? null);
-        }
 
         // Check either key or name
         $foundKey = null;
@@ -220,11 +216,6 @@ class ResortMap extends BaseController
         $sectorId   = (int) ($data['sector'] ?? 0);
         $lengthM    = max(1, (int) ($data['length_meters'] ?? 0));
         $name       = trim((string) ($data['name'] ?? '')) ?: 'Unnamed';
-        $resortMap  = trim((string) ($data['resort_map'] ?? '')) ?: $this->getSelectedMap();
-        if (!isset(self::RESORT_MAPS[$resortMap])) {
-            $resortMap = $this->getSelectedMap();
-        }
-
         $row = [
             'type'          => $type,
             'name'          => $name,
@@ -232,7 +223,7 @@ class ResortMap extends BaseController
             'length_meters' => $lengthM,
             'sector'        => $sectorId,
             'difficulty'    => $difficulty,
-            'resort_map'    => $resortMap,
+            'resort_map'    => $this->getSelectedMap(),
             'active'        => 1,
         ];
 
@@ -242,7 +233,7 @@ class ResortMap extends BaseController
             if (!$existing) {
                 return $this->response->setStatusCode(404)->setJSON(['error' => 'Segment not found', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
             }
-            if (empty($data['resort_map']) && !empty($existing['resort_map'])) {
+            if (!empty($existing['resort_map'])) {
                 $row['resort_map'] = $existing['resort_map'];
             }
             $model->update($segId, $row);
@@ -368,6 +359,9 @@ class ResortMap extends BaseController
         $length = (float) ($segment['length_meters'] ?? 0);
         $cost   = self::calcCost($segment['type'], $liftType, $seats, $length);
 
+        // Resolve game day and any pending season rollover before checking funds and beginning transaction
+        $gameDay = getGameDay();
+
         $itemData = [
             'user_id'       => $userId,
             'segment_id'    => $segmentId,
@@ -430,7 +424,7 @@ class ResortMap extends BaseController
 
         $db->table('financial_transactions')->insert([
             'user_id'     => $userId,
-            'game_day'    => getGameDay(),
+            'game_day'    => $gameDay,
             'category'    => 'Construction',
             'description' => 'Constructed ' . $itemData['name'],
             'amount'      => $cost,
