@@ -44,8 +44,12 @@ class ResortMap extends BaseController
     {
         $userId = auth()->id();
         if (!$userId) return redirect()->to('/login');
-        $json = $this->request->getJSON(true) ?? [];
-        $map = $this->request->getPost('map') ?? $this->request->getPost('resort_map') ?? ($json['map'] ?? ($json['resort_map'] ?? null));
+
+        $map = $this->request->getPost('map') ?? $this->request->getPost('resort_map');
+        if (!$map && stripos($this->request->getHeaderLine('Content-Type'), 'application/json') !== false) {
+            $json = $this->request->getJSON(true) ?? [];
+            $map = $json['map'] ?? ($json['resort_map'] ?? null);
+        }
 
         // Check either key or name
         $foundKey = null;
@@ -82,10 +86,6 @@ class ResortMap extends BaseController
 
     public function index()
     {
-        if ($this->request->getMethod() === 'head') {
-            return $this->response->setStatusCode(200);
-        }
-
         $resortMap  = $this->getSelectedMap();
         $mapConfig  = self::RESORT_MAPS[$resortMap] ?? self::RESORT_MAPS['ParkCity'];
         $isAdmin    = $this->isAdmin();
@@ -159,10 +159,6 @@ class ResortMap extends BaseController
 
     public function getSegments()
     {
-        if ($this->request->getMethod() === 'head') {
-            return $this->response->setStatusCode(200);
-        }
-
         $resortMap = $this->getSelectedMap();
         $isAdmin   = $this->isAdmin();
         $db        = db_connect();
@@ -298,7 +294,6 @@ class ResortMap extends BaseController
         }
 
         $model->delete($segId);
-        db_connect()->table('player_items')->where('segment_id', $segId)->update(['segment_id' => null]);
 
         return $this->response->setJSON([
             'success'    => true,
@@ -370,14 +365,6 @@ class ResortMap extends BaseController
             $seats = $seatOptions[$liftType][0];
         }
 
-        $exists = $db->table('player_items')
-            ->where('user_id', $userId)
-            ->where('segment_id', $segmentId)
-            ->countAllResults();
-        if ($exists) {
-            return $this->response->setStatusCode(400)->setJSON(['error' => 'Already built', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
-        }
-
         $length = (float) ($segment['length_meters'] ?? 0);
         $cost   = max(100, self::calcCost($segment['type'], $liftType, $seats, $length));
 
@@ -397,8 +384,29 @@ class ResortMap extends BaseController
 
         $db->transStart();
 
-        $fin = $db->table('player_finances')->where('user_id', $userId)->where('cash >=', $cost)->get()->getRowArray();
-        if (!$fin) {
+        // 1. Check for duplicate build inside transaction with FOR UPDATE lock
+        $existing = $db->query(
+            'SELECT id FROM player_items WHERE user_id = ? AND segment_id = ? FOR UPDATE',
+            [$userId, $segmentId]
+        )->getRowArray();
+
+        if ($existing) {
+            $db->transRollback();
+            return $this->response->setStatusCode(400)->setJSON([
+                'error'      => 'Already built',
+                'csrf_token' => csrf_token(),
+                'csrf_hash'  => csrf_hash(),
+            ]);
+        }
+
+        // 2. Atomic balance deduction with affordability condition
+        $db->table('player_finances')
+            ->where('user_id', $userId)
+            ->where('cash >=', $cost)
+            ->set('cash', "cash - {$cost}", false)
+            ->update();
+
+        if ($db->affectedRows() === 0) {
             $db->transRollback();
             $currFin = $db->table('player_finances')->select('cash')->where('user_id', $userId)->get()->getRowArray();
             $cash = (int) ($currFin['cash'] ?? 0);
@@ -411,7 +419,7 @@ class ResortMap extends BaseController
             ]);
         }
 
-        $db->table('player_finances')->where('user_id', $userId)->set('cash', "cash - {$cost}", false)->update();
+        // 3. Insert built item and financial transaction
         $db->table('player_items')->insert($itemData);
         $itemData['id']      = (int) $db->insertID();
         $itemData['salvage'] = self::salvageValue($itemData);

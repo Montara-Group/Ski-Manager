@@ -6,10 +6,6 @@ class MapImage extends BaseController
 {
     public function serve(string $key)
     {
-        if ($this->request->getMethod() === 'head') {
-            return $this->response->setStatusCode(auth()->loggedIn() ? 200 : 401);
-        }
-
         if (!auth()->loggedIn()) {
             return $this->response->setStatusCode(401);
         }
@@ -19,7 +15,7 @@ class MapImage extends BaseController
             return $this->response->setStatusCode(404);
         }
 
-        $path = WRITEPATH . 'maps/' . basename($key) . '.jpg';
+        $path = WRITEPATH . 'maps/' . $key . '.jpg';
         if (!is_file($path)) {
             return $this->response->setStatusCode(404);
         }
