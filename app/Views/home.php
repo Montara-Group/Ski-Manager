@@ -3,46 +3,24 @@
 <?= $this->section('content') ?>
 
 <?php
-    $db = db_connect();
-    $playerCount = $db->table('users')->where('id !=', 1)->countAllResults(false);
-    $totalSlopes = $db->table('player_items')->where('item_type', 'slope')->countAllResults(false);
-    $topPlayer = $db->query("SELECT u.username, pf.cash FROM player_finances pf JOIN users u ON u.id = pf.user_id WHERE u.id != 1 ORDER BY pf.cash DESC LIMIT 1")->getRowArray();
-    $weather = getCurrentWeather();
+    $playerCount = $playerCount ?? 0;
+    $totalSlopes = $totalSlopes ?? 0;
+    $topPlayer = $topPlayer ?? null;
+    $weather = $weather ?? (function_exists('getCurrentWeather') ? getCurrentWeather() : null);
 
-    $currentSeasonNum = (int) getSeasonNumber();
-    $seasonDay = (int) getSeasonDay();
-    $seasonLen = (int) getSeasonLength();
-    $daysRemaining = max(0, $seasonLen - $seasonDay);
-    $seasonStart = strtotime(getSeasonStartDate());
+    $currentSeasonNum = (int) ($currentSeasonNum ?? (function_exists('getSeasonNumber') ? getSeasonNumber() : 1));
+    $seasonDay = (int) ($seasonDay ?? (function_exists('getSeasonDay') ? getSeasonDay() : 1));
+    $seasonLen = (int) ($seasonLen ?? (function_exists('getSeasonLength') ? getSeasonLength() : 100));
+    $daysRemaining = (int) ($daysRemaining ?? max(0, $seasonLen - $seasonDay));
+    $seasonStart = $seasonStart ?? (function_exists('getSeasonStartDate') ? strtotime(getSeasonStartDate()) : time());
 
-    // Season 2 note: only once Sector 2 is actually released, with counts from the real map
-    $__s2 = $db->table('resort_sectors')->where('resort_map', 'ParkCity')->where('name', 'Sector 2')->get()->getRowArray();
-    $__s2Live = $currentSeasonNum >= 2 && $__s2 && (int) $__s2['released'] === 1;
-    $__s2Runs = $__s2Lifts = $__s2Steep = 0;
-    $__standings = [];
-    if ($__s2Live) {
-        foreach ($db->table('map_segments')->select('type, difficulty, COUNT(*) AS n')->where('sector', $__s2['id'])->where('active', 1)->groupBy('type, difficulty')->get()->getResultArray() as $__r) {
-            if ($__r['type'] === 'lift') { $__s2Lifts += (int) $__r['n']; continue; }
-            $__s2Runs += (int) $__r['n'];
-            if (in_array($__r['difficulty'], ['black', 'double_black'], true)) $__s2Steep += (int) $__r['n'];
-        }
-        if ($db->tableExists('season_leaderboard_archives')) {
-            // Demo accounts were ranked by the Season 1 rollover; keep them off the public standings
-            $__standings = $db->table('season_leaderboard_archives a')->select('a.username, a.resort_name, a.cash, a.total_lifts, a.total_slopes')
-                ->join('users u', 'u.id = a.user_id', 'left')
-                ->where('a.season_number', 1)
-                ->groupStart()->where('u.status IS NULL')->orWhere('u.status !=', 'demo')->groupEnd()
-                ->orderBy('a.rank_position', 'ASC')->limit(5)->get()->getResultArray();
-        }
-    }
-    $__s2JustOpened = $__s2Live && $currentSeasonNum === 2 && $seasonDay <= 14;
-
-    // What people built lately (real players only)
-    $__recent = $db->table('player_items pi')->select('pi.name, pi.item_type, pi.difficulty, pi.created_at, u.username')
-        ->join('users u', 'u.id = pi.user_id')
-        ->where('u.id !=', 1)
-        ->groupStart()->where('u.status IS NULL')->orWhere('u.status !=', 'demo')->groupEnd()
-        ->orderBy('pi.id', 'DESC')->limit(6)->get()->getResultArray();
+    $__s2Live = $__s2Live ?? false;
+    $__s2Runs = $__s2Runs ?? 0;
+    $__s2Lifts = $__s2Lifts ?? 0;
+    $__s2Steep = $__s2Steep ?? 0;
+    $__s2JustOpened = $__s2JustOpened ?? false;
+    $__standings = $__standings ?? [];
+    $__recent = $__recent ?? [];
 
     $__wCond  = $weather ? ($weather['condition_name'] ?? $weather['condition'] ?? '') : '';
     $__wFresh = $weather ? (int) ($weather['snowfall'] ?? 0) : 0;

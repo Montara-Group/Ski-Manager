@@ -14,7 +14,104 @@ class Home extends BaseController
             '</sitemap.xml>; rel="describedby"; type="text/xml"',
         ]));
 
-        return view('home');
+        $data = $this->getHomepageStats();
+
+        return view('home', $data);
+    }
+
+    /**
+     * Gathers public statistics and season metrics for the landing page.
+     */
+    protected function getHomepageStats(): array
+    {
+        $db = db_connect();
+
+        $playerCount = $db->table('users')->where('id !=', 1)->countAllResults(false);
+        $totalSlopes = $db->table('player_items')->where('item_type', 'slope')->countAllResults(false);
+        $topPlayer = $db->query(
+            "SELECT u.username, pf.cash FROM player_finances pf JOIN users u ON u.id = pf.user_id WHERE u.id != 1 ORDER BY pf.cash DESC LIMIT 1"
+        )->getRowArray();
+        $weather = function_exists('getCurrentWeather') ? getCurrentWeather() : null;
+
+        $currentSeasonNum = function_exists('getSeasonNumber') ? (int) getSeasonNumber() : 1;
+        $seasonDay = function_exists('getSeasonDay') ? (int) getSeasonDay() : 1;
+        $seasonLen = function_exists('getSeasonLength') ? (int) getSeasonLength() : 100;
+        $daysRemaining = max(0, $seasonLen - $seasonDay);
+        $seasonStart = function_exists('getSeasonStartDate') ? strtotime(getSeasonStartDate()) : time();
+
+        // Season 2 note: only once Sector 2 is actually released, with counts from the real map
+        $s2 = $db->table('resort_sectors')->where('resort_map', 'ParkCity')->where('name', 'Sector 2')->get()->getRowArray();
+        $s2Live = $currentSeasonNum >= 2 && $s2 && (int) $s2['released'] === 1;
+        $s2Runs = 0;
+        $s2Lifts = 0;
+        $s2Steep = 0;
+        $standings = [];
+
+        if ($s2Live) {
+            $segments = $db->table('map_segments')
+                ->select('type, difficulty, COUNT(*) AS n')
+                ->where('sector', $s2['id'])
+                ->where('active', 1)
+                ->groupBy('type, difficulty')
+                ->get()
+                ->getResultArray();
+
+            foreach ($segments as $r) {
+                if ($r['type'] === 'lift') {
+                    $s2Lifts += (int) $r['n'];
+                    continue;
+                }
+                $s2Runs += (int) $r['n'];
+                if (in_array($r['difficulty'], ['black', 'double_black'], true)) {
+                    $s2Steep += (int) $r['n'];
+                }
+            }
+
+            if ($db->tableExists('season_leaderboard_archives')) {
+                // Demo accounts were ranked by the Season 1 rollover; keep them off the public standings
+                $standings = $db->table('season_leaderboard_archives a')
+                    ->select('a.username, a.resort_name, a.cash, a.total_lifts, a.total_slopes')
+                    ->join('users u', 'u.id = a.user_id', 'left')
+                    ->where('a.season_number', 1)
+                    ->groupStart()->where('u.status IS NULL')->orWhere('u.status !=', 'demo')->groupEnd()
+                    ->orderBy('a.rank_position', 'ASC')
+                    ->limit(5)
+                    ->get()
+                    ->getResultArray();
+            }
+        }
+
+        $s2JustOpened = $s2Live && $currentSeasonNum === 2 && $seasonDay <= 14;
+
+        // What people built lately (real players only)
+        $recent = $db->table('player_items pi')
+            ->select('pi.name, pi.item_type, pi.difficulty, pi.created_at, u.username')
+            ->join('users u', 'u.id = pi.user_id')
+            ->where('u.id !=', 1)
+            ->groupStart()->where('u.status IS NULL')->orWhere('u.status !=', 'demo')->groupEnd()
+            ->orderBy('pi.id', 'DESC')
+            ->limit(6)
+            ->get()
+            ->getResultArray();
+
+        return [
+            'playerCount'     => $playerCount,
+            'totalSlopes'     => $totalSlopes,
+            'topPlayer'       => $topPlayer,
+            'weather'         => $weather,
+            'currentSeasonNum'=> $currentSeasonNum,
+            'seasonDay'       => $seasonDay,
+            'seasonLen'       => $seasonLen,
+            'daysRemaining'   => $daysRemaining,
+            'seasonStart'     => $seasonStart,
+            '__s2Live'        => $s2Live,
+            '__s2Runs'        => $s2Runs,
+            '__s2Lifts'       => $s2Lifts,
+            '__s2Steep'       => $s2Steep,
+            '__s2JustOpened'  => $s2JustOpened,
+            '__standings'     => $standings,
+            '__recent'        => $recent,
+        ];
     }
 
     public function maintenance(): string
@@ -28,4 +125,3 @@ class Home extends BaseController
         return view('maintenance', ['maintenance' => $info]);
     }
 }
-
