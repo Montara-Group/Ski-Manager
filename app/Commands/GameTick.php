@@ -29,6 +29,8 @@ class GameTick extends BaseCommand
         $seasonNum = function_exists('getSeasonNumber') ? (int) getSeasonNumber() : 1;
 
         CLI::write("Game Tick — Day {$gameDay} (Season day {$seasonDay}, " . ($isWinter ? 'Winter' : 'Summer') . ")", 'green');
+        // Today's and tomorrow's weather (App\Libraries\Weather generates any missing day)
+        \App\Libraries\Weather::ensure($gameDay + 1);
 
         $users = $db->table('users')->get()->getResultArray();
 
@@ -242,6 +244,8 @@ class GameTick extends BaseCommand
             // LIFT/SLOPE CONDITION DECAY (mechanics reduce lift decay)
             // ==============================
             $items = $db->table('player_items')->where('user_id', $userId)->where('status', 'open')->get()->getResultArray();
+            // Snow guns protect the slopes they cover from a thin natural base (cold days only)
+            $snowCovered = $v2 ? \App\Libraries\Weather::coveredSlopes(array_filter($items, fn($i) => $i['item_type'] === 'slope'), $activeSnowmakers, (int) ($weather['temp'] ?? 0)) : [];
             foreach ($items as $item) {
                 $decay = rand(0, 2);
                 if ($item['item_type'] === 'lift' && $countAssigned('mechanic') > 0) {
@@ -249,7 +253,7 @@ class GameTick extends BaseCommand
                 }
                 // v2: slopes wear by difficulty and weather (App\Libraries\Grooming); groomers restore them below
                 if ($v2 && $item['item_type'] === 'slope') {
-                    $decay = \App\Libraries\Grooming::decay($item, $weather);
+                    $decay = \App\Libraries\Grooming::decay($item, $weather, isset($snowCovered[(int) $item['id']]));
                 }
                 $newCond = max(0, (int) $item['condition_pct'] - $decay);
                 $db->table('player_items')->where('id', $item['id'])->update(['condition_pct' => $newCond]);
@@ -307,7 +311,7 @@ class GameTick extends BaseCommand
                 elseif ($v2) {
                     // v2: only slopes the night shift actually groomed count as groomed
                     if (isset($groomedToday[(int) $sl['id']])) { $q = "groomed"; }
-                    elseif (($weather["condition_name"] ?? "") === "Freezing Rain") { $q = "icy"; }
+                    elseif (in_array($weather["condition_name"] ?? "", ["Freezing Rain", "Rain"], true)) { $q = "icy"; }
                     elseif (($weather["condition_name"] ?? "") === "Sunny" && ($weather["temp"] ?? -5) >= 0) { $q = $hasSnowmaking ? "packed" : "bare"; }
                 }
                 elseif (($weather["snowfall"] ?? 0) >= 1) { $q = $activeGroomers > 0 ? "groomed" : "packed"; }
@@ -408,7 +412,8 @@ class GameTick extends BaseCommand
             if ($v2) {
                 // Demand comes from the slopes, is damped by ticket prices and the regional market,
                 // and can't exceed what the open lifts carry
-                $demand = \App\Libraries\Economy::slopeDemand($slopesForQuality) * (1 + $totalBoost / 100) * $visMult;
+                $weatherFactor = \App\Libraries\Weather::demandFactor((string) ($weather['condition_name'] ?? ''), (int) ($weather['wind'] ?? 0));
+                $demand = \App\Libraries\Economy::slopeDemand($slopesForQuality) * (1 + $totalBoost / 100) * $visMult * $weatherFactor;
                 if (in_array('visitor_boost', $activeBoostTypes)) $demand *= 1.5;
                 $demand = \App\Libraries\Economy::marketCap($demand);
                 $allTickets = $db->table('lift_tickets')->where('user_id', $userId)->get()->getResultArray();
@@ -426,7 +431,7 @@ class GameTick extends BaseCommand
 
                 $ticketRevenue = (int) round($visitors * $ticketTerms['per_visit']);
                 $dayIncome += (int) round($ticketRevenue * $revMult);
-                $breakdown += ['tickets' => (int) round($ticketRevenue * $revMult), 'demand' => (int) round($demand), 'price_demand' => round($ticketTerms['demand'], 3),
+                $breakdown += ['tickets' => (int) round($ticketRevenue * $revMult), 'demand' => (int) round($demand), 'weather_factor' => $weatherFactor, 'price_demand' => round($ticketTerms['demand'], 3),
                     'per_visit' => round($ticketTerms['per_visit'], 2), 'lift_capacity' => $liftCapacity, 'turned_away' => $turnedAwayByLifts];
                 if ($visitors > 0) {
                     $prices = array_column($allTickets, 'price', 'ticket_type') ?: \App\Libraries\Economy::TICKET_REFERENCE;
@@ -862,76 +867,6 @@ class GameTick extends BaseCommand
                 CLI::write("  ERROR processing user {$userId}: " . $e->getMessage(), "red");
                 log_message("error", "GameTick user {$userId} failed: " . $e->getMessage());
             }
-        }
-
-        // ==============================
-        // WEATHER GENERATION
-        // ==============================
-        $tomorrow = $gameDay + 1;
-        $weatherExists = $db->table('weather')->where('game_day', $tomorrow)->countAllResults();
-        if (!$weatherExists) {
-            CLI::write("Generating weather for day {$tomorrow}...", 'cyan');
-            $seed = crc32('skimanager-weather-s' . $seasonNum . '-day-' . $tomorrow);
-            mt_srand($seed);
-
-            $tomorrowSeasonDay = (($tomorrow - 1) % getSeasonLength()) + 1;
-            $winterDays = getWinterDays();
-            $isDeepWinter = $tomorrowSeasonDay >= 30 && $tomorrowSeasonDay <= ($winterDays - 20);
-            $isTomorrowSummer = $tomorrowSeasonDay > getWinterDays();
-
-            if ($isTomorrowSummer) {
-                $temp = mt_rand(18, 25);
-                $conditions = ['Sunny', 'Partly Cloudy', 'Cloudy'];
-                $weights = [50, 35, 15];
-            } elseif ($isDeepWinter) {
-                $temp = mt_rand(-10, 0);
-                $conditions = ['Sunny', 'Partly Cloudy', 'Cloudy', 'Light Snow', 'Heavy Snow', 'Blizzard'];
-                $weights = [10, 15, 15, 25, 20, 15];
-            } else {
-                $temp = mt_rand(-5, 8);
-                $conditions = ['Sunny', 'Partly Cloudy', 'Cloudy', 'Light Snow', 'Heavy Snow', 'Freezing Rain'];
-                $weights = [20, 25, 20, 20, 10, 5];
-            }
-
-            $roll = mt_rand(1, array_sum($weights));
-            $cumulative = 0;
-            $condition = $conditions[0];
-            foreach ($conditions as $i => $c) {
-                $cumulative += $weights[$i];
-                if ($roll <= $cumulative) { $condition = $c; break; }
-            }
-            $wind = mt_rand(5, 30);
-            $snowfall = (!$isTomorrowSummer && in_array($condition, ['Light Snow', 'Heavy Snow', 'Blizzard'])) ? mt_rand(1, 20) : 0;
-            $prev = $db->table('weather')->orderBy('game_day', 'DESC')->limit(1)->get()->getRowArray();
-            $prevBase = $prev ? (int) $prev['snow_base'] : ($isTomorrowSummer ? 0 : 50);
-            $snowBase = $isTomorrowSummer ? max(0, $prevBase - mt_rand(30, 60)) : max(0, $prevBase + $snowfall - ($condition === 'Sunny' ? mt_rand(1, 3) : 0));
-            $visMap = ['Sunny' => 'Excellent', 'Partly Cloudy' => 'Good', 'Cloudy' => 'Good', 'Light Snow' => 'Moderate', 'Heavy Snow' => 'Poor', 'Blizzard' => 'Very Poor', 'Freezing Rain' => 'Poor'];
-
-            $forecast = [];
-            for ($d = 1; $d <= 5; $d++) {
-                $fDay = $tomorrow + $d;
-                $fSeasonDay = (($fDay - 1) % getSeasonLength()) + 1;
-                $fIsSummer = $fSeasonDay > getWinterDays();
-                mt_srand(crc32('skimanager-weather-s' . $seasonNum . '-day-' . $fDay));
-                if ($fIsSummer) {
-                    $fTemp = mt_rand(18, 25);
-                    $fConds = ['Sunny', 'Partly Cloudy', 'Cloudy'];
-                    $fc = $fConds[mt_rand(0, count($fConds) - 1)];
-                    $fSnow = 0;
-                } else {
-                    $fTemp = $temp + mt_rand(-3, 3);
-                    $fc = $conditions[mt_rand(0, count($conditions) - 1)];
-                    $fSnow = in_array($fc, ['Light Snow', 'Heavy Snow', 'Blizzard']) ? mt_rand(1, 20) : 0;
-                }
-                $forecast[] = ['day' => $d, 'temp' => $fTemp, 'condition' => $fc, 'snowfall' => $fSnow];
-            }
-
-            $db->table('weather')->insert([
-                'game_day' => $tomorrow, 'temp' => $temp, 'condition_name' => $condition,
-                'wind' => $wind, 'snowfall' => $snowfall, 'visibility' => $visMap[$condition] ?? 'Good',
-                'humidity' => mt_rand(40, 95), 'snow_base' => $snowBase,
-                'forecast' => json_encode($forecast), 'created_at' => date('Y-m-d H:i:s'),
-            ]);
         }
 
         // Storage Maintenance: Prune old activity logs & financial records to keep storage bounded

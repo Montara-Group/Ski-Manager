@@ -47,6 +47,7 @@ function weatherEmoji(string $condition): string
         'Heavy Snow' => '❄️',
         'Blizzard' => '🌪️',
         'Freezing Rain' => '🌧️',
+        'Rain' => '🌧️',
         default => '☁️',
     };
 }
@@ -61,6 +62,7 @@ function weatherIcon(string $condition): string
         'Heavy Snow' => 'fa-snowflake text-info',
         'Blizzard' => 'fa-wind text-info',
         'Freezing Rain' => 'fa-cloud-rain text-primary',
+        'Rain' => 'fa-cloud-showers-heavy text-info',
         default => 'fa-cloud-sun text-warning',
     };
 }
@@ -75,7 +77,8 @@ function getCurrentWeather(): array
     $db = db_connect();
     $gameDay = function_exists('getGameDay') ? getGameDay() : 1;
 
-    // 1. ALWAYS query for today's active game day
+    // Generates today's (and tomorrow's) row if the tick hasn't, e.g. right after a season starts
+    \App\Libraries\Weather::ensure($gameDay + 1);
     $row = $db->table('weather')->where('game_day', $gameDay)->get()->getRowArray();
 
     if (!$row) {

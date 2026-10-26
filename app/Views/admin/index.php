@@ -285,7 +285,7 @@
                 <div class="grid grid-cols-2 gap-x-3 gap-y-2.5 mb-3">
                     <div class="col-span-2"><label class="field-label" for="wCond">Condition</label>
                     <select name="condition" id="wCond" class="select select-sm w-full">
-                        <?php foreach (['Sunny', 'Partly Cloudy', 'Cloudy', 'Light Snow', 'Heavy Snow', 'Blizzard', 'Freezing Rain'] as $__c) : ?>
+                        <?php foreach (array_keys(\App\Libraries\Weather::VISIBILITY) as $__c) : ?>
                             <option value="<?= $__c ?>" <?= ($weather['condition_name'] ?? 'Light Snow') === $__c ? 'selected' : '' ?>><?= $__c ?></option>
                         <?php endforeach ?>
                     </select></div>

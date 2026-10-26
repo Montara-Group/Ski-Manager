@@ -20,11 +20,17 @@ class Grooming extends BaseController
 
         $sectorNames = array_column($db->table('resort_sectors')->select('id, name')->get()->getResultArray(), 'name', 'id');
         $weather = getCurrentWeather();
-        $weatherRow = ['temp' => $weather['base_temp'] ?? $weather['temp'], 'snowfall' => $weather['snowfall'] ?? 0];
+        $weatherRow = ['temp' => $weather['base_temp'] ?? $weather['temp'], 'snowfall' => $weather['snowfall'] ?? 0,
+            'snow_base' => $weather['snow_base'] ?? 0, 'condition_name' => $weather['condition_name'] ?? ''];
+        $snowmakers = $db->table('equipment')->where('user_id', $userId)->where('equipment_type', 'snowmaker')->where('status', 'active')->get()->getResultArray();
+        $covered = \App\Libraries\Weather::coveredSlopes(array_filter($state['slopes'], fn($s) => $s['status'] === 'open'), $snowmakers, (int) $weatherRow['temp']);
+        $thinBase = (int) $weatherRow['snow_base'] < \App\Libraries\Weather::THIN_BASE;
 
         $slopes = [];
         foreach ($state['slopes'] as $s) {
-            $s['decay'] = Rules::decay($s, $weatherRow);
+            $s['snow_covered'] = isset($covered[(int) $s['id']]);
+            $s['thin_base'] = $thinBase && !$s['snow_covered'];
+            $s['decay'] = Rules::decay($s, $weatherRow, $s['snow_covered']);
             $s['draw_pct'] = (int) round(Economy::conditionFactor((int) $s['condition_pct']) * 100);
             $s['groomed_today'] = (int) $s['groomed_day'] === $state['gameDay'];
             $s['extra_cost'] = Rules::extraRunCost($s);
@@ -49,6 +55,8 @@ class Grooming extends BaseController
             'slopes' => $slopes,
             'sectors' => $sectors,
             'weather' => $weather,
+            'thinBase' => $thinBase,
+            'snowmakerCount' => count($snowmakers),
             'avgCondition' => $open ? (int) round(array_sum(array_column($open, 'condition_pct')) / count($open)) : 0,
             'avgDecay' => round($avgDecay, 1),
             'nightlyRestorePerSlope' => round($nightlyRestorePerSlope, 1),

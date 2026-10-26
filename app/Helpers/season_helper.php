@@ -244,20 +244,12 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
     try {
         $db->transStart();
 
-        // 0. Archive last season's weather and start the new season on day 1 with the latest conditions
+        // 0. Archive last season's weather; the new season's is generated from day 1 (App\Libraries\Weather)
         if ($db->tableExists('weather')) {
-            $latest = $db->table('weather')->orderBy('game_day', 'DESC')->limit(1)->get()->getRowArray();
             if ($db->table($weatherArchive)->countAllResults() === 0) {
                 $db->query("INSERT INTO `{$weatherArchive}` SELECT * FROM `weather`");
             }
             $db->table('weather')->emptyTable();
-            if ($latest) {
-                unset($latest['id']);
-                $latest['game_day']   = 1;
-                $latest['created_at'] = date('Y-m-d H:i:s');
-                if (array_key_exists('updated_at', $latest)) $latest['updated_at'] = null;
-                $db->table('weather')->insert($latest);
-            }
         }
 
         // 1. Snapshot current leaderboard standings into archives

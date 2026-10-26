@@ -106,22 +106,14 @@ class SeasonReset
         return $plan;
     }
 
-    /** Start the active season over on day 1 (weather back to day 1 with today's conditions) */
+    /** Start the active season over on day 1 (its weather is regenerated from day 1 by App\Libraries\Weather) */
     public static function restartActiveSeason(): array
     {
         $db = db_connect();
         $season = $db->table('seasons')->where('active', 1)->orderBy('season_number', 'DESC')->get()->getRowArray();
         if (!$season) throw new \RuntimeException('No active season');
 
-        $latest = $db->table('weather')->orderBy('game_day', 'DESC')->limit(1)->get()->getRowArray();
         $db->table('weather')->emptyTable();
-        if ($latest) {
-            unset($latest['id']);
-            $latest['game_day'] = 1;
-            $latest['created_at'] = date('Y-m-d H:i:s');
-            if (array_key_exists('updated_at', $latest)) $latest['updated_at'] = null;
-            $db->table('weather')->insert($latest);
-        }
         $db->table('seasons')->where('id', (int) $season['id'])->update(['start_date' => date('Y-m-d')]);
         return $season;
     }

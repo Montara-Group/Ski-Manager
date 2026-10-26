@@ -2,208 +2,123 @@
 <?= $this->section('title') ?>Weather<?= $this->endSection() ?>
 <?= $this->section('content') ?>
 <?php
-helper('weather');
-$wIcons = ['Sunny' => 'fa-sun text-warning', 'Partly Cloudy' => 'fa-cloud-sun text-info', 'Cloudy' => 'fa-cloud text-base-content/50', 'Light Snow' => 'fa-snowflake text-info', 'Heavy Snow' => 'fa-snowflake text-primary', 'Blizzard' => 'fa-wind text-error', 'Freezing Rain' => 'fa-cloud-rain text-error'];
-$condColors = ['Sunny' => 'badge-warning', 'Partly Cloudy' => 'badge-info', 'Cloudy' => 'badge-ghost', 'Light Snow' => 'badge-info', 'Heavy Snow' => 'badge-primary', 'Blizzard' => 'badge-error', 'Freezing Rain' => 'badge-error'];
-$startDate = getSeasonStartDate();
-$seasonDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
-$seasonPct = min(100, round(($seasonDay / getSeasonLength()) * 100));
-$isOffSeason = $seasonDay > getSeasonLength();
+use App\Libraries\Weather as W;
+use App\Libraries\Grooming as G;
+$phaseLabel = ['early' => 'Early winter', 'deep' => 'Deep winter', 'spring' => 'Spring', 'summer' => 'Summer'][$phase];
+$pct = fn(float $f) => ($f >= 1 ? '+' : '−') . abs((int) round(($f - 1) * 100)) . '%';
+$cond = $now['condition_name'];
+$maxBase = max(array_merge([W::THIN_BASE * 2], array_column($history, 'snow_base')));
 ?>
 <div class="max-w-5xl mx-auto p-4 lg:p-8">
-
     <div class="flex items-center gap-3 mb-6">
-        <a href="/dashboard" class="btn btn-ghost btn-sm btn-circle"><i class="fa-solid fa-chevron-left"></i></a>
+        <a href="/dashboard" class="btn btn-ghost btn-sm btn-circle" aria-label="Back to dashboard"><i class="fa-solid fa-chevron-left"></i></a>
         <div>
-            <h1 class="text-2xl font-bold"><i class="fa-solid fa-cloud-sun mr-2 text-info"></i>Weather & Climate</h1>
-            <p class="text-sm text-base-content/50">Day <?= $gameDay ?> · <?= date('g:i A') ?> · <?= $isOffSeason ? 'Off-Season' : 'Season 1' ?></p>
+            <h1 class="text-2xl font-bold"><i class="fa-solid fa-cloud-sun mr-2 text-info" aria-hidden="true"></i>Weather</h1>
+            <p class="text-sm text-base-content/60"><?= esc(getSeasonName()) ?> · day <?= $seasonDay ?> of <?= $seasonLength ?> · <?= $phaseLabel ?></p>
         </div>
     </div>
 
-    <!-- Current Weather -->
-    <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body p-4 md:p-6">
+    <!-- Now -->
+    <div class="card bg-base-100 shadow-sm mb-4"><div class="card-body p-4 md:p-6">
         <div class="flex flex-col md:flex-row md:items-center gap-6">
-            <div class="text-center md:text-left">
-                <i class="fa-solid <?= $wIcons[$weather['condition']] ?? 'fa-cloud' ?> text-5xl md:text-6xl mb-2"></i>
-                <div class="text-4xl md:text-5xl font-bold"><?= temp($weather['temp']) ?></div>
-                <div class="badge <?= $condColors[$weather['condition']] ?? 'badge-ghost' ?> mt-2"><?= $weather['condition'] ?></div>
-                <div class="text-xs text-base-content/40 mt-1">
-                    Feels like <?= temp($weather['temp'] - 3) ?>
-                    · High <?= temp($weather['base_temp'] + 4) ?> / Low <?= temp($weather['base_temp'] - 4) ?>
-                </div>
+            <div class="text-center md:text-left md:w-48 shrink-0">
+                <i class="fa-solid <?= weatherIcon($cond) ?> text-5xl mb-2" aria-hidden="true"></i>
+                <div class="text-4xl font-bold"><?= esc($now['temp_formatted']) ?></div>
+                <div class="font-semibold mt-1"><?= esc($cond) ?></div>
+                <div class="text-xs text-base-content/60">Day <?= temp((int) $now['base_temp'] + 4) ?> high · night <?= temp((int) $now['base_temp'] - 4) ?> low</div>
             </div>
-            <div class="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
-                <div class="bg-base-200 rounded-lg p-3">
-                    <div class="text-xs text-base-content/50"><i class="fa-solid fa-wind mr-1"></i>Wind</div>
-                    <div class="text-xl font-bold"><?= speed($weather['wind']) ?></div>
-                    <?php if ($weather['wind'] > 40) : ?><div class="text-xs text-error">Dangerous</div>
-                    <?php elseif ($weather['wind'] > 25) : ?><div class="text-xs text-warning">Strong</div>
-                    <?php else : ?><div class="text-xs text-success">Calm</div><?php endif ?>
-                </div>
-                <div class="bg-base-200 rounded-lg p-3">
-                    <div class="text-xs text-base-content/50"><i class="fa-solid fa-snowflake mr-1"></i>Snowfall</div>
-                    <div class="text-xl font-bold"><?= snow($weather['snowfall']) ?></div>
-                    <?php if ($weather['snowfall'] > 0) : ?><div class="text-xs text-info">Fresh powder</div>
-                    <?php else : ?><div class="text-xs text-base-content/40">None</div><?php endif ?>
-                </div>
-                <div class="bg-base-200 rounded-lg p-3">
-                    <div class="text-xs text-base-content/50"><i class="fa-solid fa-layer-group mr-1"></i>Snow Base</div>
-                    <div class="text-xl font-bold"><?= snow($weather['snow_base']) ?></div>
-                    <?php if ($weather['snow_base'] > 80) : ?><div class="text-xs text-success">Excellent</div>
-                    <?php elseif ($weather['snow_base'] > 40) : ?><div class="text-xs text-warning">Fair</div>
-                    <?php else : ?><div class="text-xs text-error">Low</div><?php endif ?>
-                </div>
-                <div class="bg-base-200 rounded-lg p-3">
-                    <div class="text-xs text-base-content/50"><i class="fa-solid fa-eye mr-1"></i>Visibility</div>
-                    <div class="text-xl font-bold"><?= $weather['visibility'] ?></div>
-                </div>
-                <div class="bg-base-200 rounded-lg p-3">
-                    <div class="text-xs text-base-content/50"><i class="fa-solid fa-droplet mr-1"></i>Humidity</div>
-                    <div class="text-xl font-bold"><?= $weather['humidity'] ?>%</div>
-                </div>
-                <div class="bg-base-200 rounded-lg p-3">
-                    <div class="text-xs text-base-content/50"><i class="fa-solid fa-cable-car mr-1"></i>Lifts</div>
-                    <?php if ($weather['wind'] > 40 || $weather['condition'] === 'Blizzard') : ?>
-                        <div class="text-xl font-bold text-error">Suspended</div>
-                    <?php elseif ($weather['wind'] > 30) : ?>
-                        <div class="text-xl font-bold text-warning">Limited</div>
-                    <?php else : ?>
-                        <div class="text-xl font-bold text-success">Normal</div>
-                    <?php endif ?>
-                </div>
+            <dl class="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div class="bg-base-200 rounded-lg p-3"><dt class="text-xs text-base-content/60">New snow today</dt><dd class="text-xl font-bold"><?= esc($now['snowfall_formatted']) ?></dd></div>
+                <div class="bg-base-200 rounded-lg p-3"><dt class="text-xs text-base-content/60">Snow base</dt><dd class="text-xl font-bold <?= $thinBase ? 'text-warning' : '' ?>"><?= esc($now['snow_formatted']) ?></dd><?php if ($thinBase) : ?><dd class="text-xs text-warning">Thin (under <?= W::THIN_BASE ?> cm)</dd><?php endif ?></div>
+                <div class="bg-base-200 rounded-lg p-3"><dt class="text-xs text-base-content/60">Wind</dt><dd class="text-xl font-bold <?= $windHold ? 'text-error' : '' ?>"><?= speed((int) $now['base_wind']) ?></dd><?php if ($windHold) : ?><dd class="text-xs text-error">Lifts on wind hold</dd><?php endif ?></div>
+                <div class="bg-base-200 rounded-lg p-3"><dt class="text-xs text-base-content/60">Visibility</dt><dd class="text-xl font-bold"><?= esc($now['visibility']) ?></dd></div>
+                <div class="bg-base-200 rounded-lg p-3"><dt class="text-xs text-base-content/60">Humidity</dt><dd class="text-xl font-bold"><?= (int) $now['humidity'] ?>%</dd></div>
+                <div class="bg-base-200 rounded-lg p-3"><dt class="text-xs text-base-content/60">Snowmaking</dt><dd class="text-xl font-bold <?= $snowWindow ? 'text-success' : 'text-error' ?>"><?= $snowWindow ? count($snowWindow) . ' h' : 'Too warm' ?></dd><dd class="text-xs text-base-content/60">at <?= temp(W::SNOWMAKING_MAX_TEMP) ?> or colder</dd></div>
+            </dl>
+        </div>
+    </div></div>
+
+    <!-- What today's weather does -->
+    <div class="card bg-base-100 shadow-sm mb-4"><div class="card-body p-4">
+        <h2 class="font-bold mb-3">What today's weather does to your resort</h2>
+        <ul class="space-y-2 text-sm">
+            <li class="flex items-start gap-2">
+                <i class="fa-solid fa-person-skiing mt-0.5 w-4 <?= $demandFactor >= 1 ? 'text-success' : 'text-error' ?>" aria-hidden="true"></i>
+                <span><b>Skiers <?= $demandFactor == 1 ? 'unchanged' : $pct($demandFactor) ?></b>: <?= esc($cond) ?><?= $windHold ? ', with lifts on wind hold' : '' ?>. <?= $demandFactor >= 1 ? 'Good skiing weather.' : 'Fewer people come out in this.' ?></span>
+            </li>
+            <li class="flex items-start gap-2">
+                <i class="fa-solid fa-snowflake mt-0.5 w-4 text-<?= $quality[2] ?>" aria-hidden="true"></i>
+                <span><b>Snow: <?= $quality[0] ?></b>. <?= $quality[1] ?></span>
+            </li>
+            <li class="flex items-start gap-2">
+                <i class="fa-solid fa-mountain mt-0.5 w-4 <?= ($warm || $thinBase) ? 'text-warning' : 'text-success' ?>" aria-hidden="true"></i>
+                <span><b>Slope wear</b>:
+                    <?= $warm ? '+' . G::WARM_EXTRA . '% (warm or rain)' : 'normal temperature' ?><?= $freshSnow ? ', −' . G::FRESH_SNOW_RELIEF . '% thanks to fresh snow' : '' ?><?= $thinBase ? ', +' . G::THIN_BASE_EXTRA . '% on slopes without snowmaking (thin base)' : '' ?>.
+                    <a href="/grooming" class="link link-primary">Grooming</a></span>
+            </li>
+            <li class="flex items-start gap-2">
+                <i class="fa-solid fa-fan mt-0.5 w-4 <?= $snowWindow ? 'text-success' : 'text-error' ?>" aria-hidden="true"></i>
+                <span><b>Snow guns</b>: <?= $snowWindow ? 'cold enough for ' . count($snowWindow) . ' hours, so running guns protect the slopes they cover from a thin base.' : 'too warm all day, so they can\'t protect slopes today.' ?> <a href="/snowmaking" class="link link-primary">Snowmaking</a></span>
+            </li>
+        </ul>
+    </div></div>
+
+    <!-- Hourly -->
+    <div class="card bg-base-100 shadow-sm mb-4"><div class="card-body p-4">
+        <h2 class="font-bold mb-3">Today, hour by hour</h2>
+        <div class="overflow-x-auto"><div class="flex gap-1" style="min-width:720px">
+            <?php foreach ($hourly as $h) : $isNow = $h['hour'] === $currentHour; $canMake = $h['temp'] <= W::SNOWMAKING_MAX_TEMP; ?>
+            <div class="flex-1 text-center rounded-lg p-1.5 <?= $isNow ? 'bg-primary/20 ring-1 ring-primary' : '' ?>">
+                <div class="text-[10px] <?= $isNow ? 'font-bold text-primary' : 'text-base-content/60' ?>"><?= $isNow ? 'Now' : $h['label'] ?></div>
+                <div class="text-xs font-bold mt-0.5 <?= $canMake ? 'text-info' : ($h['temp'] > 0 ? 'text-warning' : '') ?>"><?= temp($h['temp']) ?></div>
+                <div class="w-full h-1 rounded mt-0.5 <?= $canMake ? 'bg-info/50' : 'bg-base-300' ?>"></div>
             </div>
-        </div>
+            <?php endforeach ?>
+        </div></div>
+        <div class="flex gap-4 mt-2 text-xs text-base-content/60"><span class="flex items-center gap-1"><span class="w-3 h-1 rounded bg-info/50 inline-block"></span> cold enough for snow guns</span><span class="flex items-center gap-1"><span class="w-3 h-1 rounded bg-base-300 inline-block"></span> too warm</span></div>
     </div></div>
 
-    <!-- Hourly Forecast -->
-    <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body p-4">
-        <h2 class="font-bold text-base mb-3"><i class="fa-solid fa-clock mr-1"></i>24-Hour Forecast</h2>
-        <div class="overflow-x-auto">
-            <div class="flex gap-1" style="min-width:720px">
-                <?php foreach ($hourly as $h) : ?>
-                <?php $isNow = $h['hour'] === $currentHour; ?>
-                <div class="flex-1 text-center rounded-lg p-1.5 <?= $isNow ? 'bg-primary/20 ring-1 ring-primary' : '' ?>">
-                    <div class="text-[10px] text-base-content/40 <?= $isNow ? 'font-bold text-primary' : '' ?>"><?= $isNow ? 'NOW' : $h['label'] ?></div>
-                    <div class="text-xs font-bold mt-0.5 <?= $h['temp'] <= -2 ? 'text-info' : ($h['temp'] >= 0 ? 'text-warning' : '') ?>"><?= temp($h['temp']) ?></div>
-                    <div class="mt-0.5">
-                        <?php if ($h['can_snow']) : ?>
-                        <div class="w-full h-1 rounded bg-info/40"></div>
-                        <?php else : ?>
-                        <div class="w-full h-1 rounded bg-base-300"></div>
-                        <?php endif ?>
-                    </div>
-                    <div class="text-[9px] text-base-content/30 mt-0.5"><?= speed($h['wind']) ?></div>
-                </div>
-                <?php endforeach ?>
-            </div>
-        </div>
-        <div class="flex items-center gap-4 mt-2 text-xs text-base-content/50">
-            <span class="flex items-center gap-1"><span class="w-3 h-1 rounded bg-info/40 inline-block"></span> Snowmaking OK</span>
-            <span class="flex items-center gap-1"><span class="w-3 h-1 rounded bg-base-300 inline-block"></span> Too warm</span>
-            <?php if (!empty($snowWindow)) : ?>
-            <span><i class="fa-solid fa-snowflake text-info mr-1"></i><?= count($snowWindow) ?>h snowmaking window today</span>
-            <?php else : ?>
-            <span class="text-error"><i class="fa-solid fa-ban mr-1"></i>No snowmaking window today</span>
-            <?php endif ?>
-        </div>
-    </div></div>
-
-    <!-- Snowmaking Conditions -->
-    <div class="card bg-<?= $weather['temp'] <= -2 ? 'success' : 'warning' ?>/10 border border-<?= $weather['temp'] <= -2 ? 'success' : 'warning' ?>/30 shadow-sm mb-6"><div class="card-body p-3">
-        <div class="flex items-center gap-2 text-sm">
-            <i class="fa-solid fa-snowflake <?= $weather['temp'] <= -2 ? 'text-success' : 'text-warning' ?>"></i>
-            <?php if ($weather['temp'] <= -2) : ?>
-                <span><strong>Snowmaking:</strong> Active right now (<?= temp($weather['temp']) ?>). <?= count($snowWindow) ?> hours of production today.</span>
-            <?php elseif (!empty($snowWindow)) : ?>
-                <span><strong>Snowmaking:</strong> Too warm now, but <?= count($snowWindow) ?> hours available later (overnight lows reach <?= temp($weather['base_temp'] - 4) ?>).</span>
-            <?php else : ?>
-                <span><strong>Snowmaking:</strong> Too warm all day. No production possible today.</span>
-            <?php endif ?>
-        </div>
-    </div></div>
-
-    <!-- Season Progress -->
-    <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body p-4">
-        <div class="flex justify-between text-sm mb-1">
-            <span><i class="fa-solid fa-calendar mr-1"></i>Season Progress</span>
-            <span class="text-base-content/50">Day <?= $seasonDay ?> / <?= getSeasonLength() ?></span>
-        </div>
-        <progress class="progress progress-primary w-full mb-2" value="<?= min($seasonDay, getSeasonLength()) ?>" max="<?= getSeasonLength() ?>"></progress>
-        <div class="flex justify-between text-xs text-base-content/40">
-            <span>Season Start</span>
-            <span><?= $seasonPct ?>% complete</span>
-            <span>Off-Season</span>
-        </div>
-    </div></div>
-
-    <!-- 5-Day Forecast -->
-    <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body p-4">
-        <h2 class="font-bold text-base mb-4"><i class="fa-solid fa-calendar-days mr-1"></i>5-Day Forecast</h2>
-        <div class="grid grid-cols-5 gap-2 md:gap-3">
-            <?php foreach ($forecast as $day) : ?>
-            <div class="bg-base-200 rounded-lg p-2 md:p-3 text-center">
-                <div class="text-xs text-base-content/50 mb-1">+<?= $day['day'] ?>d</div>
-                <i class="fa-solid <?= $wIcons[$day['condition']] ?? 'fa-cloud' ?> text-xl md:text-2xl mb-1"></i>
-                <div class="text-sm md:text-lg font-bold"><?= temp($day['temp']) ?></div>
-                <div class="text-[10px] text-base-content/40"><?= temp($day['temp'] + 4) ?> / <?= temp($day['temp'] - 4) ?></div>
-                <div class="text-xs text-base-content/50 hidden md:block"><?= $day['condition'] ?></div>
-                <?php if ($day['snowfall'] > 0) : ?>
-                    <div class="text-xs text-info mt-1">+<?= snow($day['snowfall']) ?></div>
-                <?php endif ?>
-                <?php if ($day['temp'] <= -2) : ?>
-                    <div class="text-xs text-success mt-0.5"><i class="fa-solid fa-snowflake"></i></div>
-                <?php endif ?>
+    <!-- Forecast -->
+    <div class="card bg-base-100 shadow-sm mb-4"><div class="card-body p-4">
+        <h2 class="font-bold mb-3">Next 5 days</h2>
+        <div class="grid grid-cols-5 gap-2">
+            <?php foreach ($forecast as $f) : $ff = W::demandFactor($f['condition'], (int) ($f['wind'] ?? 0)); ?>
+            <div class="bg-base-200 rounded-lg p-2 text-center">
+                <div class="text-xs text-base-content/60">Day <?= $seasonDay + (int) $f['day'] ?></div>
+                <i class="fa-solid <?= weatherIcon($f['condition']) ?> text-xl my-1" aria-hidden="true"></i>
+                <div class="font-bold"><?= temp((int) $f['temp']) ?></div>
+                <div class="text-[11px] text-base-content/60 hidden sm:block"><?= esc($f['condition']) ?></div>
+                <?php if ((int) $f['snowfall'] > 0) : ?><div class="text-xs text-info">+<?= snow((int) $f['snowfall']) ?></div><?php endif ?>
+                <div class="text-[11px] <?= $ff >= 1 ? 'text-success' : 'text-error' ?>"><?= $ff == 1 ? 'skiers =' : 'skiers ' . $pct($ff) ?></div>
             </div>
             <?php endforeach ?>
         </div>
+        <p class="text-xs text-base-content/60 mt-2">Mountain forecasts here are reliable: plan grooming and snowmaking around them.</p>
     </div></div>
 
-    <!-- Impact & Tips -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
-            <h2 class="font-bold text-base mb-3"><i class="fa-solid fa-chart-line mr-1"></i>Today's Impact</h2>
-            <div class="space-y-2 text-sm">
-                <?php
-                $visitorImpact = ['Sunny' => '+20%', 'Partly Cloudy' => '0%', 'Cloudy' => '0%', 'Light Snow' => '+10%', 'Heavy Snow' => '-10%', 'Blizzard' => '-50%', 'Freezing Rain' => '-30%'];
-                $revenueImpact = ['Sunny' => '+15%', 'Partly Cloudy' => '0%', 'Cloudy' => '0%', 'Light Snow' => '+5%', 'Heavy Snow' => '-5%', 'Blizzard' => '-40%', 'Freezing Rain' => '-25%'];
-                $vi = $visitorImpact[$weather['condition']] ?? '0%';
-                $ri = $revenueImpact[$weather['condition']] ?? '0%';
-                $viClass = str_starts_with($vi, '+') ? 'text-success' : (str_starts_with($vi, '-') ? 'text-error' : '');
-                $riClass = str_starts_with($ri, '+') ? 'text-success' : (str_starts_with($ri, '-') ? 'text-error' : '');
-                ?>
-                <div class="flex justify-between"><span class="text-base-content/60">Visitors</span><span class="font-semibold <?= $viClass ?>"><?= $vi ?></span></div>
-                <div class="flex justify-between"><span class="text-base-content/60">Revenue</span><span class="font-semibold <?= $riClass ?>"><?= $ri ?></span></div>
-                <div class="flex justify-between"><span class="text-base-content/60">Snowmaking</span><span class="font-semibold <?= $weather['temp'] <= -2 ? 'text-success' : (!empty($snowWindow) ? 'text-warning' : 'text-error') ?>"><?= $weather['temp'] <= -2 ? 'Active now' : (!empty($snowWindow) ? count($snowWindow) . 'h window' : 'Unavailable') ?></span></div>
-                <div class="flex justify-between"><span class="text-base-content/60">Lift Ops</span><span class="font-semibold <?= $weather['wind'] > 40 ? 'text-error' : ($weather['wind'] > 30 ? 'text-warning' : 'text-success') ?>"><?= $weather['wind'] > 40 ? 'Suspended' : ($weather['wind'] > 30 ? 'Limited' : 'Normal') ?></span></div>
-                <div class="flex justify-between"><span class="text-base-content/60">Slope Decay</span><span class="font-semibold <?= $weather['temp'] >= 0 ? 'text-error' : 'text-success' ?>"><?= $weather['temp'] >= 0 ? 'Accelerated (warm)' : 'Normal' ?></span></div>
+    <!-- Snow base -->
+    <?php if (count($history) > 1) : ?>
+    <div class="card bg-base-100 shadow-sm mb-4"><div class="card-body p-4">
+        <h2 class="font-bold mb-3">Snow base, last <?= count($history) ?> days</h2>
+        <div class="flex items-end gap-1 h-28" role="img" aria-label="Snow base from <?= (int) $history[0]['snow_base'] ?> to <?= (int) end($history)['snow_base'] ?> centimetres">
+            <?php foreach ($history as $h) : $hb = (int) $h['snow_base']; ?>
+            <div class="flex-1 flex flex-col justify-end h-full" title="Day <?= (int) $h['game_day'] ?>: <?= $hb ?> cm base<?= (int) $h['snowfall'] ? ', +' . (int) $h['snowfall'] . ' cm new' : '' ?>">
+                <div class="rounded-t <?= $hb < W::THIN_BASE ? 'bg-warning/70' : 'bg-info/60' ?>" style="height:<?= max(2, (int) round($hb / $maxBase * 100)) ?>%"></div>
             </div>
-        </div></div>
+            <?php endforeach ?>
+        </div>
+        <div class="flex justify-between text-xs text-base-content/60 mt-1"><span>Day <?= (int) $history[0]['game_day'] ?></span><span>Today: <?= esc($now['snow_formatted']) ?></span></div>
+    </div></div>
+    <?php endif ?>
 
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
-            <h2 class="font-bold text-base mb-3"><i class="fa-solid fa-lightbulb mr-1 text-warning"></i>Weather Tips</h2>
-            <div class="space-y-2 text-xs text-base-content/60">
-                <?php if ($weather['condition'] === 'Sunny') : ?>
-                    <p><i class="fa-solid fa-sun mr-1 text-warning"></i>Great day for visitors, but snow is melting. Run cannons when temps drop overnight.</p>
-                <?php elseif ($weather['condition'] === 'Blizzard') : ?>
-                    <p><i class="fa-solid fa-wind mr-1 text-error"></i>Blizzard — lifts suspended. Low revenue but your snow base is building naturally.</p>
-                <?php elseif (in_array($weather['condition'], ['Light Snow', 'Heavy Snow'])) : ?>
-                    <p><i class="fa-solid fa-snowflake mr-1 text-info"></i>Natural snowfall — save on snowmaking costs today.</p>
-                <?php elseif ($weather['condition'] === 'Freezing Rain') : ?>
-                    <p><i class="fa-solid fa-cloud-rain mr-1 text-error"></i>Freezing rain creates icy slopes. Grooming is essential today.</p>
-                <?php else : ?>
-                    <p><i class="fa-solid fa-cloud mr-1"></i>Steady conditions. Normal operations.</p>
-                <?php endif ?>
-                <?php if ($weather['wind'] > 25) : ?>
-                    <p><i class="fa-solid fa-wind mr-1"></i>High winds affecting exposed lifts.</p>
-                <?php endif ?>
-                <?php if ($weather['snow_base'] < 30) : ?>
-                    <p><i class="fa-solid fa-triangle-exclamation mr-1 text-warning"></i>Snow base critically low. Prioritize snowmaking.</p>
-                <?php endif ?>
-                <?php if (!empty($snowWindow) && $weather['temp'] > -2) : ?>
-                    <p><i class="fa-solid fa-clock mr-1 text-info"></i>Temps drop below freezing overnight — schedule snowmaking for those hours.</p>
-                <?php endif ?>
-            </div>
-        </div></div>
-    </div>
+    <details class="card bg-base-100 shadow-sm">
+        <summary class="card-body p-4 cursor-pointer font-semibold text-sm">How weather works</summary>
+        <ul class="px-4 pb-4 text-sm text-base-content/80 space-y-1 list-disc pl-9">
+            <li>The season runs early winter → deep winter (coldest) → spring (thawing) → summer from day <?= $winterDays + 1 ?>. Weather fronts last a few days.</li>
+            <li>Below freezing it snows (light, heavy or a blizzard); around 0–1°C it's freezing rain, above that rain.</li>
+            <li>The snow base grows with snowfall and shrinks with warm days and rain. Under <?= W::THIN_BASE ?> cm, slopes need snow guns.</li>
+            <li>Skiers by weather: <?php foreach (W::DEMAND as $c => $f) : ?><?= esc($c) ?> <?= $f == 1 ? '±0%' : $pct($f) ?><?= $c !== array_key_last(W::DEMAND) ? ', ' : '' ?><?php endforeach ?>; wind of <?= W::WIND_HOLD ?> km/h or more puts lifts on hold (<?= $pct(W::WIND_HOLD_FACTOR) ?>).</li>
+        </ul>
+    </details>
 </div>
 <?= $this->endSection() ?>

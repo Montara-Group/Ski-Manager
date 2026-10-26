@@ -96,7 +96,7 @@ $batchCost = array_sum(array_column($batch, 'extra_cost'));
                     </td>
                     <?php if ($s['status'] === 'open') : ?>
                     <td class="text-xs"><?= $s['draw_pct'] ?>% of skiers</td>
-                    <td class="text-xs">−<?= $s['decay'] ?>%</td>
+                    <td class="text-xs">−<?= $s['decay'] ?>%<?php if ($s['thin_base']) : ?> <span class="badge badge-warning badge-xs" title="Natural snow base under <?= \App\Libraries\Weather::THIN_BASE ?> cm and no snow gun on this slope">thin base</span><?php elseif ($thinBase && $s['snow_covered']) : ?> <span class="badge badge-info badge-xs" title="A snow gun covers this slope today">snowmaking</span><?php endif ?></td>
                     <?php else : ?>
                     <td class="text-xs text-error">Closed</td>
                     <td class="text-xs text-base-content/60">—</td>
@@ -207,7 +207,8 @@ $batchCost = array_sum(array_column($batch, 'extra_cost'));
         <div class="px-4 pb-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-base-content/80">
             <ul class="space-y-1 list-disc pl-5">
                 <li>Open slopes wear every day: green −2%, blue −3%, red/black −4%, double black −5%.</li>
-                <li>Above 0°C they wear 2% faster; 5 cm or more of fresh snow takes 2% off the wear.</li>
+                <li>Above 0°C or in rain they wear 2% faster; 5 cm or more of fresh snow takes 2% off the wear.</li>
+                <li>When the natural snow base is under <?= \App\Libraries\Weather::THIN_BASE ?> cm, slopes wear another 2% unless a snow gun covers them (each running gun covers as many slopes as its capacity, on days cold enough to make snow).</li>
                 <li>A slope at 100% draws all its skiers; at 50% it draws 80%; at 0% it closes until it's groomed again.</li>
                 <li>Slopes groomed overnight count as groomed snow, which attracts a few more visitors.</li>
             </ul>

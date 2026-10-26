@@ -12,19 +12,25 @@ class Grooming
     /** Daily wear by difficulty, in condition points */
     public const DECAY = ['green' => 2, 'blue' => 3, 'red' => 4, 'black' => 4, 'double_black' => 5];
     public const DECAY_DEFAULT = 3;
-    public const WARM_EXTRA = 2;          // base temperature above 0°C
+    public const WARM_EXTRA = 2;          // base temperature above 0°C, or rain
     public const FRESH_SNOW_RELIEF = 2;   // 5 cm or more of new snow
+    public const THIN_BASE_EXTRA = 2;     // natural base under Weather::THIN_BASE and no snowmaking on the slope
     public const RESTORE_BASE = 20;       // points one grooming pass restores
     public const RESTORE_PER_LEVEL = 2;   // plus this per average operator level
     public const RESTORE_MAX = 35;
     public const EXTRA_RUN_PER_M = 0.15;  // EUR of fuel per metre for a daytime run
 
-    /** @param array $weather weather row (temp = base °C, snowfall in cm) */
-    public static function decay(array $slope, array $weather): int
+    /**
+     * @param array $weather weather row (temp = base °C, snowfall in cm, snow_base in cm, condition_name)
+     * @param bool $snowmaking a snow gun covers this slope today (protects it from a thin natural base)
+     */
+    public static function decay(array $slope, array $weather, bool $snowmaking = false): int
     {
         $d = self::DECAY[$slope['difficulty'] ?? ''] ?? self::DECAY_DEFAULT;
-        if ((int) ($weather['temp'] ?? $weather['base_temp'] ?? -5) > 0) $d += self::WARM_EXTRA;
+        $condition = $weather['condition_name'] ?? $weather['condition'] ?? '';
+        if ((int) ($weather['temp'] ?? $weather['base_temp'] ?? -5) > 0 || in_array($condition, ['Rain', 'Freezing Rain'], true)) $d += self::WARM_EXTRA;
         if ((int) ($weather['snowfall'] ?? 0) >= 5) $d -= self::FRESH_SNOW_RELIEF;
+        if (isset($weather['snow_base']) && (int) $weather['snow_base'] < Weather::THIN_BASE && !$snowmaking) $d += self::THIN_BASE_EXTRA;
         return max(0, $d);
     }
 

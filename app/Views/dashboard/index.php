@@ -20,6 +20,7 @@ $wIcons = [
     'Heavy Snow'    => 'fa-snowflake text-primary',
     'Blizzard'      => 'fa-wind text-error',
     'Freezing Rain' => 'fa-cloud-rain text-error',
+    'Rain' => 'fa-cloud-showers-heavy text-info',
 ];
 
 $totalParkingCap = 0;

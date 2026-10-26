@@ -309,7 +309,9 @@ class Admin extends BaseController
         $snowBase = (int) $this->request->getPost('snow_base');
         $snowfall = (int) $this->request->getPost('snowfall');
 
-        $visMap = ['Sunny' => 'Excellent', 'Partly Cloudy' => 'Good', 'Cloudy' => 'Good', 'Light Snow' => 'Moderate', 'Heavy Snow' => 'Poor', 'Blizzard' => 'Very Poor', 'Freezing Rain' => 'Poor'];
+        $visMap = \App\Libraries\Weather::VISIBILITY;
+        if (!isset($visMap[$condition])) return redirect()->to('/admin/settings')->with('error', 'Unknown weather condition.');
+        \App\Libraries\Weather::ensure($gameDay + 1);
 
         $db->table('weather')->where('game_day', $gameDay)->update([
             'condition_name' => $condition, 'temp' => $temp,
