@@ -441,11 +441,13 @@ class GameTick extends BaseCommand
                     if ($sales) $db->table('ticket_sales')->insertBatch($sales);
                 }
 
-                // Buildings earn in proportion to how full they are; a staffed one earns the staff bonus
-                $util = \App\Libraries\Economy::buildingUtilization($buildings, $visitors, $summerTourists);
-                $perType = array_count_values(array_column($buildings, 'building_type'));
+                // Buildings earn in proportion to how full they are; a staffed one earns the staff bonus.
+                // Real estate has its own market (below), so it's left out here.
+                $guestBuildings = array_values(array_filter($buildings, fn($b) => $b['building_type'] !== 'real_estate'));
+                $util = \App\Libraries\Economy::buildingUtilization($guestBuildings, $visitors, $summerTourists);
+                $perType = array_count_values(array_column($guestBuildings, 'building_type'));
                 $buildingRevenue = 0;
-                foreach ($buildings as $b) {
+                foreach ($guestBuildings as $b) {
                     $t = $b['building_type'];
                     $buildingRevenue += (int) $b['revenue_per_day'] * ($util[$t] ?? 0) * \App\Libraries\Economy::staffBonus($t, $perType[$t] ?? 0, $assignedByRole);
                 }
@@ -453,6 +455,30 @@ class GameTick extends BaseCommand
                 $dayIncome += $buildingRevenue;
                 $breakdown['buildings'] = $buildingRevenue;
                 $breakdown['occupancy'] = array_map(fn($u) => round($u, 3), $util);
+
+                // Real estate (App\Libraries\RealEstate): construction, rent on leased properties, fees on sold ones
+                $estate = $db->table('buildings')->where('user_id', $userId)->where('building_type', 'real_estate')->get()->getResultArray();
+                if ($estate) {
+                    $conds = array_map(fn($sl) => (int) $sl['condition_pct'], $slopesForQuality);
+                    $market = \App\Libraries\RealEstate::market((int) (resortRating($userId)['stars'] ?? 0), $openSlopes, $conds ? (int) round(array_sum($conds) / count($conds)) : 0)['value'];
+                    $rent = 0; $fees = 0;
+                    foreach ($estate as $re) {
+                        if ($re['status'] === 'upgrading') {
+                            $left = max(0, (int) $re['build_days_left'] - 1);
+                            // A finished property is leased out straight away; the owner can sell it any time
+                            $db->table('buildings')->where('id', $re['id'])->update($left > 0 ? ['build_days_left' => $left] : ['build_days_left' => 0, 'status' => 'open']);
+                            if ($left === 0) notify($userId, 'real_estate', $re['name'] . ' is finished', 'It\'s leased out and earning rent. You can also sell it on the property market.', 'fa-solid fa-city', '/real-estate');
+                        } elseif ($re['tenure'] === 'sold') {
+                            $fees += \App\Libraries\RealEstate::managementFee((int) $re['sale_price']);
+                        } elseif ($re['status'] === 'open') {
+                            $rent += \App\Libraries\RealEstate::rent((int) $re['level'], $market, (int) $re['condition_pct'], $isWinter);
+                        }
+                    }
+                    $estateIncome = (int) round(($rent + $fees) * $revMult);
+                    $dayIncome += $estateIncome;
+                    $breakdown['real_estate'] = $estateIncome;
+                    $breakdown['property_market'] = $market;
+                }
 
                 // Lifts and slopes cost money to run
                 $allItems = $db->table('player_items')->where('user_id', $userId)->get()->getResultArray();

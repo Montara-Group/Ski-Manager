@@ -72,6 +72,8 @@ class Buildings extends BaseController
         if (!isset($defs[$type]) || !isset($defs[$type]['levels'][$level])) {
             return redirect()->back()->with('error', 'Invalid building.');
         }
+        // Real estate has plots, construction and a market of its own (Controllers/RealEstate)
+        if ($type === 'real_estate') return redirect()->to('/real-estate');
 
         $def = $defs[$type];
         $lvl = $def['levels'][$level];
@@ -114,7 +116,12 @@ class Buildings extends BaseController
         $userId = auth()->id();
         $building = $this->model->where('id', $id)->where('user_id', $userId)->first();
         if (!$building) return redirect()->back()->with('error', 'Building not found.');
+        if ($building['building_type'] === 'real_estate') return redirect()->to('/real-estate');
 
+        // A broken building used to come straight back to 'open' here, a free repair
+        if (!in_array($building['status'], ['open', 'closed'], true)) {
+            return redirect()->back()->with('error', $building['name'] . ' is ' . $building['status'] . ' and can\'t be reopened.');
+        }
         $new = $building['status'] === 'open' ? 'closed' : 'open';
         $this->model->update($id, ['status' => $new]);
 
@@ -129,6 +136,7 @@ class Buildings extends BaseController
         $userId = auth()->id();
         $building = $this->model->where('id', $id)->where('user_id', $userId)->first();
         if (!$building) return redirect()->back()->with('error', 'Building not found.');
+        if ($building['building_type'] === 'real_estate') return redirect()->to('/real-estate');
 
         $defs = $this->getBuildingDefs();
         $type = $building['building_type'];
@@ -175,6 +183,7 @@ class Buildings extends BaseController
         $userId = auth()->id();
         $building = $this->model->where('id', $id)->where('user_id', $userId)->first();
         if (!$building) return redirect()->back()->with('error', 'Building not found.');
+        if ($building['building_type'] === 'real_estate') return redirect()->to('/real-estate');
 
         $defs = $this->getBuildingDefs();
         $type = $building['building_type'];
