@@ -3,33 +3,14 @@
 <?= $this->section('content') ?>
 
 <?php
-    $playerCount = $playerCount ?? 0;
-    $totalSlopes = $totalSlopes ?? 0;
-    $topPlayer = $topPlayer ?? null;
-    $weather = $weather ?? (function_exists('getCurrentWeather') ? getCurrentWeather() : null);
-
-    $currentSeasonNum = (int) ($currentSeasonNum ?? (function_exists('getSeasonNumber') ? getSeasonNumber() : 1));
-    $seasonDay = (int) ($seasonDay ?? (function_exists('getSeasonDay') ? getSeasonDay() : 1));
-    $seasonLen = (int) ($seasonLen ?? (function_exists('getSeasonLength') ? getSeasonLength() : 100));
-    $daysRemaining = (int) ($daysRemaining ?? max(0, $seasonLen - $seasonDay));
-    $seasonStart = $seasonStart ?? (function_exists('getSeasonStartDate') ? strtotime(getSeasonStartDate()) : time());
-
-    $__s2Live = $__s2Live ?? false;
-    $__s2Runs = $__s2Runs ?? 0;
-    $__s2Lifts = $__s2Lifts ?? 0;
-    $__s2Steep = $__s2Steep ?? 0;
-    $__s2JustOpened = $__s2JustOpened ?? false;
-    $__standings = $__standings ?? [];
-    $__recent = $__recent ?? [];
-
-    $__wCond  = $weather ? ($weather['condition_name'] ?? $weather['condition'] ?? '') : '';
-    $__wFresh = $weather ? (int) ($weather['snowfall'] ?? 0) : 0;
-    $__seasons = [
+    $weatherCondition = $weather ? ($weather['condition_name'] ?? $weather['condition'] ?? '') : '';
+    $snowfall = $weather ? (int) ($weather['snowfall'] ?? 0) : 0;
+    $seasons = [
         1 => ['Park City base', 'Green and blue terrain. The first lifts, ski patrol, and not going broke.'],
         2 => ['Advanced Peaks', 'The upper mountain: steep bowls, high ridges, black and double-black runs.'],
         3 => ['Beyond Park City', 'Backcountry, terrain parks, and a new mountain chosen by player vote.'],
     ];
-    $__diffClass = ['green' => 'green', 'blue' => 'blue', 'black' => 'black', 'double_black' => 'black'];
+    $diffClass = ['green' => 'green', 'blue' => 'blue', 'black' => 'black', 'double_black' => 'black'];
 ?>
 <style>
 .home-hero { position: relative; isolation: isolate; overflow: hidden; color: #fff; background: #141b24; }
@@ -118,7 +99,7 @@
 <section class="home-hero">
     <div class="max-w-6xl mx-auto px-4 py-14 md:py-20 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
         <div class="lg:col-span-7 space-y-6">
-            <?php if ($__s2JustOpened) : ?>
+            <?php if ($s2JustOpened) : ?>
             <a href="#season-2" class="note">Season 2 opened on <?= date('F j', $seasonStart) ?>. What's new →</a>
             <?php else : ?>
             <div class="small">Season <?= $currentSeasonNum ?>, day <?= $seasonDay ?> of <?= $seasonLen ?></div>
@@ -148,12 +129,12 @@
                     <div>
                         <div class="report-label">Summit</div>
                         <div class="report-num"><?= $weather ? esc($weather['temp_formatted']) : '–' ?></div>
-                        <div class="text-xs mt-1" style="color:#5b6470"><?= esc($__wCond ?: '—') ?></div>
+                        <div class="text-xs mt-1" style="color:#5b6470"><?= esc($weatherCondition ?: '—') ?></div>
                     </div>
                     <div>
                         <div class="report-label">Base depth</div>
                         <div class="report-num"><?= isset($weather['snow_base']) ? snow($weather['snow_base']) : '–' ?></div>
-                        <div class="text-xs mt-1" style="color:#5b6470"><?= $__wFresh > 0 ? snow($__wFresh) . ' new snow' : 'No new snow' ?></div>
+                        <div class="text-xs mt-1" style="color:#5b6470"><?= $snowfall > 0 ? snow($snowfall) . ' new snow' : 'No new snow' ?></div>
                     </div>
                 </div>
                 <dl class="report-rows">
@@ -168,24 +149,24 @@
     </div>
 </section>
 
-<?php if ($__s2Live) : ?>
+<?php if ($s2Live) : ?>
 <!-- Season 2 note -->
 <section id="season-2" class="home-section bg-base-100 border-b border-base-300">
     <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-12">
         <div class="lg:col-span-7 prose-home">
             <div class="text-sm muted mb-2"><?= date('F j, Y', $seasonStart) ?></div>
             <h2 class="mb-5">Season 2 is open</h2>
-            <p>Sector 2, the upper part of Park City, is now on the trail map.<?php if ($__s2Runs) : ?> It has <?= number_format($__s2Runs) ?> runs and <?= number_format($__s2Lifts) ?> lift<?= $__s2Lifts === 1 ? '' : 's' ?>, and most of it is steep: <?= number_format($__s2Steep) ?> of those runs are black or double black.<?php endif ?></p>
+            <p>Sector 2, the upper part of Park City, is now on the trail map.<?php if ($s2Runs) : ?> It has <?= number_format($s2Runs) ?> runs and <?= number_format($s2Lifts) ?> lift<?= $s2Lifts === 1 ? '' : 's' ?>, and most of it is steep: <?= number_format($s2Steep) ?> of those runs are black or double black.<?php endif ?></p>
             <p>Everything you built in Season 1 is still there, and so is your cash. The final Season 1 standings have been saved, everyone who played got the Season 1 Pioneer badge, and the top ten got 50 Genepis each.</p>
             <p class="pt-1"><a href="<?= auth()->loggedIn() ? '/map' : '/register' ?>" class="textlink"><?= auth()->loggedIn() ? 'Open the trail map' : 'Start a resort' ?> →</a></p>
         </div>
-        <?php if ($__standings) : ?>
+        <?php if ($standings) : ?>
         <div class="lg:col-span-5">
             <h3 class="font-semibold mb-3">How Season 1 ended</h3>
             <table class="standings">
                 <thead><tr><th></th><th>Player</th><th class="num">Cash</th></tr></thead>
                 <tbody>
-                <?php foreach ($__standings as $__i => $__p) : ?>
+                <?php foreach ($standings as $__i => $__p) : ?>
                     <tr>
                         <td class="pos"><?= $__i + 1 ?></td>
                         <td><?= esc($__p['username']) ?><?php if ((int) $__p['total_lifts'] + (int) $__p['total_slopes'] > 0) : ?><small><?= (int) $__p['total_lifts'] ?> lift<?= (int) $__p['total_lifts'] === 1 ? '' : 's' ?>, <?= (int) $__p['total_slopes'] ?> run<?= (int) $__p['total_slopes'] === 1 ? '' : 's' ?></small><?php endif ?></td>
@@ -224,7 +205,7 @@
     </div>
 </section>
 
-<?php if ($__recent) : ?>
+<?php if ($recent) : ?>
 <!-- Recently built -->
 <section class="home-section bg-base-100 border-b border-base-300">
     <div class="max-w-6xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -234,12 +215,12 @@
         </div>
         <div class="lg:col-span-7">
             <ul class="recent">
-                <?php foreach ($__recent as $__b) : ?>
+                <?php foreach ($recent as $__b) : ?>
                 <li>
                     <?php if ($__b['item_type'] === 'lift') : ?>
                         <i class="fa-solid fa-cable-car muted text-sm w-3 text-center" aria-hidden="true"></i>
                     <?php else : ?>
-                        <span class="tsign <?= $__diffClass[$__b['difficulty'] ?? ''] ?? 'blue' ?>" aria-hidden="true"></span>
+                        <span class="tsign <?= $diffClass[$__b['difficulty'] ?? ''] ?? 'blue' ?>" aria-hidden="true"></span>
                     <?php endif ?>
                     <span class="min-w-0 truncate"><b class="font-semibold"><?= esc($__b['username']) ?></b> built <?= esc($__b['name']) ?></span>
                     <span class="when muted"><?= timeAgo($__b['created_at']) ?></span>
@@ -260,7 +241,7 @@
         </div>
         <div class="lg:col-span-7">
             <ul class="season-list">
-                <?php foreach ($__seasons as $__n => [$__title, $__text]) :
+                <?php foreach ($seasons as $__n => [$__title, $__text]) :
                     $__isNow = $__n === 3 ? $currentSeasonNum >= 3 : $__n === $currentSeasonNum;
                     $__when  = $__isNow ? 'Now, day ' . $seasonDay : ($__n < $currentSeasonNum ? 'Finished' : 'Later');
                 ?>

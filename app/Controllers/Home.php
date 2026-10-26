@@ -31,13 +31,13 @@ class Home extends BaseController
         $topPlayer = $db->query(
             "SELECT u.username, pf.cash FROM player_finances pf JOIN users u ON u.id = pf.user_id WHERE u.id != 1 ORDER BY pf.cash DESC LIMIT 1"
         )->getRowArray();
-        $weather = function_exists('getCurrentWeather') ? getCurrentWeather() : null;
+        $weather = getCurrentWeather();
 
-        $currentSeasonNum = function_exists('getSeasonNumber') ? (int) getSeasonNumber() : 1;
-        $seasonDay = function_exists('getSeasonDay') ? (int) getSeasonDay() : 1;
-        $seasonLen = function_exists('getSeasonLength') ? (int) getSeasonLength() : 100;
+        $currentSeasonNum = (int) getSeasonNumber();
+        $seasonDay = (int) getSeasonDay();
+        $seasonLen = (int) getSeasonLength();
         $daysRemaining = max(0, $seasonLen - $seasonDay);
-        $seasonStart = function_exists('getSeasonStartDate') ? strtotime(getSeasonStartDate()) : time();
+        $seasonStart = strtotime(getSeasonStartDate());
 
         // Season 2 note: only once Sector 2 is actually released, with counts from the real map
         $s2 = $db->table('resort_sectors')->where('resort_map', 'ParkCity')->where('name', 'Sector 2')->get()->getRowArray();
@@ -104,13 +104,13 @@ class Home extends BaseController
             'seasonLen'       => $seasonLen,
             'daysRemaining'   => $daysRemaining,
             'seasonStart'     => $seasonStart,
-            '__s2Live'        => $s2Live,
-            '__s2Runs'        => $s2Runs,
-            '__s2Lifts'       => $s2Lifts,
-            '__s2Steep'       => $s2Steep,
-            '__s2JustOpened'  => $s2JustOpened,
-            '__standings'     => $standings,
-            '__recent'        => $recent,
+            's2Live'          => $s2Live,
+            's2Runs'          => $s2Runs,
+            's2Lifts'         => $s2Lifts,
+            's2Steep'         => $s2Steep,
+            's2JustOpened'    => $s2JustOpened,
+            'standings'       => $standings,
+            'recent'          => $recent,
         ];
     }
 
