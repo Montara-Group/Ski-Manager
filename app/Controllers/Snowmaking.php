@@ -2,6 +2,7 @@
 
 namespace App\Controllers;
 
+use App\Libraries\Fleet;
 use App\Libraries\Snowmaking as SM;
 use App\Libraries\Utilities;
 use App\Libraries\Weather as W;
@@ -22,7 +23,7 @@ class Snowmaking extends BaseController
         $weather = getCurrentWeather();
         $baseTemp = (int) $weather['base_temp'];
         $snowBase = (int) $weather['snow_base'];
-        $prices = SM::prices();
+        $prices = Fleet::prices();
 
         $crew = $db->table('staff')->where('user_id', $userId)->where('role', 'snowmaker')->where('status', 'active')->get()->getResultArray();
         $crewByGun = array_column(array_filter($crew, fn($s) => !empty($s['assigned_to'])), 'name', 'assigned_to');
@@ -35,7 +36,6 @@ class Snowmaking extends BaseController
 
         $costMult = ((int) getDifficultyConfig('cost_multiplier', '100')) / 100;
         foreach ($guns as &$g) {
-            $price = $prices[$g['model_key']] ?? 0;
             $g['max_temp'] = SM::maxTemp($g);
             $g['hours'] = SM::hours($g, $baseTemp);
             $g['runs'] = SM::runs($g, $baseTemp);
@@ -49,8 +49,8 @@ class Snowmaking extends BaseController
             $g['priority'] = SM::prioritySlope($g);
             $g['crew'] = $crewByGun[$g['name']] ?? null;
             $g['operating_cost'] = (int) round((int) $g['fuel_cost'] * $costMult);
-            $g['repair_cost'] = SM::repairCost($g, $price);
-            $g['resale'] = SM::resaleValue($g, $price);
+            $g['repair_cost'] = Fleet::repairCost($g, $prices);
+            $g['resale'] = Fleet::resaleValue($g, $prices);
         }
         unset($g);
         $running = array_filter($guns, fn($g) => $g['runs']);
@@ -138,31 +138,12 @@ class Snowmaking extends BaseController
 
     public function repair(int $id)
     {
-        $userId = auth()->id();
-        $db = db_connect();
         $eq = $this->gun($id);
         if (!$eq) return redirect()->back()->with('error', 'Snow gun not found.');
         if ((int) $eq['condition_pct'] >= 100) return redirect()->back()->with('error', esc($eq['name']) . ' is already in perfect condition.');
 
-        $cost = SM::repairCost($eq, SM::prices()[$eq['model_key']] ?? 0);
-        $db->transStart();
-        $db->table('player_finances')->where('user_id', $userId)->where('cash >=', $cost)
-            ->set('cash', 'cash - ' . $cost, false)->set('total_expenses', 'total_expenses + ' . $cost, false)->update();
-        if ($cost > 0 && $db->affectedRows() !== 1) {
-            $db->transRollback();
-            return redirect()->back()->with('error', 'Not enough cash: repairing ' . esc($eq['name']) . ' costs ' . currency($cost) . '.');
-        }
-        // A repaired broken gun comes back switched off; otherwise it keeps its on/off state
-        $db->table('equipment')->where('id', $id)->update([
-            'condition_pct' => 100, 'status' => $eq['status'] === 'broken' ? 'off' : $eq['status'], 'updated_at' => date('Y-m-d H:i:s'),
-        ]);
-        $db->table('financial_transactions')->insert([
-            'user_id' => $userId, 'game_day' => getGameDay(), 'category' => 'Snowmaking', 'description' => 'Repaired ' . $eq['name'],
-            'amount' => $cost, 'type' => 'expense', 'created_at' => date('Y-m-d H:i:s'),
-        ]);
-        $db->transComplete();
-
-        log_activity($userId, 'Snowmaking', 'Repaired ' . $eq['name'] . ' for ' . currency($cost), 'fa-solid fa-wrench');
+        $cost = Fleet::repair(auth()->id(), $eq);
+        if ($cost === null) return redirect()->back()->with('error', 'Not enough cash: repairing ' . esc($eq['name']) . ' costs ' . currency(Fleet::repairCost($eq)) . '.');
         return redirect()->to('/snowmaking')->with('success', esc($eq['name']) . ' repaired for ' . currency($cost) . '.');
     }
 
@@ -185,25 +166,9 @@ class Snowmaking extends BaseController
 
     public function sell(int $id)
     {
-        $userId = auth()->id();
-        $db = db_connect();
         $eq = $this->gun($id);
         if (!$eq) return redirect()->back()->with('error', 'Snow gun not found.');
-
-        $refund = SM::resaleValue($eq, SM::prices()[$eq['model_key']] ?? 0);
-        $db->transStart();
-        $db->table('equipment')->where('id', $id)->delete();
-        $db->table('staff')->where('user_id', $userId)->where('role', 'snowmaker')->where('assigned_to', $eq['name'])->update(['assigned_to' => null]);
-        if ($refund > 0) {
-            $db->table('player_finances')->where('user_id', $userId)->set('cash', 'cash + ' . $refund, false)->set('total_income', 'total_income + ' . $refund, false)->update();
-            $db->table('financial_transactions')->insert([
-                'user_id' => $userId, 'game_day' => getGameDay(), 'category' => 'Snowmaking', 'description' => 'Sold ' . $eq['name'],
-                'amount' => $refund, 'type' => 'income', 'created_at' => date('Y-m-d H:i:s'),
-            ]);
-        }
-        $db->transComplete();
-
-        log_activity($userId, 'Snowmaking', 'Sold ' . $eq['name'] . ' for ' . currency($refund), 'fa-solid fa-coins');
+        $refund = Fleet::sell(auth()->id(), $eq);
         return redirect()->to('/snowmaking')->with('success', esc($eq['name']) . ' sold for ' . currency($refund) . '.');
     }
 }

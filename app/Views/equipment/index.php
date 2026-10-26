@@ -73,13 +73,14 @@
                     <?php elseif ($eq['status'] === 'broken') : ?><span class="badge badge-error badge-xs">Broken</span>
                     <?php else : ?><span class="badge badge-ghost badge-xs">Off</span><?php endif ?>
                 </div>
-                <div class="flex gap-1">
-                    <?php if ($eq['status'] === 'broken') : ?>
-                        <form action="/equipment/repair/<?= $eq['id'] ?>" method="post" class="flex-1" data-confirm="Repair for <?= currency(5000) ?>?"><?= csrf_field() ?><button class="btn btn-warning btn-xs w-full gap-1"><i class="fa-solid fa-wrench"></i>Repair <?= currency(5000) ?></button></form>
-                    <?php else : ?>
+                <div class="flex flex-wrap gap-1">
+                    <?php if ($eq['status'] !== 'broken') : ?>
                         <form action="/equipment/toggle/<?= $eq['id'] ?>" method="post" class="flex-1"><?= csrf_field() ?><button class="btn btn-<?= $eq['status'] === 'active' ? 'ghost' : 'success' ?> btn-xs w-full"><i class="fa-solid fa-power-off mr-1"></i><?= $eq['status'] === 'active' ? 'Off' : 'On' ?></button></form>
                     <?php endif ?>
-                    <form action="/equipment/sell/<?= $eq['id'] ?>" method="post" data-confirm="Sell <?= esc($eq['name']) ?>?"><?= csrf_field() ?><button class="btn btn-ghost btn-xs text-error gap-1"><i class="fa-solid fa-coins"></i></button></form>
+                    <?php if ((int) $eq['condition_pct'] < 100) : ?>
+                        <form action="/equipment/repair/<?= $eq['id'] ?>" method="post" class="flex-1" data-confirm="Repair <?= esc($eq['name']) ?> to 100% for <?= currency($eq['repair_cost']) ?>?"><?= csrf_field() ?><button class="btn <?= $eq['status'] === 'broken' ? 'btn-warning' : 'btn-outline' ?> btn-xs w-full gap-1"><i class="fa-solid fa-wrench"></i>Repair <?= currency($eq['repair_cost']) ?></button></form>
+                    <?php endif ?>
+                    <form action="/equipment/sell/<?= $eq['id'] ?>" method="post" data-confirm="Sell <?= esc($eq['name']) ?> for <?= currency($eq['resale']) ?>?"><?= csrf_field() ?><button class="btn btn-ghost btn-xs text-error gap-1"><i class="fa-solid fa-coins"></i>Sell <?= currency($eq['resale']) ?></button></form>
                 </div>
             </div></div>
         <?php endforeach ?>

@@ -249,7 +249,7 @@ $diffBadge = ['green' => 'bg-success', 'blue' => 'bg-info', 'red' => 'bg-error',
             <li>A switched-on gun runs on any day with at least one hour cold enough for its model (most need <?= temp(W::SNOWMAKING_MAX_TEMP) ?>; some work up to <?= temp(0) ?>, and the SnowFactory at any temperature). On warmer days it waits at no cost.</li>
             <li>Each running gun covers as many open slopes as its capacity: its priority slope first, then the worst-condition slopes left.</li>
             <li>Running guns cost their daily running cost and use energy and water; anything your own <a href="/energy" class="link">energy</a> and <a href="/water" class="link">water</a> sources don't supply is bought.</li>
-            <li>Guns wear 1–3% a day while running and break at 0%. Repairs cost up to <?= (int) (SM::REPAIR_SHARE * 100) ?>% of the gun's price, depending on wear; selling returns up to <?= (int) (SM::RESALE_SHARE * 100) ?>%.</li>
+            <li>Guns wear 1–3% a day while running and break at 0%. Repairs cost up to <?= (int) (\App\Libraries\Fleet::REPAIR_SHARE * 100) ?>% of the gun's price, depending on wear; selling returns up to <?= (int) (\App\Libraries\Fleet::RESALE_SHARE * 100) ?>%.</li>
             <li>Covered slopes stay packed on warm sunny days instead of going bare.</li>
         </ul>
     </details>

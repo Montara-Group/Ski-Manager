@@ -2,6 +2,8 @@
 
 namespace App\Controllers;
 
+use App\Libraries\Fleet;
+
 class Equipment extends BaseController
 {
     public function index(): string
@@ -44,6 +46,12 @@ class Equipment extends BaseController
         }
 
         $equipment = $db->table('equipment')->where('user_id', $userId)->get()->getResultArray();
+        $prices = Fleet::prices();
+        foreach ($equipment as &$e) {
+            $e['repair_cost'] = Fleet::repairCost($e, $prices);
+            $e['resale'] = Fleet::resaleValue($e, $prices);
+        }
+        unset($e);
         $ownedGroomers = array_filter($equipment, fn($e) => $e['equipment_type'] === 'groomer');
         $ownedSnowmakers = array_filter($equipment, fn($e) => $e['equipment_type'] === 'snowmaker');
         $totalFuel = array_sum(array_column(array_filter($equipment, fn($e) => $e['status'] === 'active'), 'fuel_cost'));
@@ -142,25 +150,20 @@ class Equipment extends BaseController
 
     public function repair(int $id)
     {
-        $userId = auth()->id();
-        $db = db_connect();
-        $eq = $db->table('equipment')->where('id', $id)->where('user_id', $userId)->get()->getRowArray();
+        $eq = db_connect()->table('equipment')->where('id', $id)->where('user_id', auth()->id())->get()->getRowArray();
         if (!$eq) return redirect()->back()->with('error', 'Not found.');
+        if ((int) $eq['condition_pct'] >= 100) return redirect()->to('/equipment')->with('error', esc($eq['name']) . ' is already in perfect condition.');
 
-        $db->table('equipment')->where('id', $id)->update(['condition_pct' => 100, 'status' => 'off', 'updated_at' => date('Y-m-d H:i:s')]);
-        log_activity($userId, 'Equipment', 'Repaired ' . $eq['name'], 'fa-solid fa-wrench');
-        return redirect()->to('/equipment')->with('success', $eq['name'] . ' repaired.');
+        $cost = Fleet::repair(auth()->id(), $eq);
+        if ($cost === null) return redirect()->to('/equipment')->with('error', 'Not enough cash: repairing ' . esc($eq['name']) . ' costs ' . currency(Fleet::repairCost($eq)) . '.');
+        return redirect()->to('/equipment')->with('success', esc($eq['name']) . ' repaired for ' . currency($cost) . '.');
     }
 
     public function sell(int $id)
     {
-        $userId = auth()->id();
-        $db = db_connect();
-        $eq = $db->table('equipment')->where('id', $id)->where('user_id', $userId)->get()->getRowArray();
+        $eq = db_connect()->table('equipment')->where('id', $id)->where('user_id', auth()->id())->get()->getRowArray();
         if (!$eq) return redirect()->back()->with('error', 'Not found.');
-
-        $db->table('equipment')->where('id', $id)->delete();
-        log_activity($userId, 'Equipment', 'Sold ' . $eq['name'], 'fa-solid fa-money-bill-wave');
-        return redirect()->to('/equipment')->with('success', $eq['name'] . ' sold.');
+        $refund = Fleet::sell(auth()->id(), $eq);
+        return redirect()->to('/equipment')->with('success', esc($eq['name']) . ' sold for ' . currency($refund) . '.');
     }
 }

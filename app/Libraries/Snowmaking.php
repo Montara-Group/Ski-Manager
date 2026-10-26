@@ -16,8 +16,6 @@ class Snowmaking
     /** Models that make snow at any temperature */
     public const ALL_WEATHER = ['ta_aw50'];
 
-    public const REPAIR_SHARE = 0.3;  // repairing from 0% costs this share of the gun's price
-    public const RESALE_SHARE = 0.5;  // a gun in perfect condition sells for this share of its price
     public const CREW_WEAR_RELIEF = 1; // a gun with a crew member assigned wears this much less per day
 
     public static function maxTemp(array $gun): ?int
@@ -78,23 +76,6 @@ class Snowmaking
     public static function prioritySlope(array $gun): ?int
     {
         return preg_match('/^slope_(\d+)$/', (string) ($gun['assigned_to'] ?? ''), $m) ? (int) $m[1] : null;
-    }
-
-    /** Gun prices by model, from the shop catalog */
-    public static function prices(): array
-    {
-        return array_map('intval', array_column(db_connect()->table('equipment_catalog')->select('model_key, cost')
-            ->where('equipment_type', 'snowmaker')->get()->getResultArray(), 'cost', 'model_key'));
-    }
-
-    public static function repairCost(array $gun, int $price): int
-    {
-        return (int) round($price * self::REPAIR_SHARE * (100 - (int) $gun['condition_pct']) / 100);
-    }
-
-    public static function resaleValue(array $gun, int $price): int
-    {
-        return (int) round($price * self::RESALE_SHARE * (int) $gun['condition_pct'] / 100);
     }
 
     /** Hour-by-hour offsets from the day's base temperature (same curve as weather_helper) */
