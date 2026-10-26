@@ -156,6 +156,10 @@ class GameTick extends BaseCommand
             // EQUIPMENT (groomers + snowmakers) — fuel, decay, staff bonuses
             // ==============================
             $equipment = $db->table('equipment')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
+            // Snow guns only run (and cost or wear) on days cold enough for their model
+            $baseTemp = (int) ($weather['temp'] ?? 0);
+            $equipment = array_values(array_filter($equipment, fn($e) => $e['equipment_type'] !== 'snowmaker' || \App\Libraries\Snowmaking::runs($e, $baseTemp)));
+            $crewedGuns = array_flip(array_column(array_filter($allStaff, fn($s) => $s['role'] === 'snowmaker' && !empty($s['assigned_to'])), 'assigned_to'));
             foreach ($equipment as $e) {
                 $dayExpenses += (int) round($e['fuel_cost'] * $costMult);
 
@@ -164,8 +168,8 @@ class GameTick extends BaseCommand
                 if ($e['equipment_type'] === 'groomer' && $countAssigned('groomer') > 0) {
                     $baseDecay = max(1, $baseDecay - 1);
                 }
-                if ($e['equipment_type'] === 'snowmaker' && $countAssigned('snowmaker') > 0) {
-                    $baseDecay = max(1, $baseDecay - 1);
+                if ($e['equipment_type'] === 'snowmaker' && isset($crewedGuns[$e['name']])) {
+                    $baseDecay = max(1, $baseDecay - \App\Libraries\Snowmaking::CREW_WEAR_RELIEF);
                 }
 
                 $eqNewCond = max(0, (int) $e['condition_pct'] - $baseDecay);
@@ -181,7 +185,7 @@ class GameTick extends BaseCommand
                 }
             }
 
-            // Snowmaking energy costs from equipment (snowmakers)
+            // Snow guns running today: their energy and water count toward demand below
             $activeSnowmakers = array_filter($equipment, fn($e) => $e['equipment_type'] === 'snowmaker');
             $snowmakingEnergy = array_sum(array_column($activeSnowmakers, 'energy_kwh'));
             $snowmakingWater = array_sum(array_column($activeSnowmakers, 'water_liters'));
@@ -245,7 +249,7 @@ class GameTick extends BaseCommand
             // ==============================
             $items = $db->table('player_items')->where('user_id', $userId)->where('status', 'open')->get()->getResultArray();
             // Snow guns protect the slopes they cover from a thin natural base (cold days only)
-            $snowCovered = $v2 ? \App\Libraries\Weather::coveredSlopes(array_filter($items, fn($i) => $i['item_type'] === 'slope'), $activeSnowmakers, (int) ($weather['temp'] ?? 0)) : [];
+            $snowCovered = $v2 ? \App\Libraries\Snowmaking::coverage(array_filter($items, fn($i) => $i['item_type'] === 'slope'), $activeSnowmakers, $baseTemp) : [];
             foreach ($items as $item) {
                 $decay = rand(0, 2);
                 if ($item['item_type'] === 'lift' && $countAssigned('mechanic') > 0) {
@@ -312,7 +316,7 @@ class GameTick extends BaseCommand
                     // v2: only slopes the night shift actually groomed count as groomed
                     if (isset($groomedToday[(int) $sl['id']])) { $q = "groomed"; }
                     elseif (in_array($weather["condition_name"] ?? "", ["Freezing Rain", "Rain"], true)) { $q = "icy"; }
-                    elseif (($weather["condition_name"] ?? "") === "Sunny" && ($weather["temp"] ?? -5) >= 0) { $q = $hasSnowmaking ? "packed" : "bare"; }
+                    elseif (($weather["condition_name"] ?? "") === "Sunny" && ($weather["temp"] ?? -5) >= 0) { $q = isset($snowCovered[(int) $sl['id']]) ? "packed" : "bare"; }
                 }
                 elseif (($weather["snowfall"] ?? 0) >= 1) { $q = $activeGroomers > 0 ? "groomed" : "packed"; }
                 elseif (($weather["condition_name"] ?? "") === "Freezing Rain") { $q = "icy"; }

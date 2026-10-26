@@ -161,12 +161,12 @@
                 <p class="text-xs text-base-content/50 mb-3 line-clamp-2"><?= $s['desc'] ?></p>
                 <div class="grid grid-cols-2 gap-2 text-xs mb-3">
                     <div class="bg-base-200 rounded-lg p-2 text-center">
-                        <div class="font-bold text-base"><?= snow($s['capacity']) ?></div>
-                        <div class="text-base-content/50">Per Day</div>
+                        <div class="font-bold text-base"><?= (int) $s['capacity'] ?> slope<?= (int) $s['capacity'] === 1 ? '' : 's' ?></div>
+                        <div class="text-base-content/50">Covers</div>
                     </div>
                     <div class="bg-base-200 rounded-lg p-2 text-center">
-                        <div class="font-bold text-base"><?= currency($s['fuel']) ?></div>
-                        <div class="text-base-content/50">Energy</div>
+                        <div class="font-bold text-base"><?= currency($s['fuel']) ?>/day</div>
+                        <div class="text-base-content/50">Running cost</div>
                     </div>
                 </div>
                 <div class="border-t border-base-300 pt-3 flex items-center justify-between">

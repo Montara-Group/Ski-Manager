@@ -146,22 +146,4 @@ class Weather
         }
         return $out;
     }
-
-    /** Snow guns can run today if at least one hour reaches SNOWMAKING_MAX_TEMP */
-    public static function canMakeSnow(int $baseTemp): bool
-    {
-        return function_exists('snowmakingWindow') ? (bool) snowmakingWindow($baseTemp) : $baseTemp - 4 <= self::SNOWMAKING_MAX_TEMP;
-    }
-
-    /**
-     * Slope ids covered by snowmaking today: each running snow gun covers as many open slopes as
-     * its capacity, worst condition first, on days cold enough to make snow.
-     */
-    public static function coveredSlopes(array $openSlopes, array $activeSnowmakers, int $baseTemp): array
-    {
-        if (!$activeSnowmakers || !self::canMakeSnow($baseTemp)) return [];
-        $capacity = array_sum(array_map(fn($g) => max(1, (int) ($g['capacity'] ?? 1)), $activeSnowmakers));
-        usort($openSlopes, fn($a, $b) => (int) $a['condition_pct'] <=> (int) $b['condition_pct']);
-        return array_flip(array_map(fn($s) => (int) $s['id'], array_slice($openSlopes, 0, $capacity)));
-    }
 }

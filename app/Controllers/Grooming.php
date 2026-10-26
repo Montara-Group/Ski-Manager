@@ -23,7 +23,7 @@ class Grooming extends BaseController
         $weatherRow = ['temp' => $weather['base_temp'] ?? $weather['temp'], 'snowfall' => $weather['snowfall'] ?? 0,
             'snow_base' => $weather['snow_base'] ?? 0, 'condition_name' => $weather['condition_name'] ?? ''];
         $snowmakers = $db->table('equipment')->where('user_id', $userId)->where('equipment_type', 'snowmaker')->where('status', 'active')->get()->getResultArray();
-        $covered = \App\Libraries\Weather::coveredSlopes(array_filter($state['slopes'], fn($s) => $s['status'] === 'open'), $snowmakers, (int) $weatherRow['temp']);
+        $covered = \App\Libraries\Snowmaking::coverage(array_filter($state['slopes'], fn($s) => $s['status'] === 'open'), $snowmakers, (int) $weatherRow['temp']);
         $thinBase = (int) $weatherRow['snow_base'] < \App\Libraries\Weather::THIN_BASE;
 
         $slopes = [];

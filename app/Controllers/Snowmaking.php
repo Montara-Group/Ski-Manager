@@ -2,9 +2,14 @@
 
 namespace App\Controllers;
 
-use App\Models\StaffModel;
-use App\Models\WeatherModel;
+use App\Libraries\Snowmaking as SM;
+use App\Libraries\Utilities;
+use App\Libraries\Weather as W;
 
+/**
+ * /snowmaking: snow guns, which slopes they cover today, the next five days and what it all costs.
+ * The rules are App\Libraries\Snowmaking, the same ones the nightly tick uses.
+ */
 class Snowmaking extends BaseController
 {
     public function index(): string
@@ -12,146 +17,193 @@ class Snowmaking extends BaseController
         $locked = checkFeatureUnlock('snowmaking'); if ($locked) return $locked;
         $userId = auth()->id();
         $db = db_connect();
-
-        $cannons = $db->table('equipment')->where('user_id', $userId)->where('equipment_type', 'snowmaker')->get()->getResultArray();
-        $staffModel = new StaffModel();
-        $snowmakers = $staffModel->where('user_id', $userId)->where('role', 'snowmaker')->where('status !=', 'fired')->findAll();
+        helper('weather');
 
         $weather = getCurrentWeather();
-        $temp = $weather['temp'];
-        $canMakeSnow = $weather['can_make_snow'];
-        $snowBase = $weather['snow_base'];
+        $baseTemp = (int) $weather['base_temp'];
+        $snowBase = (int) $weather['snow_base'];
+        $prices = SM::prices();
 
-        $activeCannons = array_filter($cannons, fn($c) => $c['status'] === 'active');
-        $totalOutput = array_sum(array_column($activeCannons, 'output_per_day'));
-        $totalEnergy = array_sum(array_column($activeCannons, 'energy_kwh'));
-        $totalWater = array_sum(array_column($activeCannons, 'water_liters'));
+        $crew = $db->table('staff')->where('user_id', $userId)->where('role', 'snowmaker')->where('status', 'active')->get()->getResultArray();
+        $crewByGun = array_column(array_filter($crew, fn($s) => !empty($s['assigned_to'])), 'name', 'assigned_to');
 
-        $energySources = $db->table('energy_management')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
-        $waterSources = $db->table('water_management')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
-        $energySupply = array_sum(array_column($energySources, 'output_kwh'));
-        $waterSupply = array_sum(array_column($waterSources, 'output_liters'));
+        $guns = $db->table('equipment')->where('user_id', $userId)->where('equipment_type', 'snowmaker')->orderBy('id')->get()->getResultArray();
+        $slopes = $db->table('player_items')->where('user_id', $userId)->where('item_type', 'slope')->orderBy('name')->get()->getResultArray();
+        $open = array_values(array_filter($slopes, fn($s) => $s['status'] === 'open'));
+        $coverage = SM::coverage($open, $guns, $baseTemp);
+        $slopeNames = array_column($slopes, 'name', 'id');
 
-        $dailyEquipCost = array_sum(array_map(fn($c) => $c['status'] === 'active' ? (int)($c['daily_cost'] ?? 0) : 0, $cannons));
-        $crewCost = array_sum(array_column($snowmakers, 'salary'));
-        $repairCost = 5000;
+        $costMult = ((int) getDifficultyConfig('cost_multiplier', '100')) / 100;
+        foreach ($guns as &$g) {
+            $price = $prices[$g['model_key']] ?? 0;
+            $g['max_temp'] = SM::maxTemp($g);
+            $g['hours'] = SM::hours($g, $baseTemp);
+            $g['runs'] = SM::runs($g, $baseTemp);
+            $g['state'] = match (true) {
+                (int) $g['condition_pct'] <= 0 || $g['status'] === 'broken' => 'broken',
+                $g['status'] !== 'active' => 'off',
+                !$g['runs'] => 'idle',
+                default => 'running',
+            };
+            $g['covers'] = array_keys(array_filter($coverage, fn($gunId) => $gunId === (int) $g['id']));
+            $g['priority'] = SM::prioritySlope($g);
+            $g['crew'] = $crewByGun[$g['name']] ?? null;
+            $g['operating_cost'] = (int) round((int) $g['fuel_cost'] * $costMult);
+            $g['repair_cost'] = SM::repairCost($g, $price);
+            $g['resale'] = SM::resaleValue($g, $price);
+        }
+        unset($g);
+        $running = array_filter($guns, fn($g) => $g['runs']);
 
-        $itemModel = new \App\Models\PlayerItemModel();
-        $slopes = $itemModel->where('user_id', $userId)->whereIn('item_type', ['slope', 'downhill', 'crosscountry', 'snowpark', 'luge'])->findAll();
+        // Energy and water: running guns against everything else the sources supply
+        $energySupply = (int) $db->table('energy_management')->selectSum('output_kwh')->where('user_id', $userId)->where('status', 'active')->get()->getRow()->output_kwh;
+        $waterSupply = (int) $db->table('water_management')->selectSum('output_liters')->where('user_id', $userId)->where('status', 'active')->get()->getRow()->output_liters;
+        $energyDemand = Utilities::energyDemand(
+            $running,
+            $db->table('night_skiing')->where('user_id', $userId)->where('status', 'active')->countAllResults(),
+            $db->table('player_items')->select('subtype, length_meters')->where('user_id', $userId)->where('item_type', 'lift')->where('status', 'open')->get()->getResultArray(),
+            $db->table('buildings')->select('level')->where('user_id', $userId)->where('status', 'open')->get()->getResultArray(),
+        );
+        $waterDemand = Utilities::waterDemand($running);
+        $hidden = array_map('trim', explode(',', (string) getDifficultyConfig('hidden_pages', '')));
+        // Imports caused by snowmaking: the extra deficit its demand adds on top of everything else
+        $energyImport = in_array('energy', $hidden, true) ? 0 : Utilities::importCost('energy', max(0, $energyDemand['total'] - $energySupply) - max(0, $energyDemand['total'] - $energyDemand['snowmaking'] - $energySupply));
+        $waterImport = in_array('water', $hidden, true) ? 0 : Utilities::importCost('water', max(0, $waterDemand - $waterSupply));
+
+        // Next five days: hours a standard gun can run, and whether any of your guns can
+        $outlook = [];
+        foreach (is_array($weather['forecast']) ? $weather['forecast'] : [] as $f) {
+            $t = (int) $f['temp'];
+            $outlook[] = [
+                'day' => getSeasonDay() + (int) $f['day'], 'temp' => $t, 'condition' => $f['condition'], 'snowfall' => (int) $f['snowfall'],
+                'hours' => SM::hours(['model_key' => ''], $t),
+                'guns' => count(array_filter($guns, fn($g) => $g['status'] === 'active' && (int) $g['condition_pct'] > 0 && SM::hours($g, $t) > 0)),
+            ];
+        }
 
         return view('snowmaking/index', [
-            'cannons' => $cannons,
-            'activeCannons' => $activeCannons,
-            'snowmakers' => $snowmakers,
-            'temp' => $temp,
-            'canMakeSnow' => $canMakeSnow,
-            'snowBase' => $snowBase,
-            'totalOutput' => $totalOutput,
-            'totalEnergy' => $totalEnergy,
-            'totalWater' => $totalWater,
-            'energySupply' => $energySupply,
-            'waterSupply' => $waterSupply,
-            'dailyEquipCost' => $dailyEquipCost,
-            'crewCost' => $crewCost,
-            'repairCost' => $repairCost,
+            'guns' => $guns,
+            'running' => $running,
+            'crew' => $crew,
+            'crewByGun' => $crewByGun,
             'slopes' => $slopes,
+            'openSlopes' => $open,
+            'slopeNames' => $slopeNames,
+            'coverage' => $coverage,
+            'capacity' => array_sum(array_map(fn($g) => max(1, (int) $g['capacity']), $running)),
+            'weather' => $weather,
+            'baseTemp' => $baseTemp,
+            'snowBase' => $snowBase,
+            'thinBase' => $snowBase < W::THIN_BASE,
+            'standardHours' => SM::hours(['model_key' => ''], $baseTemp),
+            'outlook' => $outlook,
+            'energy' => ['need' => $energyDemand['snowmaking'], 'total' => $energyDemand['total'], 'supply' => $energySupply, 'import' => $energyImport, 'hidden' => in_array('energy', $hidden, true)],
+            'water' => ['need' => $waterDemand, 'supply' => $waterSupply, 'import' => $waterImport, 'hidden' => in_array('water', $hidden, true)],
+            'operatingCost' => array_sum(array_column($running, 'operating_cost')),
         ]);
+    }
+
+    private function gun(int $id): ?array
+    {
+        return db_connect()->table('equipment')->where('id', $id)->where('user_id', auth()->id())->where('equipment_type', 'snowmaker')->get()->getRowArray();
     }
 
     public function toggle(int $id)
     {
         $userId = auth()->id();
-        $db = db_connect();
-        $eq = $db->table('equipment')->where('id', $id)->where('user_id', $userId)->where('equipment_type', 'snowmaker')->get()->getRowArray();
-        if (!$eq) return redirect()->back()->with('error', 'Cannon not found.');
-        if ((int) $eq['condition_pct'] <= 0) return redirect()->back()->with('error', 'Broken — repair first.');
+        $eq = $this->gun($id);
+        if (!$eq) return redirect()->back()->with('error', 'Snow gun not found.');
+        if ((int) $eq['condition_pct'] <= 0) return redirect()->back()->with('error', esc($eq['name']) . ' is broken: repair it first.');
 
         $newStatus = $eq['status'] === 'active' ? 'off' : 'active';
-        $db->table('equipment')->where('id', $id)->update(['status' => $newStatus, 'updated_at' => date('Y-m-d H:i:s')]);
-        log_activity($userId, 'Snowmaking', $eq['name'] . ($newStatus === 'active' ? ' turned on' : ' turned off'), 'fa-solid fa-power-off');
-        return redirect()->to('/snowmaking')->with('success', $eq['name'] . ($newStatus === 'active' ? ' turned on.' : ' turned off.'));
+        db_connect()->table('equipment')->where('id', $id)->update(['status' => $newStatus, 'updated_at' => date('Y-m-d H:i:s')]);
+        log_activity($userId, 'Snowmaking', $eq['name'] . ($newStatus === 'active' ? ' switched on' : ' switched off'), 'fa-solid fa-power-off');
+        return redirect()->to('/snowmaking')->with('success', esc($eq['name']) . ($newStatus === 'active' ? ' switched on.' : ' switched off.'));
     }
 
     public function toggleAll()
     {
         $userId = auth()->id();
-        $action = $this->request->getPost('action');
+        $on = $this->request->getPost('action') === 'on';
         $db = db_connect();
-
-        if ($action === 'on') {
-            $db->table('equipment')->where('user_id', $userId)->where('equipment_type', 'snowmaker')->where('condition_pct >', 0)->update(['status' => 'active', 'updated_at' => date('Y-m-d H:i:s')]);
-            log_activity($userId, 'Snowmaking', 'All cannons turned on', 'fa-solid fa-power-off');
-            return redirect()->to('/snowmaking')->with('success', 'All working cannons turned on.');
+        $q = $db->table('equipment')->where('user_id', $userId)->where('equipment_type', 'snowmaker');
+        if ($on) {
+            $q->where('condition_pct >', 0)->whereIn('status', ['off', 'active'])->update(['status' => 'active', 'updated_at' => date('Y-m-d H:i:s')]);
         } else {
-            $db->table('equipment')->where('user_id', $userId)->where('equipment_type', 'snowmaker')->update(['status' => 'off', 'updated_at' => date('Y-m-d H:i:s')]);
-            log_activity($userId, 'Snowmaking', 'All cannons turned off', 'fa-solid fa-power-off');
-            return redirect()->to('/snowmaking')->with('success', 'All cannons turned off.');
+            $q->where('status', 'active')->update(['status' => 'off', 'updated_at' => date('Y-m-d H:i:s')]);
         }
+        log_activity($userId, 'Snowmaking', $on ? 'All snow guns switched on' : 'All snow guns switched off', 'fa-solid fa-power-off');
+        return redirect()->to('/snowmaking')->with('success', $on ? 'All working snow guns switched on.' : 'All snow guns switched off.');
     }
 
     public function repair(int $id)
     {
         $userId = auth()->id();
         $db = db_connect();
-        $eq = $db->table('equipment')->where('id', $id)->where('user_id', $userId)->where('equipment_type', 'snowmaker')->get()->getRowArray();
-        if (!$eq) return redirect()->back()->with('error', 'Cannon not found.');
+        $eq = $this->gun($id);
+        if (!$eq) return redirect()->back()->with('error', 'Snow gun not found.');
+        if ((int) $eq['condition_pct'] >= 100) return redirect()->back()->with('error', esc($eq['name']) . ' is already in perfect condition.');
 
-        $cost = 5000;
-        $finance = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
-        if ((int) ($finance['cash'] ?? 0) < $cost) return redirect()->back()->with('error', 'Not enough cash for repair.');
-
+        $cost = SM::repairCost($eq, SM::prices()[$eq['model_key']] ?? 0);
         $db->transStart();
-        $db->table('player_finances')->where('user_id', $userId)->set('cash', 'cash - ' . $cost, false)->update();
-        $db->table('equipment')->where('id', $id)->update(['condition_pct' => 100, 'status' => 'off', 'updated_at' => date('Y-m-d H:i:s')]);
-        $startDate = getSeasonStartDate();
-        $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
+        $db->table('player_finances')->where('user_id', $userId)->where('cash >=', $cost)
+            ->set('cash', 'cash - ' . $cost, false)->set('total_expenses', 'total_expenses + ' . $cost, false)->update();
+        if ($cost > 0 && $db->affectedRows() !== 1) {
+            $db->transRollback();
+            return redirect()->back()->with('error', 'Not enough cash: repairing ' . esc($eq['name']) . ' costs ' . currency($cost) . '.');
+        }
+        // A repaired broken gun comes back switched off; otherwise it keeps its on/off state
+        $db->table('equipment')->where('id', $id)->update([
+            'condition_pct' => 100, 'status' => $eq['status'] === 'broken' ? 'off' : $eq['status'], 'updated_at' => date('Y-m-d H:i:s'),
+        ]);
         $db->table('financial_transactions')->insert([
-            'user_id' => $userId, 'game_day' => $gameDay,
-            'category' => 'Snowmaking', 'description' => 'Repaired ' . $eq['name'],
+            'user_id' => $userId, 'game_day' => getGameDay(), 'category' => 'Snowmaking', 'description' => 'Repaired ' . $eq['name'],
             'amount' => $cost, 'type' => 'expense', 'created_at' => date('Y-m-d H:i:s'),
         ]);
         $db->transComplete();
 
-        log_activity($userId, 'Snowmaking', 'Repaired ' . $eq['name'] . ' for ' . $cost, 'fa-solid fa-wrench');
-        return redirect()->to('/snowmaking')->with('success', $eq['name'] . ' repaired for ' . currency($cost) . '.');
+        log_activity($userId, 'Snowmaking', 'Repaired ' . $eq['name'] . ' for ' . currency($cost), 'fa-solid fa-wrench');
+        return redirect()->to('/snowmaking')->with('success', esc($eq['name']) . ' repaired for ' . currency($cost) . '.');
     }
 
     public function assignCannon()
     {
         $userId = auth()->id();
-        $cannonId = (int) $this->request->getPost('cannon_id');
-        $slopeId = $this->request->getPost('slope_id');
         $db = db_connect();
+        $eq = $this->gun((int) $this->request->getPost('cannon_id'));
+        if (!$eq) return redirect()->back()->with('error', 'Snow gun not found.');
 
-        $eq = $db->table('equipment')->where('id', $cannonId)->where('user_id', $userId)->where('equipment_type', 'snowmaker')->get()->getRowArray();
-        if (!$eq) return redirect()->back()->with('error', 'Cannon not found.');
+        $slopeId = (int) $this->request->getPost('slope_id');
+        $slope = $slopeId ? $db->table('player_items')->where('id', $slopeId)->where('user_id', $userId)->where('item_type', 'slope')->get()->getRowArray() : null;
+        if ($slopeId && !$slope) return redirect()->back()->with('error', 'Slope not found.');
 
-        $assignment = $slopeId ? 'slope_' . (int) $slopeId : null;
-        $slopeName = '';
-        if ($assignment) {
-            $slope = $db->table('player_items')->where('id', (int) $slopeId)->where('user_id', $userId)->get()->getRowArray();
-            $slopeName = $slope ? $slope['name'] : 'Unknown';
-        }
-
-        $db->table('equipment')->where('id', $cannonId)->update(['assigned_to' => $assignment, 'updated_at' => date('Y-m-d H:i:s')]);
-        $msg = $assignment ? $eq['name'] . ' assigned to ' . $slopeName : $eq['name'] . ' unassigned';
+        $db->table('equipment')->where('id', $eq['id'])->update(['assigned_to' => $slope ? 'slope_' . $slope['id'] : null, 'updated_at' => date('Y-m-d H:i:s')]);
+        $msg = $slope ? $eq['name'] . ' now covers ' . $slope['name'] . ' first' : $eq['name'] . ' now covers the worst slopes first';
         log_activity($userId, 'Snowmaking', $msg, 'fa-solid fa-snowflake');
-        return redirect()->to('/snowmaking')->with('success', $msg);
+        return redirect()->to('/snowmaking')->with('success', esc($msg) . '.');
     }
 
     public function sell(int $id)
     {
         $userId = auth()->id();
         $db = db_connect();
-        $eq = $db->table('equipment')->where('id', $id)->where('user_id', $userId)->where('equipment_type', 'snowmaker')->get()->getRowArray();
-        if (!$eq) return redirect()->back()->with('error', 'Cannon not found.');
+        $eq = $this->gun($id);
+        if (!$eq) return redirect()->back()->with('error', 'Snow gun not found.');
 
-        $refund = (int)(($eq['purchase_price'] ?? 0) * 0.5);
-        if ($refund > 0) {
-            $db->table('player_finances')->where('user_id', $userId)->set('cash', 'cash + ' . $refund, false)->update();
-        }
+        $refund = SM::resaleValue($eq, SM::prices()[$eq['model_key']] ?? 0);
+        $db->transStart();
         $db->table('equipment')->where('id', $id)->delete();
-        log_activity($userId, 'Snowmaking', 'Sold ' . $eq['name'] . ' for ' . $refund, 'fa-solid fa-coins');
-        return redirect()->to('/snowmaking')->with('success', $eq['name'] . ' sold' . ($refund > 0 ? ' for ' . currency($refund) : '') . '.');
+        $db->table('staff')->where('user_id', $userId)->where('role', 'snowmaker')->where('assigned_to', $eq['name'])->update(['assigned_to' => null]);
+        if ($refund > 0) {
+            $db->table('player_finances')->where('user_id', $userId)->set('cash', 'cash + ' . $refund, false)->set('total_income', 'total_income + ' . $refund, false)->update();
+            $db->table('financial_transactions')->insert([
+                'user_id' => $userId, 'game_day' => getGameDay(), 'category' => 'Snowmaking', 'description' => 'Sold ' . $eq['name'],
+                'amount' => $refund, 'type' => 'income', 'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+        $db->transComplete();
+
+        log_activity($userId, 'Snowmaking', 'Sold ' . $eq['name'] . ' for ' . currency($refund), 'fa-solid fa-coins');
+        return redirect()->to('/snowmaking')->with('success', esc($eq['name']) . ' sold for ' . currency($refund) . '.');
     }
 }

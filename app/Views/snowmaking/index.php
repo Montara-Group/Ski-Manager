@@ -1,180 +1,184 @@
 <?= $this->extend('layouts/main') ?>
 <?= $this->section('title') ?>Snowmaking<?= $this->endSection() ?>
 <?= $this->section('content') ?>
+<?php
+use App\Libraries\Snowmaking as SM;
+use App\Libraries\Weather as W;
+use App\Libraries\Grooming as G;
+$coveredCount = count($coverage);
+$openCount = count($openSlopes);
+$uncovered = $openCount - $coveredCount;
+$stateBadge = [
+    'running' => ['badge-info', 'Running'], 'idle' => ['badge-warning', 'Idle: too warm'],
+    'off' => ['badge-ghost', 'Off'], 'broken' => ['badge-error', 'Broken'],
+];
+$tempLimit = fn(?int $max) => $max === null ? 'any temperature' : temp($max) . ' or colder';
+$diffBadge = ['green' => 'bg-success', 'blue' => 'bg-info', 'red' => 'bg-error', 'black' => 'bg-neutral', 'double_black' => 'bg-neutral'];
+?>
 <div class="max-w-6xl mx-auto p-4 lg:p-8">
 
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div class="flex items-center gap-3">
-            <a href="/dashboard" class="btn btn-ghost btn-sm btn-circle"><i class="fa-solid fa-chevron-left"></i></a>
+            <a href="/dashboard" class="btn btn-ghost btn-sm btn-circle" aria-label="Back to dashboard"><i class="fa-solid fa-chevron-left"></i></a>
             <div>
-                <h1 class="text-2xl font-bold"><i class="fa-solid fa-snowflake mr-2 text-info"></i>Snowmaking</h1>
-                <p class="text-sm text-base-content/50">Produce artificial snow to maintain and build your base</p>
+                <h1 class="text-2xl font-bold"><i class="fa-solid fa-snowflake mr-2 text-info" aria-hidden="true"></i>Snowmaking</h1>
+                <p class="text-sm text-base-content/60">Snow guns keep slopes skiable when the natural base is thin</p>
             </div>
         </div>
-        <div class="flex gap-2">
-            <?php if (!empty($cannons)) : ?>
+        <div class="flex flex-wrap gap-2">
+            <?php if ($guns) : ?>
             <form action="/snowmaking/toggle-all" method="post"><?= csrf_field() ?>
                 <input type="hidden" name="action" value="on">
-                <button class="btn btn-info btn-sm gap-1"><i class="fa-solid fa-power-off"></i> All On</button>
+                <button class="btn btn-info btn-sm gap-1"><i class="fa-solid fa-power-off" aria-hidden="true"></i> All on</button>
             </form>
             <form action="/snowmaking/toggle-all" method="post"><?= csrf_field() ?>
                 <input type="hidden" name="action" value="off">
-                <button class="btn btn-ghost btn-sm gap-1"><i class="fa-solid fa-power-off"></i> All Off</button>
+                <button class="btn btn-ghost btn-sm gap-1"><i class="fa-solid fa-power-off" aria-hidden="true"></i> All off</button>
             </form>
             <?php endif ?>
-            <a href="/equipment" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-shop"></i> Buy Cannons</a>
+            <a href="/equipment" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-shop" aria-hidden="true"></i> Buy snow guns</a>
         </div>
     </div>
 
-    <?php if (session('success')) : ?><div class="alert alert-success mb-4"><span><?= session('success') ?></span></div><?php endif ?>
-    <?php if (session('error')) : ?><div class="alert alert-error mb-4"><span><?= session('error') ?></span></div><?php endif ?>
+    <?php if (session('success')) : ?><div class="alert alert-success mb-4" role="status"><span><?= session('success') ?></span></div><?php endif ?>
+    <?php if (session('error')) : ?><div class="alert alert-error mb-4" role="alert"><span><?= session('error') ?></span></div><?php endif ?>
 
-    <!-- Temperature + Snow Base -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div class="card shadow-xl <?= $canMakeSnow ? 'bg-gradient-to-br from-sky-100 to-blue-200 dark:from-sky-900 dark:to-blue-950' : 'bg-gradient-to-br from-orange-100 to-red-200 dark:from-orange-900 dark:to-red-950' ?>">
-            <div class="card-body p-5">
-                <div class="flex items-center gap-4">
-                    <div class="text-4xl">
-                        <?= $canMakeSnow ? '<i class="fa-solid fa-snowflake text-info"></i>' : '<i class="fa-solid fa-temperature-high text-error"></i>' ?>
-                    </div>
-                    <div>
-                        <div class="text-3xl font-bold"><?= temp($temp) ?></div>
-                        <div class="text-sm font-semibold <?= $canMakeSnow ? 'text-info' : 'text-error' ?>">
-                            <?= $canMakeSnow ? ($temp <= -8 ? 'Perfect snowmaking conditions' : 'Snowmaking conditions: OK') : 'Too warm for snowmaking (needs ≤ ' . (isImperial() ? '28°F' : '-2°C') . ')' ?>
-                        </div>
-                        <?php if ($canMakeSnow && $temp <= -8) : ?>
-                        <div class="text-xs opacity-60 mt-1"><i class="fa-solid fa-arrow-up mr-1"></i>Cold bonus: +50% snow quality</div>
-                        <?php endif ?>
-                    </div>
-                </div>
+    <!-- Today -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Today's temperature</div>
+            <div class="text-2xl font-bold"><?= temp($baseTemp) ?></div>
+            <div class="text-xs text-base-content/60">night <?= temp($baseTemp - 4) ?> · day <?= temp($baseTemp + 4) ?></div>
+        </div></div>
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Snowmaking window</div>
+            <div class="text-2xl font-bold <?= $standardHours ? 'text-info' : 'text-error' ?>"><?= $standardHours ? $standardHours . ' h' : 'Too warm' ?></div>
+            <div class="text-xs text-base-content/60">hours at <?= temp(W::SNOWMAKING_MAX_TEMP) ?> or colder</div>
+        </div></div>
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Natural snow base</div>
+            <div class="text-2xl font-bold <?= $thinBase ? 'text-warning' : 'text-success' ?>"><?= snow($snowBase) ?></div>
+            <div class="text-xs <?= $thinBase ? 'text-warning' : 'text-base-content/60' ?>"><?= $thinBase ? 'Thin: under ' . snow(W::THIN_BASE) : 'Deep enough: guns optional' ?></div>
+        </div></div>
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Slopes covered today</div>
+            <div class="text-2xl font-bold <?= $uncovered > 0 && $thinBase ? 'text-warning' : '' ?>"><?= $coveredCount ?> / <?= $openCount ?></div>
+            <div class="text-xs text-base-content/60"><?= count($running) ?> of <?= count($guns) ?> gun<?= count($guns) === 1 ? '' : 's' ?> running · room for <?= $capacity ?></div>
+        </div></div>
+    </div>
+
+    <?php if ($thinBase && $openCount > 0) : ?>
+    <div class="alert <?= $uncovered > 0 ? 'alert-warning' : 'alert-success' ?> mb-4">
+        <i class="fa-solid <?= $uncovered > 0 ? 'fa-triangle-exclamation' : 'fa-circle-check' ?>" aria-hidden="true"></i>
+        <span>
+            <?php if ($uncovered <= 0) : ?>
+                The natural base is thin, but every open slope has a snow gun today.
+            <?php elseif (!$guns) : ?>
+                The natural base is thin: all <?= $openCount ?> open slopes wear an extra <?= G::THIN_BASE_EXTRA ?>% a day. Buy snow guns to protect them.
+            <?php elseif (!$standardHours && !$running) : ?>
+                The natural base is thin and it's too warm for your guns today: <?= $uncovered ?> slope<?= $uncovered === 1 ? '' : 's' ?> wear an extra <?= G::THIN_BASE_EXTRA ?>% a day.
+            <?php else : ?>
+                The natural base is thin: <?= $uncovered ?> uncovered slope<?= $uncovered === 1 ? '' : 's' ?> wear an extra <?= G::THIN_BASE_EXTRA ?>% a day.
+                <?= count($running) < count(array_filter($guns, fn($g) => $g['state'] !== 'broken')) ? 'Switch on more guns or buy' : 'Buy' ?> guns with more capacity.
+            <?php endif ?>
+        </span>
+    </div>
+    <?php endif ?>
+
+    <!-- Next 5 days -->
+    <?php if ($outlook) : ?>
+    <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body p-4">
+        <h2 class="font-bold mb-3">Next 5 days</h2>
+        <div class="grid grid-cols-5 gap-2">
+            <?php foreach ($outlook as $o) : ?>
+            <div class="bg-base-200 rounded-lg p-2 text-center">
+                <div class="text-xs text-base-content/60">Day <?= $o['day'] ?></div>
+                <i class="fa-solid <?= weatherIcon($o['condition']) ?> text-lg my-1" aria-hidden="true"></i>
+                <div class="font-bold text-sm"><?= temp($o['temp']) ?></div>
+                <?php if ($o['snowfall'] > 0) : ?><div class="text-xs text-info">+<?= snow($o['snowfall']) ?></div><?php endif ?>
+                <div class="text-[11px] mt-1 <?= $o['hours'] ? 'text-info' : 'text-error' ?>"><?= $o['hours'] ? $o['hours'] . ' h guns' : 'too warm' ?></div>
+                <?php if (!$o['hours'] && $o['guns']) : ?><div class="text-[11px] text-success"><?= $o['guns'] ?> of yours can run</div><?php endif ?>
             </div>
+            <?php endforeach ?>
         </div>
-        <div class="card bg-base-100 shadow-sm">
-            <div class="card-body p-5">
-                <div class="flex items-center justify-between mb-2">
-                    <h3 class="font-bold text-sm"><i class="fa-solid fa-mountain-sun mr-1"></i> Snow Base</h3>
-                    <span class="text-xs text-base-content/50"><?= $snowBase >= 60 ? 'Excellent' : ($snowBase >= 30 ? 'Adequate' : 'Low — make more snow') ?></span>
-                </div>
-                <div class="text-3xl font-bold mb-1"><?= snow($snowBase) ?></div>
-                <progress class="progress <?= $snowBase >= 60 ? 'progress-info' : ($snowBase >= 30 ? 'progress-warning' : 'progress-error') ?> w-full h-3" value="<?= min($snowBase, 150) ?>" max="150"></progress>
-                <div class="flex justify-between text-xs text-base-content/40 mt-1">
-                    <span>0</span><span>Min. skiable (30)</span><span>150+</span>
-                </div>
-            </div>
-        </div>
-    </div>
+        <p class="text-xs text-base-content/60 mt-2">Hours a standard gun can run. Guns left on simply wait out warm days at no cost.</p>
+    </div></div>
+    <?php endif ?>
 
-    <!-- Resource Status -->
-    <div class="grid grid-cols-2 gap-3 mb-4">
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2"><i class="fa-solid fa-bolt text-warning"></i><span class="text-xs font-semibold">Energy</span></div>
-                <a href="/energy" class="link link-primary text-xs">Manage</a>
-            </div>
-            <div class="flex items-center justify-between mt-1 text-xs">
-                <span>Supply: <?= number_format($energySupply) ?> kWh</span>
-                <span class="<?= $energySupply >= $totalEnergy ? 'text-success' : 'text-error' ?>">Need: <?= number_format($totalEnergy) ?> kWh</span>
-            </div>
-            <progress class="progress <?= $energySupply >= $totalEnergy ? 'progress-success' : 'progress-error' ?> w-full mt-1" value="<?= min($energySupply, max(1, $totalEnergy)) ?>" max="<?= max(1, $totalEnergy) ?>"></progress>
-        </div></div>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2"><i class="fa-solid fa-droplet text-info"></i><span class="text-xs font-semibold">Water</span></div>
-                <a href="/water" class="link link-primary text-xs">Manage</a>
-            </div>
-            <div class="flex items-center justify-between mt-1 text-xs">
-                <span>Supply: <?= number_format($waterSupply) ?> L</span>
-                <span class="<?= $waterSupply >= $totalWater ? 'text-success' : 'text-error' ?>">Need: <?= number_format($totalWater) ?> L</span>
-            </div>
-            <progress class="progress <?= $waterSupply >= $totalWater ? 'progress-success' : 'progress-error' ?> w-full mt-1" value="<?= min($waterSupply, max(1, $totalWater)) ?>" max="<?= max(1, $totalWater) ?>"></progress>
-        </div></div>
-    </div>
-
-    <!-- Production Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center">
-            <div class="text-2xl font-bold text-info"><?= $totalOutput ?></div>
-            <div class="text-xs text-base-content/50"><?= isImperial() ? 'in' : 'cm' ?>/day output</div>
-        </div></div>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center">
-            <div class="text-2xl font-bold"><?= count($activeCannons) ?>/<?= count($cannons) ?></div>
-            <div class="text-xs text-base-content/50">cannons running</div>
-        </div></div>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center">
-            <div class="text-2xl font-bold"><?= count($snowmakers) ?></div>
-            <div class="text-xs text-base-content/50">crew on duty</div>
-        </div></div>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center">
-            <div class="text-2xl font-bold text-warning"><?= number_format($totalEnergy) ?></div>
-            <div class="text-xs text-base-content/50">kWh/day</div>
-        </div></div>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center">
-            <div class="text-2xl font-bold text-blue-400"><?= number_format($totalWater) ?> L</div>
-            <div class="text-xs text-base-content/50">water/day</div>
-        </div></div>
-    </div>
-
-    <!-- Snow Cannons -->
-    <h2 class="text-lg font-bold mb-3"><i class="fa-solid fa-snowflake mr-1 text-info"></i> Snow Cannons</h2>
-    <?php if (empty($cannons)) : ?>
-        <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body text-center py-12">
-            <i class="fa-solid fa-snowflake text-5xl text-base-content/15 mb-3"></i>
-            <p class="font-semibold">No snow cannons</p>
-            <p class="text-sm text-base-content/50 mt-1">Buy snowmakers from the <a href="/equipment" class="link link-primary">Equipment Shop</a></p>
+    <!-- Snow guns -->
+    <h2 class="text-lg font-bold mb-3">Snow guns</h2>
+    <?php if (!$guns) : ?>
+        <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body text-center py-10">
+            <i class="fa-solid fa-snowflake text-5xl text-base-content/20 mb-3" aria-hidden="true"></i>
+            <p class="font-semibold">No snow guns yet</p>
+            <p class="text-sm text-base-content/60 mt-1">Each gun covers one or more slopes on cold days. Buy them in the <a href="/equipment" class="link link-primary">equipment shop</a>.</p>
         </div></div>
     <?php else : ?>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-        <?php foreach ($cannons as $cannon) : ?>
-            <?php $isOn = $cannon['status'] === 'active'; $cond = (int) $cannon['condition_pct']; $isBroken = $cond <= 0; ?>
-            <div class="card bg-base-100 shadow-sm <?= $isBroken ? 'border border-error/30' : '' ?>">
-                <div class="card-body p-3">
-                    <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-lg <?= $isBroken ? 'bg-error/20' : ($isOn ? ($canMakeSnow ? 'bg-info/20' : 'bg-warning/20') : 'bg-base-200') ?> flex items-center justify-center">
-                                <i class="fa-solid fa-<?= $isBroken ? 'wrench text-error' : 'snowflake' ?> <?= $isOn && !$isBroken ? ($canMakeSnow ? 'text-info' : 'text-warning') : 'text-base-content/30' ?>"></i>
-                            </div>
-                            <div>
-                                <div class="font-semibold text-sm"><?= esc($cannon['name']) ?></div>
-                                <div class="text-xs text-base-content/50"><?= esc($cannon['brand']) ?> · <?= currency($cannon['daily_cost'] ?? 0) ?>/day</div>
-                            </div>
+        <?php foreach ($guns as $g) : $cond = (int) $g['condition_pct']; [$badge, $label] = $stateBadge[$g['state']]; ?>
+            <div class="card bg-base-100 shadow-sm <?= $g['state'] === 'broken' ? 'border border-error/40' : '' ?>">
+                <div class="card-body p-4 gap-2">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <div class="font-semibold truncate"><?= esc($g['name']) ?></div>
+                            <div class="text-xs text-base-content/60"><?= esc($g['brand']) ?> · works at <?= $tempLimit($g['max_temp']) ?></div>
                         </div>
-                        <span class="badge badge-xs <?= $isBroken ? 'badge-error' : ($isOn ? ($canMakeSnow ? 'badge-info' : 'badge-warning') : 'badge-ghost') ?>">
-                            <?= $isBroken ? 'BROKEN' : ($isOn ? ($canMakeSnow ? 'PRODUCING' : 'TOO WARM') : 'OFF') ?>
-                        </span>
+                        <span class="badge badge-sm <?= $badge ?> shrink-0"><?= $label ?></span>
                     </div>
-                    <div class="grid grid-cols-3 gap-2 text-xs text-center mb-2">
-                        <div><span class="font-bold text-info"><?= $cannon['output_per_day'] ?> <?= isImperial() ? 'in' : 'cm' ?></span><br><span class="text-base-content/50">Output</span></div>
-                        <div><span class="font-bold"><?= number_format($cannon['energy_kwh']) ?></span><br><span class="text-base-content/50">kWh</span></div>
-                        <div><span class="font-bold"><?= number_format($cannon['water_liters']) ?>L</span><br><span class="text-base-content/50">Water</span></div>
-                    </div>
+
+                    <dl class="grid grid-cols-3 gap-2 text-xs text-center">
+                        <div class="bg-base-200 rounded p-1.5"><dt class="text-base-content/60">Covers</dt><dd class="font-bold"><?= (int) $g['capacity'] ?> slope<?= (int) $g['capacity'] === 1 ? '' : 's' ?></dd></div>
+                        <div class="bg-base-200 rounded p-1.5"><dt class="text-base-content/60">Running cost</dt><dd class="font-bold"><?= currency($g['operating_cost']) ?>/day</dd></div>
+                        <div class="bg-base-200 rounded p-1.5"><dt class="text-base-content/60">Uses</dt><dd class="font-bold"><?= number_format((int) $g['energy_kwh']) ?> kWh · <?= number_format((int) $g['water_liters'] / 1000, 1) ?> m³</dd></div>
+                    </dl>
+
                     <div class="flex items-center gap-2">
-                        <span class="text-xs text-base-content/50 w-10">Health</span>
-                        <progress class="progress <?= $cond >= 60 ? 'progress-success' : ($cond >= 30 ? 'progress-warning' : 'progress-error') ?> flex-1 h-1.5" value="<?= $cond ?>" max="100"></progress>
-                        <span class="text-xs font-mono w-8 text-right"><?= $cond ?>%</span>
+                        <span class="text-xs text-base-content/60 w-12">Health</span>
+                        <progress class="progress <?= $cond >= 60 ? 'progress-success' : ($cond >= 30 ? 'progress-warning' : 'progress-error') ?> flex-1 h-1.5" value="<?= $cond ?>" max="100" aria-label="Health <?= $cond ?>%"></progress>
+                        <span class="text-xs font-mono w-9 text-right"><?= $cond ?>%</span>
                     </div>
-                    <form action="/snowmaking/assign" method="post" class="flex gap-2 mt-2"><?= csrf_field() ?>
-                        <input type="hidden" name="cannon_id" value="<?= $cannon['id'] ?>">
-                        <select name="slope_id" class="select select-bordered select-xs flex-1">
-                            <option value="">- No trail -</option>
+
+                    <div class="text-xs">
+                        <?php if ($g['state'] === 'running') : ?>
+                            <span class="text-info"><i class="fa-solid fa-snowflake mr-1" aria-hidden="true"></i><?= $g['hours'] ?> h today, covering
+                            <?= $g['covers'] ? esc(implode(', ', array_map(fn($id) => $slopeNames[$id] ?? '?', $g['covers']))) : 'nothing (no open slopes left)' ?></span>
+                        <?php elseif ($g['state'] === 'idle') : ?>
+                            <span class="text-warning">Waiting for a colder day: no cost or wear today.</span>
+                        <?php elseif ($g['state'] === 'off') : ?>
+                            <span class="text-base-content/60">Switched off.</span>
+                        <?php else : ?>
+                            <span class="text-error">Broken: repair it to use it again.</span>
+                        <?php endif ?>
+                    </div>
+                    <div class="text-xs text-base-content/60">
+                        <i class="fa-solid fa-user mr-1" aria-hidden="true"></i><?= $g['crew'] ? 'Crew: ' . esc($g['crew']) . ' (−' . SM::CREW_WEAR_RELIEF . '% wear a day)' : 'No crew assigned' ?>
+                    </div>
+
+                    <form action="/snowmaking/assign" method="post" class="flex gap-2"><?= csrf_field() ?>
+                        <input type="hidden" name="cannon_id" value="<?= (int) $g['id'] ?>">
+                        <label class="sr-only" for="prio-<?= (int) $g['id'] ?>">Priority slope for <?= esc($g['name']) ?></label>
+                        <select id="prio-<?= (int) $g['id'] ?>" name="slope_id" class="select select-bordered select-xs flex-1 min-w-0">
+                            <option value="">Auto: worst slopes first</option>
                             <?php foreach ($slopes as $sl) : ?>
-                            <option value="<?= $sl['id'] ?>" <?= $cannon['assigned_to'] === 'slope_' . $sl['id'] ? 'selected' : '' ?>><?= esc($sl['name']) ?></option>
+                            <option value="<?= (int) $sl['id'] ?>" <?= $g['priority'] === (int) $sl['id'] ? 'selected' : '' ?>>First: <?= esc($sl['name']) ?><?= $sl['status'] !== 'open' ? ' (' . esc($sl['status']) . ')' : '' ?></option>
                             <?php endforeach ?>
                         </select>
-                        <button type="submit" class="btn btn-primary btn-xs"><i class="fa-solid fa-check"></i></button>
+                        <button type="submit" class="btn btn-primary btn-xs" aria-label="Save priority slope"><i class="fa-solid fa-check" aria-hidden="true"></i></button>
                     </form>
-                    <div class="flex gap-1 mt-1">
-                        <?php if (!$isBroken) : ?>
-                        <form action="/snowmaking/toggle/<?= $cannon['id'] ?>" method="post" class="flex-1"><?= csrf_field() ?>
-                            <button class="btn btn-xs w-full <?= $isOn ? 'btn-ghost' : 'btn-info' ?>"><i class="fa-solid fa-power-off mr-1"></i><?= $isOn ? 'Turn Off' : 'Turn On' ?></button>
+
+                    <div class="flex gap-1">
+                        <?php if ($g['state'] !== 'broken') : ?>
+                        <form action="/snowmaking/toggle/<?= (int) $g['id'] ?>" method="post" class="flex-1"><?= csrf_field() ?>
+                            <button class="btn btn-xs w-full <?= $g['status'] === 'active' ? 'btn-ghost' : 'btn-info' ?>"><i class="fa-solid fa-power-off mr-1" aria-hidden="true"></i><?= $g['status'] === 'active' ? 'Switch off' : 'Switch on' ?></button>
                         </form>
                         <?php endif ?>
                         <?php if ($cond < 100) : ?>
-                        <form action="/snowmaking/repair/<?= $cannon['id'] ?>" method="post" data-confirm="Repair <?= esc($cannon['name']) ?> for <?= currency($repairCost) ?>?"><?= csrf_field() ?>
-                            <button class="btn btn-xs btn-outline gap-1"><i class="fa-solid fa-wrench"></i> <?= currency($repairCost) ?></button>
+                        <form action="/snowmaking/repair/<?= (int) $g['id'] ?>" method="post" class="<?= $g['state'] === 'broken' ? 'flex-1' : '' ?>" data-confirm="Repair <?= esc($g['name']) ?> to 100% for <?= currency($g['repair_cost']) ?>?"><?= csrf_field() ?>
+                            <button class="btn btn-xs btn-outline gap-1 w-full"><i class="fa-solid fa-wrench" aria-hidden="true"></i> Repair <?= currency($g['repair_cost']) ?></button>
                         </form>
                         <?php endif ?>
-                        <form action="/snowmaking/sell/<?= $cannon['id'] ?>" method="post" data-confirm="Sell <?= esc($cannon['name']) ?>?"><?= csrf_field() ?>
-                            <button class="btn btn-xs btn-ghost text-error"><i class="fa-solid fa-coins"></i></button>
+                        <form action="/snowmaking/sell/<?= (int) $g['id'] ?>" method="post" data-confirm="Sell <?= esc($g['name']) ?> for <?= currency($g['resale']) ?>?"><?= csrf_field() ?>
+                            <button class="btn btn-xs btn-ghost text-error gap-1"><i class="fa-solid fa-coins" aria-hidden="true"></i> Sell <?= currency($g['resale']) ?></button>
                         </form>
                     </div>
                 </div>
@@ -183,129 +187,78 @@
         </div>
     <?php endif ?>
 
-    <!-- Trail Snow Depth -->
-    <?php if (!empty($slopes)) : ?>
-    <h2 class="text-lg font-bold mb-3"><i class="fa-solid fa-mountain mr-1"></i> Trail Snow Base</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-        <?php foreach ($slopes as $sl) : ?>
-        <?php
-            $depth = (int) ($sl['snow_depth'] ?? 50);
-            $assigned = array_filter($cannons, fn($c) => $c['assigned_to'] === 'slope_' . $sl['id'] && $c['status'] === 'active');
-            $cannonOutput = array_sum(array_column($assigned, 'output_per_day'));
-        ?>
-        <div class="card bg-base-100 shadow-sm <?= $depth < 20 ? 'border border-error/30' : '' ?>">
-            <div class="card-body p-3">
-                <div class="flex items-center justify-between mb-1">
-                    <span class="font-semibold text-sm truncate"><?= esc($sl['name']) ?></span>
-                    <div class="flex items-center gap-1">
-                        <?php if ($depth < 20) : ?><span class="badge badge-xs badge-error">Critical</span><?php endif ?>
-                        <span class="badge badge-xs <?= match($sl['snow_quality'] ?? 'packed') { 'powder' => 'badge-info', 'groomed' => 'badge-success', 'packed' => 'badge-ghost', 'icy' => 'badge-warning', 'bare' => 'badge-error', default => 'badge-ghost' } ?>"><?= ucfirst($sl['snow_quality'] ?? 'packed') ?></span>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2">
-                    <progress class="progress <?= $depth >= 60 ? 'progress-info' : ($depth >= 30 ? 'progress-warning' : 'progress-error') ?> flex-1 h-2" value="<?= min($depth, 150) ?>" max="150"></progress>
-                    <span class="text-xs font-mono font-bold w-12 text-right"><?= snow($depth) ?></span>
-                </div>
-                <div class="flex items-center justify-between mt-1 text-xs text-base-content/50">
-                    <span><?= ucwords(str_replace('_', ' ', $sl['subtype'] ?? $sl['item_type'] ?? '')) ?></span>
-                    <?php if (count($assigned) > 0) : ?>
-                    <span class="text-info"><i class="fa-solid fa-snowflake mr-1"></i><?= count($assigned) ?> cannon<?= count($assigned) > 1 ? 's' : '' ?> · +<?= $cannonOutput ?> <?= isImperial() ? 'in' : 'cm' ?>/day</span>
-                    <?php else : ?>
-                    <span class="text-base-content/30"><i class="fa-solid fa-snowflake mr-1"></i>No cannons</span>
-                    <?php endif ?>
-                </div>
-            </div>
+    <!-- Slope coverage -->
+    <?php if ($slopes) : ?>
+    <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body p-4">
+        <h2 class="font-bold mb-1">Slope coverage today</h2>
+        <p class="text-xs text-base-content/60 mb-3">Each gun takes its priority slope first, then the worst-condition slopes no other gun covers.</p>
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead><tr><th>Slope</th><th>Condition</th><th>Snow gun</th><th class="text-right">Base wear</th></tr></thead>
+                <tbody>
+                <?php foreach ($slopes as $sl) : $id = (int) $sl['id']; $isOpen = $sl['status'] === 'open'; $gunId = $coverage[$id] ?? null; ?>
+                    <tr class="<?= $isOpen ? '' : 'opacity-50' ?>">
+                        <td><span class="inline-block w-2 h-2 rounded-full mr-2 <?= $diffBadge[$sl['difficulty'] ?? ''] ?? 'bg-base-300' ?>" aria-hidden="true"></span><?= esc($sl['name']) ?></td>
+                        <td><span class="<?= (int) $sl['condition_pct'] < 40 ? 'text-error' : ((int) $sl['condition_pct'] < 70 ? 'text-warning' : '') ?>"><?= (int) $sl['condition_pct'] ?>%</span></td>
+                        <td>
+                            <?php if (!$isOpen) : ?><span class="text-base-content/60"><?= esc(ucfirst($sl['status'])) ?></span>
+                            <?php elseif ($gunId) : $gun = array_values(array_filter($guns, fn($g) => (int) $g['id'] === $gunId))[0]; ?>
+                                <span class="text-info"><i class="fa-solid fa-snowflake mr-1" aria-hidden="true"></i><?= esc($gun['name']) ?></span><?php if ($gun['priority'] === $id) : ?> <span class="badge badge-xs badge-outline">priority</span><?php endif ?>
+                            <?php else : ?><span class="text-base-content/60">Not covered</span><?php endif ?>
+                        </td>
+                        <td class="text-right"><?= !$isOpen ? '' : ($gunId || !$thinBase ? '<span class="text-success">normal</span>' : '<span class="text-warning">+' . G::THIN_BASE_EXTRA . '%/day</span>') ?></td>
+                    </tr>
+                <?php endforeach ?>
+                </tbody>
+            </table>
         </div>
-        <?php endforeach ?>
-    </div>
+    </div></div>
     <?php endif ?>
 
-    <!-- Snowmaker Crew -->
-    <?php if (!empty($snowmakers)) : ?>
-    <h2 class="text-lg font-bold mb-3"><i class="fa-solid fa-users mr-1"></i> Snowmaker Crew</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-        <?php foreach ($snowmakers as $sm) : ?>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-full bg-info/10 flex items-center justify-center">
-                    <i class="fa-solid fa-user text-info text-xs"></i>
-                </div>
-                <div class="flex-1">
-                    <div class="text-sm font-semibold"><?= esc($sm['name']) ?></div>
-                    <div class="flex items-center gap-2 text-xs text-base-content/50">
-                        <span class="flex items-center gap-0.5"><?php for($i=0;$i<min($sm['level'],5);$i++): ?><i class="fa-solid fa-star text-warning text-[8px]"></i><?php endfor ?></span>
-                        <span>Lv.<?= $sm['level'] ?></span>
-                        <span>·</span>
-                        <span>Morale <?= $sm['morale'] ?>%</span>
-                        <?php if ($sm['assigned_to']) : ?><span>·</span><span class="text-info"><?= esc($sm['assigned_to']) ?></span><?php endif ?>
-                    </div>
-                </div>
+    <!-- Costs, energy, water -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Running cost today</div>
+            <div class="text-2xl font-bold"><?= currency($operatingCost + $energy['import'] + $water['import']) ?></div>
+            <div class="text-xs text-base-content/60"><?= currency($operatingCost) ?> guns<?= $energy['import'] ? ' + ' . currency($energy['import']) . ' grid power' : '' ?><?= $water['import'] ? ' + ' . currency($water['import']) . ' bought water' : '' ?></div>
+        </div></div>
+        <?php foreach (['energy' => ['fa-bolt text-warning', 'Energy', 'kWh', '/energy'], 'water' => ['fa-droplet text-info', 'Water', 'L', '/water']] as $k => [$icon, $title, $unit, $link]) : $r = $$k; if ($r['hidden']) continue;
+            $use = $k === 'energy' ? $r['total'] : $r['need']; $ok = $r['supply'] >= $use; ?>
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="flex items-center justify-between">
+                <span class="text-xs text-base-content/60"><i class="fa-solid <?= $icon ?> mr-1" aria-hidden="true"></i><?= $title ?> for snowmaking</span>
+                <a href="<?= $link ?>" class="link link-primary text-xs">Manage</a>
+            </div>
+            <div class="text-2xl font-bold"><?= number_format($r['need']) ?> <span class="text-sm font-normal"><?= $unit ?></span></div>
+            <div class="text-xs <?= $ok ? 'text-success' : 'text-warning' ?>">
+                <?= $k === 'energy' ? 'Resort total ' . number_format($use) . ' kWh, ' : '' ?>your sources make <?= number_format($r['supply']) ?> <?= $unit ?>
+                <?= $ok ? '' : '· the rest is bought' ?>
             </div>
         </div></div>
         <?php endforeach ?>
     </div>
-    <?php else : ?>
-    <div class="alert alert-warning mb-6"><i class="fa-solid fa-user-slash"></i><span>No snowmaker crew. <a href="/staff/hire" class="link font-semibold">Hire snowmakers</a> to operate your cannons.</span></div>
+
+    <?php if (!$crew && $guns) : ?>
+    <div class="alert mb-6"><i class="fa-solid fa-user-plus text-info" aria-hidden="true"></i><span>Snowmaking crew is optional: a crew member assigned to a gun cuts its wear by <?= SM::CREW_WEAR_RELIEF ?>% a day. <a href="/staff/hire" class="link link-primary">Hire snowmakers</a>, then assign them on the <a href="/staff" class="link link-primary">staff page</a>.</span></div>
     <?php endif ?>
 
-    <!-- Snowmaking Economics -->
-    <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body p-4">
-        <h3 class="text-sm font-bold mb-3"><i class="fa-solid fa-chart-line mr-1"></i> Daily Costs</h3>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-            <div>
-                <div class="text-xs text-base-content/50">Equipment</div>
-                <div class="text-lg font-bold"><?= currency($dailyEquipCost) ?></div>
-            </div>
-            <div>
-                <div class="text-xs text-base-content/50">Crew Salaries</div>
-                <div class="text-lg font-bold"><?= currency($crewCost) ?></div>
-            </div>
-            <div>
-                <div class="text-xs text-base-content/50">Total/Day</div>
-                <div class="text-lg font-bold text-error"><?= currency($dailyEquipCost + $crewCost) ?></div>
-            </div>
-            <div>
-                <div class="text-xs text-base-content/50">Cost per <?= isImperial() ? 'in' : 'cm' ?></div>
-                <div class="text-lg font-bold"><?= $totalOutput > 0 ? currency((int)(($dailyEquipCost + $crewCost) / max(1, $totalOutput))) : '-' ?></div>
-            </div>
-        </div>
-    </div></div>
+    <details class="card bg-base-100 shadow-sm mb-6">
+        <summary class="card-body p-4 cursor-pointer font-semibold text-sm">How snowmaking works</summary>
+        <ul class="px-4 pb-4 text-sm text-base-content/80 space-y-1 list-disc pl-9">
+            <li>When the natural base is under <?= snow(W::THIN_BASE) ?>, slopes wear an extra <?= G::THIN_BASE_EXTRA ?>% a day unless a snow gun covers them. With a deep base, guns don't change wear.</li>
+            <li>A switched-on gun runs on any day with at least one hour cold enough for its model (most need <?= temp(W::SNOWMAKING_MAX_TEMP) ?>; some work up to <?= temp(0) ?>, and the SnowFactory at any temperature). On warmer days it waits at no cost.</li>
+            <li>Each running gun covers as many open slopes as its capacity: its priority slope first, then the worst-condition slopes left.</li>
+            <li>Running guns cost their daily running cost and use energy and water; anything your own <a href="/energy" class="link">energy</a> and <a href="/water" class="link">water</a> sources don't supply is bought.</li>
+            <li>Guns wear 1–3% a day while running and break at 0%. Repairs cost up to <?= (int) (SM::REPAIR_SHARE * 100) ?>% of the gun's price, depending on wear; selling returns up to <?= (int) (SM::RESALE_SHARE * 100) ?>%.</li>
+            <li>Covered slopes stay packed on warm sunny days instead of going bare.</li>
+        </ul>
+    </details>
 
-    <!-- How It Works -->
-    <div class="collapse collapse-arrow bg-base-100 shadow-sm mb-6">
-        <input type="checkbox" />
-        <div class="collapse-title font-semibold text-sm"><i class="fa-solid fa-circle-info mr-1"></i> How Snowmaking Works</div>
-        <div class="collapse-content text-sm text-base-content/70">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                <div>
-                    <h4 class="font-semibold text-xs uppercase tracking-wide mb-2 text-base-content/40">Temperature</h4>
-                    <ul class="space-y-1">
-                        <li><i class="fa-solid fa-snowflake text-xs mr-2 text-info"></i>Below <?= isImperial() ? "18°F" : "-8°C" ?>: optimal, +50% snow quality</li>
-                        <li><i class="fa-solid fa-check text-xs mr-2 text-success"></i><?= isImperial() ? "18°F to 28°F" : "-8°C to -2°C" ?>: normal operation</li>
-                        <li><i class="fa-solid fa-ban text-xs mr-2 text-error"></i>Above <?= isImperial() ? "28°F" : "-2°C" ?>: too warm, cannons idle</li>
-                        <li><i class="fa-solid fa-bolt text-xs mr-2 text-warning"></i>Each cannon uses energy + water per day</li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="font-semibold text-xs uppercase tracking-wide mb-2 text-base-content/40">Production</h4>
-                    <ul class="space-y-1">
-                        <li><i class="fa-solid fa-mountain text-xs mr-2 text-info"></i>Snow output increases snow base daily</li>
-                        <li><i class="fa-solid fa-user text-xs mr-2 text-info"></i>Crew level boosts efficiency (+5%/level)</li>
-                        <li><i class="fa-solid fa-wrench text-xs mr-2 text-warning"></i>Low condition reduces output</li>
-                        <li><i class="fa-solid fa-coins text-xs mr-2 text-success"></i>Sell unused cannons for 50% refund</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Quick Links -->
     <div class="flex flex-wrap gap-2">
-        <a href="/equipment" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-toolbox"></i> Equipment Shop</a>
-        <a href="/staff/hire" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-user-plus"></i> Hire Crew</a>
-        <a href="/energy" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-bolt"></i> Energy</a>
-        <a href="/water" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-droplet"></i> Water</a>
-        <a href="/grooming" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-tractor"></i> Grooming</a>
+        <a href="/equipment" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-toolbox" aria-hidden="true"></i> Equipment shop</a>
+        <a href="/weather" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-cloud-sun" aria-hidden="true"></i> Weather</a>
+        <a href="/grooming" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-tractor" aria-hidden="true"></i> Grooming</a>
+        <a href="/staff" class="btn btn-outline btn-sm gap-1"><i class="fa-solid fa-users" aria-hidden="true"></i> Staff</a>
     </div>
 </div>
 <?= $this->endSection() ?>
