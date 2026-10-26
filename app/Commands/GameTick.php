@@ -845,6 +845,9 @@ class GameTick extends BaseCommand
             log_activity($userId, 'Daily Report', "Day {$gameDay}: +" . number_format($dayIncome) . '€ income, -' . number_format($dayExpenses) . '€ expenses, ' . number_format($visitors) . ' visitors', 'fa-solid fa-chart-line');
 
             CLI::write("  Income: {$dayIncome} | Expenses: {$dayExpenses} | Visitors: {$visitors} | Cash: {$newCash}", "white");
+
+            // Achievements: progress and feature unlocks shouldn't wait for a visit to /achievements
+            if (($user['status'] ?? '') !== 'demo') \App\Libraries\Achievements::sync($userId);
                 if ($db->transStatus() === false) {
                     $db->transRollback();
                     CLI::write("  Transaction failed for user {$userId}, rolled back.", "red");
