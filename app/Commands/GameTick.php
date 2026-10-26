@@ -651,7 +651,8 @@ class GameTick extends BaseCommand
             // Energy demand vs output: grid import if deficit. Difficulties that hide the energy/water
             // pages (easy) can't build sources, so they aren't billed for imports either.
             $hiddenPages = array_map('trim', explode(',', (string) ($diffConfig['hidden_pages'] ?? '')));
-            $totalEnergyDemand = \App\Libraries\Utilities::energyDemand($activeSnowmakers, count($lights), $openLifts, count($buildings))['total'];
+            $openLiftRows = $db->table('player_items')->select('subtype, length_meters')->where('user_id', $userId)->where('item_type', 'lift')->where('status', 'open')->get()->getResultArray();
+            $totalEnergyDemand = \App\Libraries\Utilities::energyDemand($activeSnowmakers, count($lights), $openLiftRows, $buildings)['total'];
             if ($totalEnergyDemand > $totalEnergyOutput && !in_array('energy', $hiddenPages, true)) {
                 $energyDeficit = $totalEnergyDemand - $totalEnergyOutput;
                 $gridTariff = \App\Libraries\Utilities::importCost('energy', $energyDeficit);

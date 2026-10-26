@@ -31,8 +31,11 @@ class Economy
     public const RIDES_PER_SKIER = 10;
     public const WALK_UP_VISITORS = 100;
 
-    /** Running cost in EUR per metre per day; a closed lift costs a fifth */
-    public const LIFT_RUN_PER_M = ['button' => 0.5, 'chair_fixed' => 0.8, 'chair_detach' => 1.2, 'gondola' => 1.8, 'cable_car' => 2.5];
+    /**
+     * Running cost (maintenance, staff) in EUR per metre per day; a closed lift costs a fifth.
+     * Electricity is billed separately (Utilities::LIFT_KWH_PER_M at the grid tariff, or from own sources).
+     */
+    public const LIFT_RUN_PER_M = ['button' => 0.4, 'chair_fixed' => 0.6, 'chair_detach' => 0.95, 'gondola' => 1.45, 'cable_car' => 2.05];
     public const SLOPE_RUN_PER_M = 0.25;
 
     /** Regional skier market: demand above this flattens out */

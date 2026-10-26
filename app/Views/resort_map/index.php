@@ -869,6 +869,7 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
         'capacity' => \App\Libraries\Economy::LIFT_CAPACITY, 'maxSeats' => \App\Libraries\Economy::LIFT_MAX_SEATS,
         'liftRun' => \App\Libraries\Economy::LIFT_RUN_PER_M, 'slopeRun' => \App\Libraries\Economy::SLOPE_RUN_PER_M,
         'perDay' => \App\Libraries\Economy::LIFT_HOURS / \App\Libraries\Economy::RIDES_PER_SKIER,
+        'liftKwh' => \App\Libraries\Utilities::LIFT_KWH_PER_M,
     ] : null) ?>;
 
     var map, mapBounds;
@@ -1597,7 +1598,7 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
                 var ltv = (document.querySelector('input[name="liftType"]:checked') || {}).value || 'chair_fixed';
                 var stv = parseInt((document.querySelector('input[name="seats"]:checked') || {}).value || 4, 10);
                 var perHour = Math.round((ECONOMY_V2.capacity[ltv] || 2400) * Math.min(1, stv / (ECONOMY_V2.maxSeats[ltv] || 4)));
-                info = 'Carries ~' + Math.round(perHour * ECONOMY_V2.perDay).toLocaleString() + ' skiers/day · runs $' + Math.round(m * (ECONOMY_V2.liftRun[ltv] || 0.8)).toLocaleString() + '/day';
+                info = 'Carries ~' + Math.round(perHour * ECONOMY_V2.perDay).toLocaleString() + ' skiers/day · runs $' + Math.round(m * (ECONOMY_V2.liftRun[ltv] || 0.8)).toLocaleString() + '/day + ' + Math.round(m * (ECONOMY_V2.liftKwh[ltv] || 0.8)).toLocaleString() + ' kWh';
             } else {
                 info = 'Draws ~' + Math.round(30 + m / 40) + ' skiers/day · upkeep $' + Math.round(m * ECONOMY_V2.slopeRun).toLocaleString() + '/day';
             }

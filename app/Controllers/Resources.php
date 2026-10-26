@@ -41,8 +41,8 @@ class Resources extends BaseController
             $demand = Utilities::energyDemand(
                 $snowmakers,
                 $db->table('night_skiing')->where('user_id', $userId)->where('status', 'active')->countAllResults(),
-                $db->table('player_items')->where('user_id', $userId)->where('item_type', 'lift')->where('status', 'open')->countAllResults(),
-                $db->table('buildings')->where('user_id', $userId)->where('status', 'open')->countAllResults(),
+                $db->table('player_items')->select('subtype, length_meters')->where('user_id', $userId)->where('item_type', 'lift')->where('status', 'open')->get()->getResultArray(),
+                $db->table('buildings')->select('level')->where('user_id', $userId)->where('status', 'open')->get()->getResultArray(),
             );
         } else {
             $demand = ['snowmaking' => Utilities::waterDemand($snowmakers)];
@@ -73,6 +73,7 @@ class Resources extends BaseController
         unset($s);
 
         return view('resources/page', [
+            'owned' => array_count_values(array_column($sources, 'source_type')),
             'category' => $category,
             'unit' => $meta['unit'],
             'outputCol' => $meta['output'],
@@ -110,6 +111,10 @@ class Resources extends BaseController
         $name = mb_substr(trim(strip_tags((string) $this->request->getPost('name'))), 0, 60) ?: $cfg['label'];
 
         $db = db_connect();
+        $limit = Utilities::LIMIT[$type] ?? null;
+        if ($limit !== null && $db->table($meta['table'])->where('user_id', $userId)->where('source_type', $type)->countAllResults() >= $limit) {
+            return redirect()->to('/' . $category)->with('error', 'A resort can only have ' . $limit . ' ' . $cfg['label'] . '.');
+        }
         $db->transStart();
         // Deduct only if the cash is there, in one statement, so a double submit can't overspend
         $db->table('player_finances')->where('user_id', $userId)->where('cash >=', $cfg['cost'])->set('cash', 'cash - ' . $cfg['cost'], false)->update();

@@ -60,7 +60,7 @@ $statusBadge = fn($s) => match ($s) { 'active' => ['badge-success', 'On'], 'off'
             <?php endforeach ?>
         </div>
         <p class="text-xs text-base-content/60 mt-3">
-            <?php if ($isEnergy) : ?>Running snow guns use their rated energy; each lit night-skiing area uses <?= \App\Libraries\Utilities::DRAW_NIGHT_LIGHT ?> kWh, each open lift <?= \App\Libraries\Utilities::DRAW_LIFT ?> kWh and each open building <?= \App\Libraries\Utilities::DRAW_BUILDING ?> kWh a day.
+            <?php if ($isEnergy) : $k = \App\Libraries\Utilities::LIFT_KWH_PER_M; $b = \App\Libraries\Utilities::BUILDING_KWH; ?>Open lifts use the most: <?= $k['button'] ?> kWh per metre a day for a button lift up to <?= $k['cable_car'] ?> for a cable car. Each open building uses <?= $b[1] ?>/<?= $b[2] ?>/<?= $b[3] ?> kWh by level, each lit night-skiing area <?= \App\Libraries\Utilities::DRAW_NIGHT_LIGHT ?> kWh, and running snow guns their rated energy.
             <?php else : ?>Only running snow guns use water, each at its rated litres per day.<?php endif ?>
             A shortfall is simply bought in; nothing shuts down.
         </p>
@@ -84,7 +84,7 @@ $statusBadge = fn($s) => match ($s) { 'active' => ['badge-success', 'On'], 'off'
             <?php if ($s['status'] === 'active') : ?>
             <div class="text-xs mt-2 <?= $s['value'] >= 0 ? 'text-success' : 'text-warning' ?>">
                 <?php if ($s['used_output'] < (int) $s[$outputCol]) : ?>Only <?= $fmt($s['used_output']) ?> of its output is needed. <?php endif ?>
-                <?= $s['value'] >= 0 ? 'Saves ' . currency($s['value']) . '/day' : 'Costs ' . currency(-$s['value']) . '/day more' ?> than importing the same amount.
+                <?= $s['value'] >= 0 ? 'Saves ' . currency($s['value']) . '/day compared with importing' : 'Costs ' . currency(-$s['value']) . '/day more than importing' ?> the same amount.
             </div>
             <?php endif ?>
             <?php if ($s['status'] !== 'under_construction') : ?>
@@ -120,12 +120,18 @@ $statusBadge = fn($s) => match ($s) { 'active' => ['badge-success', 'On'], 'off'
                 <dt class="text-base-content/60">Output</dt><dd class="text-right font-semibold"><?= $fmt($cfg['output']) ?>/day</dd>
                 <dt class="text-base-content/60">Upkeep</dt><dd class="text-right font-semibold"><?= currency($up) ?>/day</dd>
                 <dt class="text-base-content/60">Build</dt><dd class="text-right font-semibold"><?= currency($cfg['cost']) ?> · <?= $cfg['build_days'] ?>d</dd>
+                <dt class="text-base-content/60">Pays back</dt><dd class="text-right font-semibold"><?php $m = \App\Libraries\Utilities::importCost($category, $cfg['output']) - $up; ?><?= $m > 0 ? '~' . (int) ceil($cfg['cost'] / $m) . ' days at full use' : 'never' ?></dd>
                 <dt class="text-base-content/60">Today it'd</dt><dd class="text-right font-semibold <?= $worth >= 0 ? 'text-success' : 'text-warning' ?>"><?= $worth >= 0 ? 'save ' . currency($worth) : 'cost ' . currency(-$worth) ?>/day</dd>
             </dl>
             <form action="/<?= $category ?>/build" method="post" class="mt-3 space-y-1.5"><?= csrf_field() ?>
                 <input type="hidden" name="source_type" value="<?= esc($key, 'attr') ?>">
                 <input type="text" name="name" maxlength="60" class="input input-bordered input-sm w-full" placeholder="Name (optional)" aria-label="Name for the new <?= esc($cfg['label'], 'attr') ?>">
+                <?php $atLimit = isset(\App\Libraries\Utilities::LIMIT[$key]) && ($owned[$key] ?? 0) >= \App\Libraries\Utilities::LIMIT[$key]; ?>
+                <?php if ($atLimit) : ?>
+                <button type="button" class="btn btn-sm w-full" disabled>You have one already</button>
+                <?php else : ?>
                 <button type="submit" class="btn btn-primary btn-sm w-full" <?= $cash < $cfg['cost'] ? 'disabled title="Not enough cash"' : '' ?>>Build · <?= currency($cfg['cost']) ?></button>
+                <?php endif ?>
             </form>
         </div></div>
         <?php endforeach ?>
