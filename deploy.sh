@@ -8,10 +8,18 @@ echo "📥 Pulling latest code..."
 git pull origin main
 
 echo "🗄️ Running migrations..."
-php spark migrate
+if docker ps --format '{{.Names}}' | grep -q '^PHP$'; then
+    docker exec PHP php /www/sites/skiv2/ci4/spark migrate
+else
+    php spark migrate
+fi
 
 echo "🧹 Clearing cache..."
-php spark cache:clear
+if docker ps --format '{{.Names}}' | grep -q '^PHP$'; then
+    docker exec PHP php /www/sites/skiv2/ci4/spark cache:clear
+else
+    php spark cache:clear
+fi
 
 echo "🔒 Recreating writable folders & permissions..."
 mkdir -p writable/cache writable/session writable/logs writable/uploads writable/debugbar
