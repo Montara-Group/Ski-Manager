@@ -23,11 +23,15 @@ class DiscordAuth extends BaseController
             return redirect()->to('/login')->with('error', 'Discord sign-in is temporarily unavailable. Please log in with email and password.');
         }
 
+        $state = bin2hex(random_bytes(16));
+        session()->set('discord_oauth_state', $state);
+
         $params = http_build_query([
             'client_id' => $config['client_id'],
             'redirect_uri' => $config['redirect_uri'],
             'response_type' => 'code',
             'scope' => 'identify email',
+            'state' => $state,
         ]);
         return redirect()->to('https://discord.com/api/oauth2/authorize?' . $params);
     }
@@ -35,7 +39,13 @@ class DiscordAuth extends BaseController
     public function callback()
     {
         $code = $this->request->getGet('code');
-        if (!$code) return redirect()->to('/login')->with('error', 'Discord login cancelled.');
+        $state = (string) $this->request->getGet('state');
+        $savedState = (string) session()->get('discord_oauth_state');
+        session()->remove('discord_oauth_state');
+
+        if (!$code || empty($state) || !hash_equals($savedState, $state)) {
+            return redirect()->to('/login')->with('error', 'Discord login was cancelled or verification state was invalid.');
+        }
 
         $config = $this->getConfig();
 
@@ -52,8 +62,10 @@ class DiscordAuth extends BaseController
             ]),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+            CURLOPT_TIMEOUT => 10,
         ]);
-        $tokenResponse = json_decode(curl_exec($ch), true);
+        $response = curl_exec($ch);
+        $tokenResponse = $response ? json_decode($response, true) : null;
         curl_close($ch);
 
         if (!isset($tokenResponse['access_token'])) {
@@ -65,8 +77,10 @@ class DiscordAuth extends BaseController
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $tokenResponse['access_token']],
+            CURLOPT_TIMEOUT => 10,
         ]);
-        $userInfo = json_decode(curl_exec($ch), true);
+        $response = curl_exec($ch);
+        $userInfo = $response ? json_decode($response, true) : null;
         curl_close($ch);
 
         if (!isset($userInfo['id'])) {
@@ -77,8 +91,8 @@ class DiscordAuth extends BaseController
         $email = $userInfo['email'] ?? null;
         $username = $userInfo['username'] ?? 'Player';
 
-        if (!$email) {
-            return redirect()->to('/login')->with('error', 'Discord account has no email. Please use email signup.');
+        if (!$email || empty($userInfo['verified'])) {
+            return redirect()->to('/login')->with('error', 'Discord account email is missing or not verified with Discord.');
         }
 
         $db = db_connect();

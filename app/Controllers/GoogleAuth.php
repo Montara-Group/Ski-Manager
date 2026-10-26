@@ -21,6 +21,9 @@ class GoogleAuth extends BaseController
             return redirect()->to('/login')->with('error', 'Google sign-in is temporarily unavailable. Please log in with email and password.');
         }
 
+        $state = bin2hex(random_bytes(16));
+        session()->set('google_oauth_state', $state);
+
         $params = http_build_query([
             'client_id' => $clientId,
             'redirect_uri' => $this->getRedirectUri(),
@@ -28,10 +31,9 @@ class GoogleAuth extends BaseController
             'scope' => 'openid email profile',
             'access_type' => 'online',
             'prompt' => 'select_account',
-            'state' => csrf_hash(),
+            'state' => $state,
         ]);
 
-        session()->set('google_oauth_state', csrf_hash());
         return redirect()->to('https://accounts.google.com/o/oauth2/v2/auth?' . $params);
     }
 
@@ -39,9 +41,12 @@ class GoogleAuth extends BaseController
     {
         $code = $this->request->getGet('code');
         $error = $this->request->getGet('error');
+        $state = (string) $this->request->getGet('state');
+        $savedState = (string) session()->get('google_oauth_state');
+        session()->remove('google_oauth_state');
 
-        if ($error || !$code) {
-            return redirect()->to('/login')->with('error', 'Google sign-in was cancelled.');
+        if ($error || !$code || empty($state) || !hash_equals($savedState, $state)) {
+            return redirect()->to('/login')->with('error', 'Google sign-in was cancelled or verification state was invalid.');
         }
 
         $tokenData = $this->exchangeCode($code);
