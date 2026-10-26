@@ -132,9 +132,16 @@ class Dashboard extends BaseController
 
     public function toggleWidget()
     {
-        $userId = auth()->id();
+        $userId = (int) auth()->id();
         $data = $this->request->getJSON(true) ?? $this->request->getPost();
         $key = $data['widget_key'] ?? null;
+        if (!$key || !isset($this->availableWidgets[$key])) {
+            if ($this->request->isAJAX()) {
+                return $this->response->setJSON(['success' => false, 'csrf_hash' => csrf_hash()]);
+            }
+            return redirect()->to('/dashboard');
+        }
+
         $db = db_connect();
 
         $widget = $db->table('dashboard_widgets')->where('user_id', $userId)->where('widget_key', $key)->get()->getRowArray();
@@ -150,17 +157,17 @@ class Dashboard extends BaseController
 
     public function resizeWidget()
     {
-        $userId = auth()->id();
+        $userId = (int) auth()->id();
         $data = $this->request->getJSON(true) ?? $this->request->getPost();
         $key = $data['widget_key'] ?? null;
         $size = $data['size'] ?? null;
-        $db = db_connect();
 
-        if (!in_array($size, ['small', 'medium', 'large'])) {
+        if (!$key || !isset($this->availableWidgets[$key]) || !in_array($size, ['small', 'medium', 'large'], true)) {
             if ($this->request->isAJAX()) return $this->response->setJSON(['success' => false, 'csrf_hash' => csrf_hash()]);
             return redirect()->to('/dashboard');
         }
 
+        $db = db_connect();
         $db->table('dashboard_widgets')->where('user_id', $userId)->where('widget_key', $key)->update(['size' => $size]);
 
         if ($this->request->isAJAX()) {
@@ -171,14 +178,16 @@ class Dashboard extends BaseController
 
     public function reorderWidgets()
     {
-        $userId = auth()->id();
+        $userId = (int) auth()->id();
         $data = $this->request->getJSON(true) ?? $this->request->getPost();
         $order = $data['order'] ?? [];
         $db = db_connect();
 
         if (is_array($order)) {
             foreach ($order as $i => $key) {
-                $db->table('dashboard_widgets')->where('user_id', $userId)->where('widget_key', $key)->update(['sort_order' => $i]);
+                if (is_string($key) && isset($this->availableWidgets[$key])) {
+                    $db->table('dashboard_widgets')->where('user_id', $userId)->where('widget_key', $key)->update(['sort_order' => (int) $i]);
+                }
             }
         }
         if ($this->request->isAJAX()) {
@@ -189,9 +198,13 @@ class Dashboard extends BaseController
 
     public function moveWidget()
     {
-        $userId = auth()->id();
+        $userId = (int) auth()->id();
         $key = $this->request->getPost('widget_key');
         $direction = $this->request->getPost('direction');
+        if (!is_string($key) || !isset($this->availableWidgets[$key]) || !in_array($direction, ['up', 'down'], true)) {
+            return redirect()->to('/dashboard');
+        }
+
         $db = db_connect();
 
         $widgets = $db->table('dashboard_widgets')->where('user_id', $userId)->orderBy('sort_order')->get()->getResultArray();
@@ -209,12 +222,15 @@ class Dashboard extends BaseController
     public function recentActivity()
     {
         $userId = auth()->id();
+        if (!$userId) {
+            return $this->response->setStatusCode(401)->setJSON(['error' => 'Unauthenticated']);
+        }
         $logs = db_connect()->table('activity_log')
-            ->where('user_id', $userId)
+            ->where('user_id', (int) $userId)
             ->orderBy('created_at', 'DESC')
             ->limit(8)
             ->get()->getResultArray();
-        return $this->response->setJSON($logs);
+        return $this->response->setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')->setJSON($logs);
     }
 
     private function calcCashflowBreakdown(

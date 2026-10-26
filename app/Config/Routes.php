@@ -5,7 +5,7 @@ use CodeIgniter\Router\RouteCollection;
 /** @var RouteCollection $routes */
 
 $routes->get("coming-soon", function(){ return view("countdown"); });
-$routes->get("dashboard/activity", "Dashboard::recentActivity");
+$routes->match(['get', 'head'], "dashboard/activity", "Dashboard::recentActivity");
 $routes->get("/admin/activity", "Admin::activityLog");
 $routes->post("/admin/maintenance", "Admin::toggleMaintenance");
 $routes->post("/admin/season", "Admin::updateSeason");
@@ -81,7 +81,7 @@ $routes->get('/bugs', function() { return redirect()->to('https://github.com/Mon
 $routes->get('/contact', 'Contact::index');
 $routes->get('/cookies', 'Legal::cookies');
 $routes->get('/daily-bonus', 'DailyBonus::index');
-$routes->get('/dashboard', 'Dashboard::index');
+$routes->match(['get', 'head'], '/dashboard', 'Dashboard::index');
 $routes->get('/emergency', 'Emergency::index');
 $routes->get('/environment', 'Environment::index');
 $routes->get('/equipment', 'Equipment::index');
