@@ -55,8 +55,8 @@ class GoogleAuth extends BaseController
         }
 
         $userInfo = $this->getUserInfo($tokenData['access_token']);
-        if (!$userInfo || !isset($userInfo['email'])) {
-            return redirect()->to('/login')->with('error', 'Could not retrieve Google account info.');
+        if (!$userInfo || !isset($userInfo['email']) || empty($userInfo['email_verified'])) {
+            return redirect()->to('/login')->with('error', 'Google account email is missing or not verified with Google.');
         }
 
         $email = $userInfo['email'];
