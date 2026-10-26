@@ -366,7 +366,7 @@ class ResortMap extends BaseController
         }
 
         $length = (float) ($segment['length_meters'] ?? 0);
-        $cost   = max(100, self::calcCost($segment['type'], $liftType, $seats, $length));
+        $cost   = self::calcCost($segment['type'], $liftType, $seats, $length);
 
         $itemData = [
             'user_id'       => $userId,
@@ -384,32 +384,17 @@ class ResortMap extends BaseController
 
         $db->transStart();
 
-        // 1. Check for duplicate build inside transaction with FOR UPDATE lock
-        $existing = $db->query(
-            'SELECT id FROM player_items WHERE user_id = ? AND segment_id = ? FOR UPDATE',
-            [$userId, $segmentId]
+        // 1. Lock the user's existing player_finances row FIRST.
+        // This serializes concurrent build requests for this user, eliminating any gap lock
+        // or deadlock on player_items and ensuring other users are never blocked.
+        $fin = $db->query(
+            'SELECT cash FROM player_finances WHERE user_id = ? FOR UPDATE',
+            [$userId]
         )->getRowArray();
 
-        if ($existing) {
+        $cash = (int) ($fin['cash'] ?? 0);
+        if (!$fin || $cash < $cost) {
             $db->transRollback();
-            return $this->response->setStatusCode(400)->setJSON([
-                'error'      => 'Already built',
-                'csrf_token' => csrf_token(),
-                'csrf_hash'  => csrf_hash(),
-            ]);
-        }
-
-        // 2. Atomic balance deduction with affordability condition
-        $db->table('player_finances')
-            ->where('user_id', $userId)
-            ->where('cash >=', $cost)
-            ->set('cash', "cash - {$cost}", false)
-            ->update();
-
-        if ($db->affectedRows() === 0) {
-            $db->transRollback();
-            $currFin = $db->table('player_finances')->select('cash')->where('user_id', $userId)->get()->getRowArray();
-            $cash = (int) ($currFin['cash'] ?? 0);
             return $this->response->setStatusCode(400)->setJSON([
                 'error'      => 'Not enough cash ($' . number_format($cost) . ' required, $' . number_format($cash) . ' available)',
                 'cost'       => $cost,
@@ -419,7 +404,38 @@ class ResortMap extends BaseController
             ]);
         }
 
-        // 3. Insert built item and financial transaction
+        // 2. Non-locking duplicate check (serialized by the finance row lock)
+        $existing = $db->table('player_items')
+            ->where('user_id', $userId)
+            ->where('segment_id', $segmentId)
+            ->countAllResults();
+
+        if ($existing > 0) {
+            $db->transRollback();
+            return $this->response->setStatusCode(400)->setJSON([
+                'error'      => 'Already built',
+                'csrf_token' => csrf_token(),
+                'csrf_hash'  => csrf_hash(),
+            ]);
+        }
+
+        // 3. Deduct cash with condition and check affectedRows
+        $db->table('player_finances')
+            ->where('user_id', $userId)
+            ->where('cash >=', $cost)
+            ->set('cash', "cash - {$cost}", false)
+            ->update();
+
+        if ($db->affectedRows() === 0) {
+            $db->transRollback();
+            return $this->response->setStatusCode(400)->setJSON([
+                'error'      => 'Not enough cash ($' . number_format($cost) . ' required)',
+                'csrf_token' => csrf_token(),
+                'csrf_hash'  => csrf_hash(),
+            ]);
+        }
+
+        // 4. Insert built item and financial transaction
         $db->table('player_items')->insert($itemData);
         $itemData['id']      = (int) $db->insertID();
         $itemData['salvage'] = self::salvageValue($itemData);
