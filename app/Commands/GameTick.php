@@ -701,7 +701,8 @@ class GameTick extends BaseCommand
             // Stars (1-5). The 0-200 'score' made the chance 100% and every VIP type possible for nearly everyone
             $resortRating = (int) ($ratingData['stars'] ?? 2);
             $vipMagnetBonus = in_array('vip_magnet', $activeBoostTypes) ? 100 : 0;
-            $vipChance = $resortOpen ? min(100, ($resortRating * 8) + $vipBonus + $vipMagnetBonus + ($visitors > 200 ? 10 : 0) + ($countTotal('manager') * 3)) : 0;
+            // VIPs only visit a resort that had skiers today (they used to tip empty, slope-less resorts)
+            $vipChance = $resortOpen && $visitors > 0 ? min(100, ($resortRating * 8) + $vipBonus + $vipMagnetBonus + ($visitors > 200 ? 10 : 0) + ($countTotal('manager') * 3)) : 0;
             if (rand(1, 100) <= $vipChance) {
                 $vipTypes = [
                     ['type' => 'celebrity', 'name' => 'Celebrity Guest', 'icon' => 'fa-solid fa-star', 'cash_min' => 5000, 'cash_max' => 20000, 'rep' => 5],
