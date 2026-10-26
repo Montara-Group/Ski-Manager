@@ -161,3 +161,8 @@ Inside `/opt/1panel/www/sites/skiv2/ci4` (and local `/Users/324080/.gemini/antig
    ```bash
    ssh root@72.62.170.146 'tail -n 80 /opt/1panel/www/sites/skiv2/ci4/writable/logs/log-$(date +%F).log'
    ```
+
+<!-- entire-agent:begin -->
+Read .entire/agent-guide.md for this repository's workflow, source inspection, and verification guidance.
+@.entire/agent-guide.md
+<!-- entire-agent:end -->
