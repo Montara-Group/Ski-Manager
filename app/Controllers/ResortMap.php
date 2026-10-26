@@ -384,9 +384,7 @@ class ResortMap extends BaseController
 
         $db->transStart();
 
-        // 1. Lock the user's existing player_finances row FIRST.
-        // This serializes concurrent build requests for this user, eliminating any gap lock
-        // or deadlock on player_items and ensuring other users are never blocked.
+        // 1. Lock the user's finance row to serialize build requests for this user
         $fin = $db->query(
             'SELECT cash FROM player_finances WHERE user_id = ? FOR UPDATE',
             [$userId]
@@ -404,7 +402,7 @@ class ResortMap extends BaseController
             ]);
         }
 
-        // 2. Non-locking duplicate check (serialized by the finance row lock)
+        // 2. Duplicate check within serialized transaction
         $existing = $db->table('player_items')
             ->where('user_id', $userId)
             ->where('segment_id', $segmentId)
@@ -419,21 +417,11 @@ class ResortMap extends BaseController
             ]);
         }
 
-        // 3. Deduct cash with condition and check affectedRows
+        // 3. Deduct cash
         $db->table('player_finances')
             ->where('user_id', $userId)
-            ->where('cash >=', $cost)
             ->set('cash', "cash - {$cost}", false)
             ->update();
-
-        if ($db->affectedRows() === 0) {
-            $db->transRollback();
-            return $this->response->setStatusCode(400)->setJSON([
-                'error'      => 'Not enough cash ($' . number_format($cost) . ' required)',
-                'csrf_token' => csrf_token(),
-                'csrf_hash'  => csrf_hash(),
-            ]);
-        }
 
         // 4. Insert built item and financial transaction
         $db->table('player_items')->insert($itemData);
