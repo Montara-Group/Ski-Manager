@@ -37,7 +37,7 @@
                         </span>
                         <div class="auth-pw">
                             <input type="password" name="password" id="password" class="input input-bordered w-full" placeholder="Your password" required autocomplete="current-password">
-                            <button type="button" data-toggle-pw="password" aria-label="Show password" aria-pressed="false"><i class="fa-solid fa-eye" aria-hidden="true"></i></button>
+                            <button type="button" data-toggle-pw="password" aria-label="Show password" aria-pressed="false"><span data-pw-icon="show"><i class="fa-solid fa-eye" aria-hidden="true"></i></span><span data-pw-icon="hide" hidden><i class="fa-solid fa-eye-slash" aria-hidden="true"></i></span></button>
                         </div>
                     </div>
                     <?php if (setting('Auth.sessionConfig')['allowRemembering']) : ?>
@@ -73,7 +73,9 @@ document.querySelectorAll('[data-toggle-pw]').forEach(function (btn) {
         input.type = show ? 'text' : 'password';
         btn.setAttribute('aria-pressed', show);
         btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-        btn.querySelector('i').className = show ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+        // Both icons are in the button; the Font Awesome kit swaps each <i> for an <svg>, so toggle the wrappers
+        btn.querySelector('[data-pw-icon="show"]').hidden = show;
+        btn.querySelector('[data-pw-icon="hide"]').hidden = !show;
     });
 });
 </script>

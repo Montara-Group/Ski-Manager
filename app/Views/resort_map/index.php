@@ -1320,7 +1320,7 @@ body.map-drawer-open #tutorialWidgetContainer { right: calc(380px + 2rem) !impor
             var inp = card.querySelector('input[name="liftType"]');
             var checked = !!(inp && inp.checked);
             card.classList.toggle('is-checked', checked);
-            var icon = card.querySelector('i');
+            var icon = card.querySelector('i, svg'); // the Font Awesome kit turns <i> into <svg>
             if (icon) icon.style.color = checked ? '#38bdf8' : '#94a3b8';
         });
         document.querySelectorAll('#slopeTypeGrid .build-option-card').forEach(function(card) {
