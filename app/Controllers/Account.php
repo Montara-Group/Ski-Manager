@@ -11,6 +11,56 @@ class Account extends BaseController
         return redirect()->to('/settings');
     }
 
+    /** Purposes an emailed code can confirm, and what the email calls them */
+    private const CODE_PURPOSES = ['password' => 'set a new password', 'delete' => 'delete your account'];
+    private const CODE_LIFETIME = 15 * MINUTE;
+    private const CODE_TRIES = 5;
+
+    /**
+     * Email a one-time code to the account address. Players who signed up with Google or Discord
+     * never saw their (random) password, and others forget theirs; the code stands in for it.
+     */
+    public function sendCode()
+    {
+        $purpose = (string) $this->request->getPost('purpose');
+        if (!isset(self::CODE_PURPOSES[$purpose])) return redirect()->to('/settings');
+        $user = auth()->user();
+        if (!service('throttler')->check('account-code-' . $user->id, 3, 15 * MINUTE)) {
+            return redirect()->to('/settings')->with('error', 'Too many codes requested. Try again in a few minutes.');
+        }
+
+        $code = (string) random_int(100000, 999999);
+        $email = \Config\Services::email();
+        $email->setFrom('contact@ski-manager.net', 'Ski Manager');
+        $email->setTo($user->email);
+        $email->setSubject('Your Ski Manager code: ' . $code);
+        $email->setMailType('text');
+        $email->setMessage("Hi " . $user->username . ",\n\nYour code to " . self::CODE_PURPOSES[$purpose] . " is: " . $code
+            . "\n\nIt works for 15 minutes. If you didn't ask for it, you can ignore this email; nothing changes without the code.\n\nSki Manager");
+        if (!$email->send(false)) {
+            log_message('error', 'Account code email failed for user #' . $user->id);
+            return redirect()->to('/settings')->with('error', 'We couldn\'t send the email right now. Please try again in a minute.');
+        }
+
+        session()->set('account_code', ['purpose' => $purpose, 'hash' => password_hash($code, PASSWORD_DEFAULT), 'expires' => time() + self::CODE_LIFETIME, 'tries' => 0]);
+        [$local, $domain] = explode('@', $user->email, 2) + [1 => ''];
+        return redirect()->to('/settings')->with('success', 'We emailed a code to ' . mb_substr($local, 0, 1) . '•••@' . $domain . '. Enter it below within 15 minutes.');
+    }
+
+    /** True if $code is the unexpired code emailed for $purpose; it can be used once */
+    private function codeIsValid(string $purpose, string $code): bool
+    {
+        $c = session('account_code');
+        if (!is_array($c) || $c['purpose'] !== $purpose || $c['expires'] < time() || $c['tries'] >= self::CODE_TRIES) return false;
+        if (!password_verify(preg_replace('/\D/', '', $code), $c['hash'])) {
+            $c['tries']++;
+            session()->set('account_code', $c);
+            return false;
+        }
+        session()->remove('account_code');
+        return true;
+    }
+
     public function changePassword()
     {
         $current = $this->request->getPost('current_password');
@@ -26,11 +76,13 @@ class Account extends BaseController
         }
 
         $user = auth()->user();
-        $credentials = ['email' => $user->email, 'password' => $current];
-        $result = auth()->check($credentials);
-
-        if (!$result->isOK()) {
-            return redirect()->back()->with('error', 'Current password is incorrect.');
+        $code = trim((string) $this->request->getPost('code'));
+        if ($code !== '') {
+            if (!$this->codeIsValid('password', $code)) {
+                return redirect()->back()->with('error', 'That code is wrong or has expired. Ask for a new one.');
+            }
+        } elseif (!auth()->check(['email' => $user->email, 'password' => (string) $current])->isOK()) {
+            return redirect()->back()->with('error', 'Current password is incorrect. No password, or forgot it? Use "Email me a code".');
         }
 
         $userProvider = auth()->getProvider();
@@ -38,7 +90,7 @@ class Account extends BaseController
         $userProvider->save($user);
 
         log_activity(auth()->id(), 'Account', 'Changed password', 'fa-solid fa-key');
-        return redirect()->to('/account')->with('success', 'Password changed successfully.');
+        return redirect()->to('/settings')->with('success', 'Password saved. You can now also sign in with your email and this password.');
     }
 
     public function changeEmail()
@@ -95,19 +147,21 @@ class Account extends BaseController
             return redirect()->back()->with('error', 'Type DELETE to confirm.');
         }
 
-        $password = (string) $this->request->getPost('password');
-        if (empty($password)) {
-            return redirect()->back()->with('error', 'Password is required to confirm account deletion.');
-        }
-
         $user = auth()->user();
         if (!$user) {
             return redirect()->to('/login');
         }
 
-        $credentials = ['email' => $user->email, 'password' => $password];
-        $result = auth()->check($credentials);
-        if (!$result->isOK()) {
+        // Confirmed by the account password, or by a code emailed to the account address
+        $password = (string) $this->request->getPost('password');
+        $code = trim((string) $this->request->getPost('code'));
+        if ($code !== '') {
+            if (!$this->codeIsValid('delete', $code)) {
+                return redirect()->back()->with('error', 'That code is wrong or has expired. Account deletion aborted.');
+            }
+        } elseif ($password === '') {
+            return redirect()->back()->with('error', 'Enter your password, or use "Email me a code" if you don\'t have one.');
+        } elseif (!auth()->check(['email' => $user->email, 'password' => $password])->isOK()) {
             return redirect()->back()->with('error', 'Incorrect password. Account deletion aborted.');
         }
 

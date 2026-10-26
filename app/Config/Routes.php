@@ -187,6 +187,7 @@ $routes->post("water/build", "Resources::buildWater");
 $routes->post("water/repair/(:num)", "Resources::repairWater/$1");
 $routes->post("water/toggle/(:num)", "Resources::toggleWater/$1");
 $routes->post('/account/delete', 'Account::deleteAccount');
+$routes->post('/account/send-code', 'Account::sendCode');
 $routes->post('/account/email', 'Account::changeEmail');
 $routes->post('/account/password', 'Account::changePassword');
 $routes->post('/account/username', 'Account::changeUsername');

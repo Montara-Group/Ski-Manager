@@ -9,8 +9,7 @@
         <h1 class="text-2xl font-bold"><i class="fa-solid fa-gear mr-2"></i>Settings</h1>
     </div>
 
-    <?php if (session('success')) : ?><div class="alert alert-success mb-4"><span><?= session('success') ?></span></div><?php endif ?>
-    <?php if (session('error')) : ?><div class="alert alert-error mb-4"><span><?= session('error') ?></span></div><?php endif ?>
+    <?php /* Flash messages are shown by the layout */ ?>
 
     <!-- Account -->
     <h3 class="text-sm font-semibold text-base-content/50 uppercase tracking-wider mb-3">Account</h3>
@@ -34,15 +33,24 @@
     </div></div>
 
     <div class="card bg-base-100 shadow-sm mb-4"><div class="card-body p-4">
-        <h2 class="font-semibold text-sm mb-3"><i class="fa-solid fa-key mr-1"></i>Password</h2>
+        <?php $__code = session('account_code'); $__codeFor = is_array($__code) && $__code['expires'] > time() ? $__code['purpose'] : null; ?>
+        <h2 class="font-semibold text-sm mb-1"><i class="fa-solid fa-key mr-1"></i>Password</h2>
+        <p class="text-xs text-base-content/60 mb-3">Signed up with Google or Discord, or forgot your password? Use an emailed code instead of the current password.</p>
         <form action="/account/password" method="post">
             <?= csrf_field() ?>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                <?php if ($__codeFor === 'password') : ?>
+                <div><label class="label py-0" for="pwCode"><span class="label-text text-xs">Code from the email</span></label><input type="text" name="code" id="pwCode" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" class="input input-bordered input-sm w-full font-mono" required autocomplete="one-time-code"></div>
+                <?php else : ?>
                 <div><label class="label py-0"><span class="label-text text-xs">Current</span></label><input type="password" name="current_password" class="input input-bordered input-sm w-full" required autocomplete="current-password"></div>
+                <?php endif ?>
                 <div><label class="label py-0"><span class="label-text text-xs">New</span></label><input type="password" name="new_password" class="input input-bordered input-sm w-full" required minlength="8" autocomplete="new-password"></div>
                 <div><label class="label py-0"><span class="label-text text-xs">Confirm</span></label><input type="password" name="confirm_password" class="input input-bordered input-sm w-full" required minlength="8" autocomplete="new-password"></div>
             </div>
-            <button type="submit" class="btn btn-primary btn-sm">Change Password</button>
+            <button type="submit" class="btn btn-primary btn-sm"><?= $__codeFor === 'password' ? 'Set password' : 'Change Password' ?></button>
+        </form>
+        <form action="/account/send-code" method="post" class="mt-2"><?= csrf_field() ?><input type="hidden" name="purpose" value="password">
+            <button class="btn btn-ghost btn-xs"><i class="fa-solid fa-envelope mr-1" aria-hidden="true"></i><?= $__codeFor === 'password' ? 'Send a new code' : 'Email me a code instead' ?></button>
         </form>
     </div></div>
 
@@ -230,12 +238,19 @@
         <form action="/account/delete" method="post" data-confirm="This will permanently delete your account. Are you sure?" data-confirm-title="Delete Account">
             <?= csrf_field() ?>
             <div class="space-y-2">
-                <input type="password" name="password" class="input input-bordered input-sm input-error w-full text-sm" placeholder="Enter your current password" required autocomplete="current-password">
+                <?php if ($__codeFor === 'delete') : ?>
+                <input type="text" name="code" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" class="input input-bordered input-sm input-error w-full text-sm font-mono" placeholder="Code from the email" required autocomplete="one-time-code" aria-label="Code from the email">
+                <?php else : ?>
+                <input type="password" name="password" class="input input-bordered input-sm input-error w-full text-sm" placeholder="Enter your current password" required autocomplete="current-password" aria-label="Current password">
+                <?php endif ?>
                 <div class="flex gap-2">
                     <input type="text" name="confirm_delete" class="input input-bordered input-sm input-error flex-1 text-sm" placeholder="Type DELETE to confirm" autocomplete="off" required>
                     <button type="submit" class="btn btn-error btn-sm">Delete Account</button>
                 </div>
             </div>
+        </form>
+        <form action="/account/send-code" method="post" class="mt-2"><?= csrf_field() ?><input type="hidden" name="purpose" value="delete">
+            <button class="btn btn-ghost btn-xs"><i class="fa-solid fa-envelope mr-1" aria-hidden="true"></i><?= $__codeFor === 'delete' ? 'Send a new code' : 'No password? Email me a code instead' ?></button>
         </form>
     </div></div>
 </div>
