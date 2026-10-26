@@ -1,12 +1,12 @@
 <?php
 $csrfName        = csrf_token();
 $csrfHash        = csrf_hash();
-$segmentsJson    = json_encode($segments ?? []);
-$sectorsJson     = json_encode($sectors ?? []);
-$builtIdsJson    = json_encode($builtSegmentIds ?? []);
-$builtItemsJson  = json_encode($builtItems ?? new \stdClass());
-$releasedIdsJson = json_encode($releasedSectorIds ?? []);
-$resortMapsJson  = json_encode($resortMaps ?? []);
+$segmentsJson    = json_encode($segments ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+$sectorsJson     = json_encode($sectors ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+$builtIdsJson    = json_encode($builtSegmentIds ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+$builtItemsJson  = json_encode($builtItems ?? new \stdClass(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+$releasedIdsJson = json_encode($releasedSectorIds ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+$resortMapsJson  = json_encode($resortMaps ?? [], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 $userCashVal     = (int) ($userCash ?? 0);
 $distUnit        = function_exists('distanceUnit') ? distanceUnit() : 'm';
 ?>

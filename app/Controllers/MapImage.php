@@ -6,16 +6,20 @@ class MapImage extends BaseController
 {
     public function serve(string $key)
     {
+        if ($this->request->getMethod() === 'head') {
+            return $this->response->setStatusCode(auth()->loggedIn() ? 200 : 401);
+        }
+
         if (!auth()->loggedIn()) {
             return $this->response->setStatusCode(401);
         }
 
         $valid = ['AspenSnowmass', 'BigSkyCombo', 'DeerValley', 'Killington', 'PalisadesTahoe', 'ParkCity', 'Vail'];
-        if (!in_array($key, $valid)) {
+        if (!in_array($key, $valid, true)) {
             return $this->response->setStatusCode(404);
         }
 
-        $path = WRITEPATH . 'maps/' . $key . '.jpg';
+        $path = WRITEPATH . 'maps/' . basename($key) . '.jpg';
         if (!is_file($path)) {
             return $this->response->setStatusCode(404);
         }
