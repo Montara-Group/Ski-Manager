@@ -1,186 +1,133 @@
 <?= $this->extend('layouts/main') ?>
 <?= $this->section('title') ?>Bank & Loans<?= $this->endSection() ?>
 <?= $this->section('content') ?>
+<?php
+$freeSlots = max(0, $maxLoans - count($loans));
+$loadPct = $lastIncome ? (int) round($dailyPayments / max(1, $lastIncome) * 100) : null;
+?>
 <div class="max-w-6xl mx-auto p-4 lg:p-8">
 
-    <?php $__maxLoans = $maxLoans ?? 3; $__hasExtraSlot = $hasExtraSlot ?? false; ?>
     <div class="flex items-center gap-3 mb-6">
-        <a href="/dashboard" class="btn btn-ghost btn-sm btn-circle"><i class="fa-solid fa-chevron-left"></i></a>
+        <a href="/dashboard" class="btn btn-ghost btn-sm btn-circle" aria-label="Back to dashboard"><i class="fa-solid fa-chevron-left"></i></a>
         <div>
-            <h1 class="text-2xl font-bold"><i class="fa-solid fa-landmark mr-2 text-primary"></i>Alpine National Bank</h1>
-            <p class="text-sm text-base-content/50">Loans, credit lines, and financial services for your resort</p>
+            <h1 class="text-2xl font-bold"><i class="fa-solid fa-landmark mr-2 text-primary" aria-hidden="true"></i>Alpine National Bank</h1>
+            <p class="text-sm text-base-content/60">Borrow now, repay in daily instalments</p>
         </div>
     </div>
 
-    <?php if (session('success')) : ?><div class="alert alert-success mb-4"><span><?= session('success') ?></span></div><?php endif ?>
-    <?php if (session('error')) : ?><div class="alert alert-error mb-4"><span><?= session('error') ?></span></div><?php endif ?>
+    <?php if (session('success')) : ?><div class="alert alert-success mb-4" role="status"><span><?= esc(session('success')) ?></span></div><?php endif ?>
+    <?php if (session('error')) : ?><div class="alert alert-error mb-4" role="alert"><span><?= esc(session('error')) ?></span></div><?php endif ?>
 
-    <!-- Financial Summary -->
-    <div class="card bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950 shadow-xl mb-6">
-        <div class="card-body p-6">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div class="text-center">
-                    <div class="text-xs text-base-content/50 mb-1"><i class="fa-solid fa-wallet mr-1"></i>Cash Balance</div>
-                    <div class="text-2xl font-bold text-success"><?= currency((int) $finance['cash']) ?></div>
-                </div>
-                <div class="text-center">
-                    <div class="text-xs text-base-content/50 mb-1"><i class="fa-solid fa-file-invoice-dollar mr-1"></i>Active Loans</div>
-                    <div class="text-2xl font-bold"><?= count($loans) ?><span class="text-sm text-base-content/50">/<?= $__maxLoans ?></span></div>
-                </div>
-                <div class="text-center">
-                    <div class="text-xs text-base-content/50 mb-1"><i class="fa-solid fa-scale-unbalanced mr-1"></i>Total Debt</div>
-                    <div class="text-2xl font-bold <?= $totalDebt > 0 ? 'text-error' : 'text-success' ?>"><?= currency($totalDebt) ?></div>
-                </div>
-                <div class="text-center">
-                    <div class="text-xs text-base-content/50 mb-1"><i class="fa-solid fa-calendar-check mr-1"></i>Daily Payments</div>
-                    <div class="text-2xl font-bold text-warning"><?= currency($dailyPayments) ?></div>
-                </div>
+    <!-- Summary -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Cash</div>
+            <div class="text-2xl font-bold <?= $cash < 0 ? 'text-error' : '' ?>"><?= currency($cash) ?></div>
+        </div></div>
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Owed</div>
+            <div class="text-2xl font-bold <?= $totalDebt > 0 ? 'text-error' : 'text-success' ?>"><?= currency($totalDebt) ?></div>
+            <div class="text-xs text-base-content/60"><?= $totalDebt > 0 ? currency($totalPayoff) . ' to pay off today' : 'Debt free' ?></div>
+        </div></div>
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Daily repayments</div>
+            <div class="text-2xl font-bold <?= $dailyPayments ? 'text-warning' : '' ?>"><?= currency($dailyPayments) ?></div>
+            <div class="text-xs <?= $loadPct !== null && $loadPct > 50 ? 'text-error' : 'text-base-content/60' ?>">
+                <?= $loadPct === null ? 'taken each night' : $loadPct . '% of yesterday\'s income (' . currency($lastIncome) . ')' ?>
             </div>
-        </div>
-    </div>
-
-    <!-- Credit Health -->
-    <?php $__debtRatio = (int)$finance['cash'] > 0 ? round($totalDebt / (int)$finance['cash'] * 100) : 0; ?>
-    <div class="grid grid-cols-3 gap-3 mb-4">
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3">
-            <div class="text-xs text-base-content/50 mb-1">Debt-to-Cash Ratio</div>
-            <div class="text-lg font-bold <?= $__debtRatio <= 50 ? 'text-success' : ($__debtRatio <= 100 ? 'text-warning' : 'text-error') ?>"><?= $__debtRatio ?>%</div>
-            <div class="text-xs text-base-content/40"><?= $__debtRatio <= 50 ? 'Healthy' : ($__debtRatio <= 100 ? 'Caution' : 'Risky') ?></div>
         </div></div>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3">
-            <div class="text-xs text-base-content/50 mb-1">Days to Payoff</div>
-            <div class="text-lg font-bold"><?= $dailyPayments > 0 ? ceil($totalDebt / $dailyPayments) : 0 ?></div>
-            <div class="text-xs text-base-content/40">at current rate</div>
-        </div></div>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3">
-            <div class="text-xs text-base-content/50 mb-1">Loan Slots</div>
-            <div class="text-lg font-bold"><?= $__maxLoans - count($loans) ?> free</div>
-            <div class="text-xs text-base-content/40"><?= $__hasExtraSlot ? 'Extra slot active' : '' ?></div>
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Loan slots</div>
+            <div class="text-2xl font-bold"><?= count($loans) ?> / <?= $maxLoans ?></div>
+            <div class="text-xs text-base-content/60"><?= $hasExtraSlot ? 'includes your extra slot' : '<a href="/genepis" class="link">Extra slot</a> with Génépis' ?></div>
         </div></div>
     </div>
 
-    <?php if ($totalDebt > (int) $finance['cash'] * 2) : ?>
-    <div class="alert alert-warning mb-4"><i class="fa-solid fa-triangle-exclamation"></i><span>Your debt exceeds twice your cash reserves. Consider paying off loans before borrowing more.</span></div>
+    <?php if ($loadPct !== null && $loadPct > 50) : ?>
+    <div class="alert alert-warning mb-4"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Repayments take more than half of what your resort earned yesterday. Repayments are taken even when cash runs out, so your balance can go negative.</span></div>
+    <?php elseif ($cash < 0 && $loans) : ?>
+    <div class="alert alert-error mb-4"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>Your cash is negative and repayments keep coming. Cut costs or raise income before borrowing more.</span></div>
     <?php endif ?>
 
     <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <!-- Active Loans -->
-        <div class="lg:col-span-2">
-            <h2 class="text-lg font-bold mb-3"><i class="fa-solid fa-file-contract mr-1"></i> Active Loans</h2>
-            <?php if (empty($loans)) : ?>
-                <div class="card bg-base-100 shadow-sm"><div class="card-body text-center py-12">
-                    <i class="fa-solid fa-check-circle text-5xl text-success/30 mb-3"></i>
-                    <p class="font-semibold text-success">Debt Free!</p>
-                    <p class="text-sm text-base-content/50 mt-1">No active loans - your finances are clean</p>
+        <!-- Active loans -->
+        <section class="lg:col-span-2" aria-labelledby="loans-h">
+            <h2 id="loans-h" class="text-lg font-bold mb-3">Your loans</h2>
+            <?php if (!$loans) : ?>
+                <div class="card bg-base-100 shadow-sm"><div class="card-body text-center py-10">
+                    <i class="fa-solid fa-circle-check text-5xl text-success/40 mb-3" aria-hidden="true"></i>
+                    <p class="font-semibold">Debt free</p>
+                    <p class="text-sm text-base-content/60 mt-1">Borrowing can pay for lifts and buildings before they earn.</p>
                 </div></div>
             <?php else : ?>
                 <div class="space-y-3">
-                <?php foreach ($loans as $loan) : ?>
-                    <?php $progress = $loan['days_total'] > 0 ? round(($loan['days_total'] - $loan['days_remaining']) / $loan['days_total'] * 100) : 0; ?>
-                    <div class="card bg-base-100 shadow-sm">
-                        <div class="card-body p-4">
-                            <div class="flex items-center justify-between mb-2">
-                                <div>
-                                    <div class="font-bold"><?= currency((int) $loan['principal']) ?></div>
-                                    <div class="text-xs text-base-content/50"><?= ucfirst($loan['loan_type']) ?> · <?= $loan['interest_rate'] ?>% APR</div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="font-mono text-sm font-bold text-error"><?= currency((int) $loan['remaining']) ?></div>
-                                    <div class="text-xs text-base-content/50">remaining</div>
-                                </div>
+                <?php foreach ($loans as $loan) : $canPay = $cash >= $loan['payoff']; ?>
+                    <div class="card bg-base-100 shadow-sm"><div class="card-body p-4 gap-2">
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <div class="font-bold"><?= esc($loan['name']) ?></div>
+                                <div class="text-xs text-base-content/60"><?= currency((int) $loan['principal']) ?> borrowed · <?= rtrim(rtrim((string) $loan['interest_rate'], '0'), '.') ?>% interest</div>
                             </div>
-
-                            <div class="flex items-center justify-between text-xs mb-1">
-                                <span><?= $loan['days_remaining'] ?> days left</span>
-                                <span><?= $progress ?>% paid</span>
-                            </div>
-                            <progress class="progress progress-primary w-full" value="<?= $progress ?>" max="100"></progress>
-
-                            <div class="flex items-center justify-between mt-3">
-                                <div class="text-xs text-base-content/50">
-                                    <i class="fa-solid fa-calendar mr-1"></i><?= currency((int) $loan['daily_payment']) ?>/day
-                                </div>
-                                <form action="/bank/repay/<?= $loan['id'] ?>" method="post" data-confirm="Pay off the remaining balance?" data-confirm-title="Repay Loan">
-                                    <?= csrf_field() ?>
-                                    <button class="btn btn-success btn-xs gap-1" <?= (int) $finance['cash'] < (int) $loan['remaining'] ? 'disabled' : '' ?>>
-                                        <i class="fa-solid fa-check"></i> Pay Off
-                                    </button>
-                                </form>
+                            <div class="text-right">
+                                <div class="font-mono font-bold text-error"><?= currency((int) $loan['remaining']) ?></div>
+                                <div class="text-xs text-base-content/60">left to repay</div>
                             </div>
                         </div>
-                    </div>
+                        <div class="flex justify-between text-xs"><span><?= (int) $loan['days_remaining'] ?> days left · <?= currency((int) $loan['daily_payment']) ?>/day</span><span><?= $loan['paid_pct'] ?>% of term</span></div>
+                        <progress class="progress progress-primary w-full" value="<?= $loan['paid_pct'] ?>" max="100" aria-label="<?= $loan['paid_pct'] ?>% of the term done"></progress>
+                        <form action="/bank/repay/<?= (int) $loan['id'] ?>" method="post" class="flex items-center justify-between gap-2 mt-1"
+                              data-confirm="Pay off the <?= esc($loan['name']) ?> now for <?= currency($loan['payoff']) ?>?" data-confirm-title="Pay off loan"><?= csrf_field() ?>
+                            <span class="text-xs <?= $loan['saving'] > 0 ? 'text-success' : 'text-base-content/60' ?>"><?= $loan['saving'] > 0 ? 'Pay off now and save ' . currency($loan['saving']) . ' interest' : 'Pay off now' ?></span>
+                            <button class="btn btn-success btn-xs gap-1 shrink-0" <?= $canPay ? '' : 'disabled' ?>><i class="fa-solid fa-check" aria-hidden="true"></i> Pay <?= currency($loan['payoff']) ?></button>
+                        </form>
+                        <?php if (!$canPay) : ?><div class="text-xs text-base-content/60 text-right">You need <?= currency($loan['payoff'] - $cash) ?> more cash</div><?php endif ?>
+                    </div></div>
                 <?php endforeach ?>
                 </div>
             <?php endif ?>
-        </div>
+        </section>
 
-        <!-- Loan Products -->
-        <div class="lg:col-span-3">
-            <h2 class="text-lg font-bold mb-3"><i class="fa-solid fa-hand-holding-dollar mr-1 text-success"></i> Available Loans</h2>
-            <?php if (count($loans) >= $__maxLoans) : ?>
-                <div class="alert alert-warning mb-3"><i class="fa-solid fa-lock"></i><span>Maximum <?= $__maxLoans ?> active loans. Repay an existing loan to borrow again.<?php if (!$__hasExtraSlot) : ?> <a href="/genepis" class="link font-semibold">Get an extra slot</a> with Genepis.<?php endif ?></span></div>
+        <!-- Products -->
+        <section class="lg:col-span-3" aria-labelledby="offers-h">
+            <h2 id="offers-h" class="text-lg font-bold mb-3">Borrow</h2>
+            <?php if (!$freeSlots) : ?>
+                <div class="alert alert-warning mb-3"><i class="fa-solid fa-lock" aria-hidden="true"></i><span>All <?= $maxLoans ?> loan slots are in use. Pay one off to borrow again.<?php if (!$hasExtraSlot) : ?> <a href="/genepis" class="link font-semibold">Get an extra slot</a> with Génépis.<?php endif ?></span></div>
             <?php endif ?>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <?php foreach ($loanOptions as $key => $opt) : ?>
-                <div class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow <?= $key === 'emergency' ? 'border border-error/30' : '' ?>">
-                    <div class="card-body p-4">
-                        <div class="flex items-center gap-2 mb-3">
-                            <div class="w-10 h-10 rounded-xl <?= $key === 'emergency' ? 'bg-error/10' : 'bg-primary/10' ?> flex items-center justify-center">
-                                <i class="<?= $opt['icon'] ?> text-lg <?= $key === 'emergency' ? 'text-error' : 'text-primary' ?>"></i>
-                            </div>
-                            <div>
-                                <div class="font-bold text-sm"><?= $opt['name'] ?></div>
-                                <div class="text-xl font-bold text-success"><?= currency($opt['amount']) ?></div>
-                            </div>
+            <?php foreach ($products as $key => $p) : $emergency = $key === 'emergency'; ?>
+                <div class="card bg-base-100 shadow-sm <?= $emergency ? 'border border-error/30' : '' ?>"><div class="card-body p-4 gap-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl <?= $emergency ? 'bg-error/10' : 'bg-primary/10' ?> flex items-center justify-center"><i class="<?= $p['icon'] ?> text-lg <?= $emergency ? 'text-error' : 'text-primary' ?>" aria-hidden="true"></i></div>
+                        <div>
+                            <div class="font-bold text-sm"><?= esc($p['name']) ?></div>
+                            <div class="text-xl font-bold text-success"><?= currency($p['amount']) ?></div>
                         </div>
-
-                        <div class="grid grid-cols-2 gap-2 text-xs mb-3">
-                            <div class="bg-base-200 rounded-lg p-2 text-center">
-                                <div class="font-bold"><?= $opt['rate'] ?>%</div>
-                                <div class="text-base-content/50">Interest</div>
-                            </div>
-                            <div class="bg-base-200 rounded-lg p-2 text-center">
-                                <div class="font-bold"><?= $opt['days'] ?> days</div>
-                                <div class="text-base-content/50">Term</div>
-                            </div>
-                            <div class="bg-base-200 rounded-lg p-2 text-center">
-                                <div class="font-bold"><?= currency($opt['daily_payment']) ?></div>
-                                <div class="text-base-content/50">Daily Payment</div>
-                            </div>
-                            <div class="bg-base-200 rounded-lg p-2 text-center">
-                                <div class="font-bold"><?= currency($opt['total_repay']) ?></div>
-                                <div class="text-base-content/50">Total Repay</div>
-                            </div>
-                        </div>
-
-                        <form action="/bank/borrow" method="post" data-confirm="Borrow <?= currency($opt['amount']) ?> at <?= $opt['rate'] ?>% for <?= $opt['days'] ?> days?" data-confirm-title="Confirm Loan">
-                            <?= csrf_field() ?>
-                            <input type="hidden" name="type" value="<?= $key ?>">
-                            <button class="btn <?= $key === 'emergency' ? 'btn-error' : 'btn-primary' ?> btn-sm w-full gap-1" <?= count($loans) >= $__maxLoans ? 'disabled' : '' ?>>
-                                <i class="fa-solid fa-hand-holding-dollar"></i> Borrow <?= currency($opt['amount']) ?>
-                            </button>
-                        </form>
                     </div>
-                </div>
+                    <dl class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="bg-base-200 rounded-lg p-2 text-center"><dt class="text-base-content/60">Interest</dt><dd class="font-bold"><?= currency($p['interest']) ?> (<?= $p['rate'] + 0 ?>%)</dd></div>
+                        <div class="bg-base-200 rounded-lg p-2 text-center"><dt class="text-base-content/60">Term</dt><dd class="font-bold"><?= $p['days'] ?> days</dd></div>
+                        <div class="bg-base-200 rounded-lg p-2 text-center"><dt class="text-base-content/60">Each day</dt><dd class="font-bold"><?= currency($p['daily_payment']) ?></dd></div>
+                        <div class="bg-base-200 rounded-lg p-2 text-center"><dt class="text-base-content/60">Total to repay</dt><dd class="font-bold"><?= currency($p['total_repay']) ?></dd></div>
+                    </dl>
+                    <form action="/bank/borrow" method="post" data-confirm="Borrow <?= currency($p['amount']) ?> and repay <?= currency($p['daily_payment']) ?> a day for <?= $p['days'] ?> days (<?= currency($p['total_repay']) ?> in total)?" data-confirm-title="Confirm loan"><?= csrf_field() ?>
+                        <input type="hidden" name="type" value="<?= esc($key) ?>">
+                        <button class="btn <?= $emergency ? 'btn-error' : 'btn-primary' ?> btn-sm w-full gap-1" <?= $freeSlots ? '' : 'disabled' ?>><i class="fa-solid fa-hand-holding-dollar" aria-hidden="true"></i> Borrow <?= currency($p['amount']) ?></button>
+                    </form>
+                </div></div>
             <?php endforeach ?>
             </div>
 
-            <div class="card bg-base-100 shadow-sm mt-4"><div class="card-body p-4">
-                <h3 class="font-semibold text-sm mb-2"><i class="fa-solid fa-circle-info mr-1 text-info"></i>How Loans Work</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-base-content/60">
-                    <div class="space-y-1.5">
-                        <div><i class="fa-solid fa-coins mr-1 text-success"></i> Borrowed cash is added to your balance instantly</div>
-                        <div><i class="fa-solid fa-calendar mr-1"></i> Daily payments are deducted automatically by the game tick</div>
-                        <div><i class="fa-solid fa-percent mr-1 text-warning"></i> Interest is calculated upfront and included in total repayment</div>
-                    </div>
-                    <div class="space-y-1.5">
-                        <div><i class="fa-solid fa-lock mr-1"></i> Maximum 3 active loans at a time</div>
-                        <div><i class="fa-solid fa-check mr-1 text-success"></i> Pay off early anytime - no penalties</div>
-                        <div><i class="fa-solid fa-triangle-exclamation mr-1 text-error"></i> Emergency credit has the highest interest rate</div>
-                    </div>
-                </div>
-            </div></div>
-        </div>
+            <details class="card bg-base-100 shadow-sm mt-4">
+                <summary class="card-body p-4 cursor-pointer font-semibold text-sm">How loans work</summary>
+                <ul class="px-4 pb-4 text-sm text-base-content/80 space-y-1 list-disc pl-9">
+                    <li>The money is added to your cash straight away.</li>
+                    <li>The interest is the total for the whole term, not a yearly rate. It's added up front and repaid in equal instalments each night.</li>
+                    <li>Instalments are taken even when your cash runs out, so your balance can go negative.</li>
+                    <li>Pay off early at any time: you pay what's left of the money you borrowed plus the interest so far, and skip the rest.</li>
+                    <li>Up to <?= $maxLoans ?> loans at once<?= $hasExtraSlot ? ' (with your extra slot)' : ', or one more with an extra slot from Génépis' ?>. Loans are cleared when a new season starts, and count against your net worth for the legacy bonus.</li>
+                </ul>
+            </details>
+        </section>
     </div>
 </div>
 <?= $this->endSection() ?>
