@@ -1,0 +1,5 @@
+fix/improve/ravamp https://ski-manager.net/equipment
+
+---
+
+Deploy the equipment revamp to production (back up first), then commit and push.
