@@ -1,0 +1,9 @@
+Back up, then delete the 12 broken demo accounts and demo guests older than 7 days that were never claimed, on production.
+
+---
+
+Find out why demo account #338 has a real email but is still a demo, fix the cause, and tell me how to restore that player's account.
+
+---
+
+Deploy the demo-save fix to production (back up first), then commit and push.
