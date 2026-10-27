@@ -159,6 +159,14 @@ class GameTick extends BaseCommand
             // Snow guns only run (and cost or wear) on days cold enough for their model
             $baseTemp = (int) ($weather['temp'] ?? 0);
             $equipment = array_values(array_filter($equipment, fn($e) => $e['equipment_type'] !== 'snowmaker' || \App\Libraries\Snowmaking::runs($e, $baseTemp)));
+            // v2: groomers without an operator stay parked (no fuel, no wear); the night shift below uses the same fleet
+            if ($v2) {
+                $crewedGroomers = array_flip(array_map(fn($m) => (int) $m['id'], \App\Libraries\Grooming::fleet(
+                    array_filter($equipment, fn($e) => $e['equipment_type'] === 'groomer'),
+                    array_values(array_filter($allStaff, fn($s) => $s['role'] === 'groomer'))
+                )['machines']));
+                $equipment = array_values(array_filter($equipment, fn($e) => $e['equipment_type'] !== 'groomer' || isset($crewedGroomers[(int) $e['id']])));
+            }
             $crewedGuns = array_flip(array_column(array_filter($allStaff, fn($s) => $s['role'] === 'snowmaker' && !empty($s['assigned_to'])), 'assigned_to'));
             foreach ($equipment as $e) {
                 $dayExpenses += (int) round($e['fuel_cost'] * $costMult);

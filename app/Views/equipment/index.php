@@ -1,258 +1,176 @@
 <?= $this->extend('layouts/main') ?>
-<?= $this->section('title') ?>Equipment Shop<?= $this->endSection() ?>
+<?= $this->section('title') ?>Equipment<?= $this->endSection() ?>
 <?= $this->section('content') ?>
+<?php
+use App\Libraries\Fleet;
+$states = [
+    'running' => ['badge-success', 'Running'], 'no_operator' => ['badge-warning', 'No operator'],
+    'idle' => ['badge-warning', 'Idle: too warm'], 'off' => ['badge-ghost', 'Off'], 'broken' => ['badge-error', 'Broken'],
+];
+$typeLabel = ['groomer' => 'Groomers', 'snowmaker' => 'Snow guns'];
+$byType = ['groomer' => array_filter($equipment, fn($e) => $e['equipment_type'] === 'groomer'), 'snowmaker' => array_filter($equipment, fn($e) => $e['equipment_type'] === 'snowmaker')];
+?>
 <div class="max-w-6xl mx-auto p-4 lg:p-8">
 
-    <div class="flex items-center gap-3 mb-6">
-        <a href="/dashboard" class="btn btn-ghost btn-sm btn-circle"><i class="fa-solid fa-chevron-left"></i></a>
-        <div>
-            <h1 class="text-2xl font-bold"><i class="fa-solid fa-shop mr-2 text-primary"></i>Equipment Shop</h1>
-            <p class="text-sm text-base-content/50">Buy snow groomers and snowmaking machines from real brands</p>
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div class="flex items-center gap-3">
+            <a href="/dashboard" class="btn btn-ghost btn-sm btn-circle" aria-label="Back to dashboard"><i class="fa-solid fa-chevron-left"></i></a>
+            <div>
+                <h1 class="text-2xl font-bold"><i class="fa-solid fa-shop mr-2 text-primary" aria-hidden="true"></i>Equipment</h1>
+                <p class="text-sm text-base-content/60">Groomers restore your slopes each night; snow guns protect them when the snow is thin</p>
+            </div>
         </div>
+        <div class="text-sm">Cash <span class="font-bold <?= $cash < 0 ? 'text-error' : 'text-success' ?>"><?= currency($cash) ?></span></div>
     </div>
 
     <?php if (session('success')) : ?><div class="alert alert-success mb-4" role="status"><span><?= session('success') ?></span></div><?php endif ?>
     <?php if (session('error')) : ?><div class="alert alert-error mb-4" role="alert"><span><?= session('error') ?></span></div><?php endif ?>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center"><div class="text-2xl font-bold"><?= count($ownedGroomers) ?></div><div class="text-xs text-base-content/50">Groomers</div></div></div>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center"><div class="text-2xl font-bold"><?= count($ownedSnowmakers) ?></div><div class="text-xs text-base-content/50">Snow Machines</div></div></div>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center"><div class="text-2xl font-bold"><?= count($equipment) ?></div><div class="text-xs text-base-content/50">Total Fleet</div></div></div>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center"><div class="text-2xl font-bold text-warning"><?= currency($totalFuel) ?></div><div class="text-xs text-base-content/50">Fuel/Day</div></div></div>
+    <!-- Summary -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        <a href="/grooming" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Grooming tonight</div>
+            <div class="text-2xl font-bold <?= $slopes && $groomCapacity < $slopes ? 'text-warning' : '' ?>"><?= $groomCapacity ?> <span class="text-sm font-normal">of <?= $slopes ?> slopes</span></div>
+            <div class="text-xs text-base-content/60"><?= $operators ?> operator<?= $operators === 1 ? '' : 's' ?> · <?= $groomers ?> groomer<?= $groomers === 1 ? '' : 's' ?></div>
+        </div></a>
+        <a href="/snowmaking" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Snow guns today</div>
+            <div class="text-2xl font-bold"><?= $gunCapacity ?> <span class="text-sm font-normal">slopes covered</span></div>
+            <div class="text-xs text-base-content/60"><?= $runningGuns ?> of <?= $guns ?> running</div>
+        </div></a>
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Running cost</div>
+            <div class="text-2xl font-bold"><?= currency($dailyCost) ?><span class="text-sm font-normal">/day</span></div>
+            <div class="text-xs text-base-content/60">fuel for machines that run</div>
+        </div></div>
+        <div class="card bg-base-100 shadow-sm"><div class="card-body p-4">
+            <div class="text-xs text-base-content/60">Fleet resale value</div>
+            <div class="text-2xl font-bold"><?= currency($fleetValue) ?></div>
+            <div class="text-xs text-base-content/60"><?= count($equipment) ?> machine<?= count($equipment) === 1 ? '' : 's' ?></div>
+        </div></div>
     </div>
-    <?php
-        $__cash = db_connect()->table('player_finances')->where('user_id', auth()->id())->get()->getRowArray()['cash'] ?? 0;
-        $__totalSlopesCap = array_sum(array_map(fn($e) => $e['equipment_type'] === 'groomer' ? (int)$e['capacity'] : 0, $equipment));
-        $__slopeCount = db_connect()->table('player_items')->where('user_id', auth()->id())->whereIn('item_type', ['slope','downhill','crosscountry','snowpark','luge'])->countAllResults();
-        $__totalSnowOutput = array_sum(array_map(fn($e) => $e['equipment_type'] === 'snowmaker' && $e['status'] === 'active' ? (int)$e['output_per_day'] : 0, $equipment));
-    ?>
 
-    <!-- Fleet Coverage -->
-    <?php if (!empty($equipment)) : ?>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-        <div class="card bg-success/10 border border-success/30 shadow-sm"><div class="card-body p-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2"><i class="fa-solid fa-tractor text-success"></i><span class="text-sm font-semibold">Grooming Capacity</span></div>
-                <span class="font-mono text-sm font-bold <?= $__totalSlopesCap >= $__slopeCount ? 'text-success' : 'text-warning' ?>"><?= $__totalSlopesCap ?>/<?= $__slopeCount ?> slopes</span>
-            </div>
-            <progress class="progress progress-success w-full mt-2 h-1.5" value="<?= min($__totalSlopesCap, $__slopeCount) ?>" max="<?= max(1, $__slopeCount) ?>"></progress>
-        </div></div>
-        <div class="card bg-info/10 border border-info/30 shadow-sm"><div class="card-body p-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2"><i class="fa-solid fa-snowflake text-info"></i><span class="text-sm font-semibold">Snow Output</span></div>
-                <span class="font-mono text-sm font-bold text-info"><?= $__totalSnowOutput ?> <?= isImperial() ? 'in' : 'cm' ?>/day</span>
-            </div>
-            <progress class="progress progress-info w-full mt-2 h-1.5" value="<?= min($__totalSnowOutput, 20) ?>" max="20"></progress>
-        </div></div>
-    </div>
+    <?php if ($idleGroomers > 0) : ?>
+    <div class="alert alert-warning mb-4"><i class="fa-solid fa-user-slash" aria-hidden="true"></i><span><?= $idleGroomers ?> groomer<?= $idleGroomers === 1 ? ' is' : 's are' ?> switched on with no operator, so <?= $idleGroomers === 1 ? 'it stays' : 'they stay' ?> parked. <a href="/staff/hire" class="link font-semibold">Hire a groomer operator</a> for each machine.</span></div>
+    <?php elseif ($slopes > 0 && $groomers === 0) : ?>
+    <div class="alert mb-4"><i class="fa-solid fa-circle-info text-info" aria-hidden="true"></i><span>Slopes wear down every day. A groomer with an operator restores the worst ones each night.</span></div>
     <?php endif ?>
 
-    <div class="text-right text-xs text-base-content/40 mb-2">Your balance: <span class="font-bold text-success"><?= currency($__cash) ?></span></div>
-
-    <!-- Owned Equipment -->
-    <?php if (!empty($equipment)) : ?>
-    <div class="mb-8">
-        <h2 class="text-lg font-bold mb-3"><i class="fa-solid fa-warehouse mr-1"></i>Your Fleet</h2>
+    <!-- Fleet -->
+    <?php foreach ($byType as $type => $list) : if (!$list) continue; ?>
+    <section class="mb-6" aria-labelledby="fleet-<?= $type ?>">
+        <div class="flex items-center justify-between mb-3">
+            <h2 id="fleet-<?= $type ?>" class="text-lg font-bold">Your <?= strtolower($typeLabel[$type]) ?></h2>
+            <a href="<?= $type === 'groomer' ? '/grooming' : '/snowmaking' ?>" class="link link-primary text-sm"><?= $type === 'groomer' ? 'Grooming' : 'Snowmaking' ?> →</a>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        <?php foreach ($equipment as $eq) : ?>
-            <div class="card bg-base-100 shadow-sm"><div class="card-body p-3">
-                <div class="flex items-center gap-3 mb-2">
-                    <div class="w-8 h-8 rounded-lg <?= $eq['status'] === 'active' ? ($eq['equipment_type'] === 'groomer' ? 'bg-success/20' : 'bg-info/20') : 'bg-base-200' ?> flex items-center justify-center">
-                        <i class="<?= $eq['equipment_type'] === 'groomer' ? 'icon-snowcat' : 'fa-solid fa-snowflake' ?> <?= $eq['status'] === 'active' ? ($eq['equipment_type'] === 'groomer' ? 'text-success' : 'text-info') : 'text-base-content/30' ?>"></i>
+        <?php foreach ($list as $eq) : $cond = (int) $eq['condition_pct']; [$badge, $label] = $states[$eq['state']]; ?>
+            <div class="card bg-base-100 shadow-sm <?= $eq['state'] === 'broken' ? 'border border-error/40' : '' ?>"><div class="card-body p-4 gap-2">
+                <div class="flex items-start justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="font-semibold truncate"><?= esc($eq['name']) ?></div>
+                        <div class="text-xs text-base-content/60"><?= esc($eq['brand']) ?> · <?= $type === 'groomer' ? 'grooms' : 'covers' ?> <?= (int) $eq['capacity'] ?> slope<?= (int) $eq['capacity'] === 1 ? '' : 's' ?> · <?= currency((int) $eq['fuel_cost']) ?>/day when running</div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="text-sm font-semibold truncate"><?= esc($eq['name']) ?></div>
-                        <div class="text-xs text-base-content/50"><?= esc($eq['brand']) ?> · <?= currency((int)$eq['fuel_cost']) ?>/day</div>
-                    </div>
+                    <span class="badge badge-sm <?= $badge ?> shrink-0"><?= $label ?></span>
                 </div>
-                <div class="flex items-center gap-2 mb-2">
-                    <progress class="progress <?= (int)$eq['condition_pct'] > 50 ? 'progress-success' : ((int)$eq['condition_pct'] > 20 ? 'progress-warning' : 'progress-error') ?> flex-1" value="<?= $eq['condition_pct'] ?>" max="100"></progress>
-                    <span class="text-xs"><?= $eq['condition_pct'] ?>%</span>
-                    <?php if ($eq['status'] === 'active') : ?><span class="badge badge-success badge-xs">On</span>
-                    <?php elseif ($eq['status'] === 'broken') : ?><span class="badge badge-error badge-xs">Broken</span>
-                    <?php else : ?><span class="badge badge-ghost badge-xs">Off</span><?php endif ?>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs text-base-content/60 w-12">Health</span>
+                    <progress class="progress <?= $cond >= 60 ? 'progress-success' : ($cond >= 30 ? 'progress-warning' : 'progress-error') ?> flex-1 h-1.5" value="<?= $cond ?>" max="100" aria-label="Health <?= $cond ?>%"></progress>
+                    <span class="text-xs font-mono w-9 text-right"><?= $cond ?>%</span>
                 </div>
+                <div class="text-xs text-base-content/60"><i class="fa-solid fa-user mr-1" aria-hidden="true"></i><?= $eq['crew'] ? esc($eq['crew']) : ($type === 'groomer' ? 'Any free operator can drive it' : 'No crew (optional)') ?></div>
                 <div class="flex flex-wrap gap-1">
-                    <?php if ($eq['status'] !== 'broken') : ?>
-                        <form action="/equipment/toggle/<?= $eq['id'] ?>" method="post" class="flex-1"><?= csrf_field() ?><button class="btn btn-<?= $eq['status'] === 'active' ? 'ghost' : 'success' ?> btn-xs w-full"><i class="fa-solid fa-power-off mr-1"></i><?= $eq['status'] === 'active' ? 'Off' : 'On' ?></button></form>
+                    <?php if ($eq['state'] !== 'broken') : ?>
+                    <form action="/equipment/toggle/<?= (int) $eq['id'] ?>" method="post" class="flex-1"><?= csrf_field() ?>
+                        <button class="btn btn-xs w-full <?= $eq['status'] === 'active' ? 'btn-ghost' : 'btn-success' ?>"><i class="fa-solid fa-power-off mr-1" aria-hidden="true"></i><?= $eq['status'] === 'active' ? 'Switch off' : 'Switch on' ?></button>
+                    </form>
                     <?php endif ?>
-                    <?php if ((int) $eq['condition_pct'] < 100) : ?>
-                        <form action="/equipment/repair/<?= $eq['id'] ?>" method="post" class="flex-1" data-confirm="Repair <?= esc($eq['name']) ?> to 100% for <?= currency($eq['repair_cost']) ?>?"><?= csrf_field() ?><button class="btn <?= $eq['status'] === 'broken' ? 'btn-warning' : 'btn-outline' ?> btn-xs w-full gap-1"><i class="fa-solid fa-wrench"></i>Repair <?= currency($eq['repair_cost']) ?></button></form>
+                    <?php if ($cond < 100) : ?>
+                    <form action="/equipment/repair/<?= (int) $eq['id'] ?>" method="post" class="flex-1" data-confirm="Repair <?= esc($eq['name']) ?> to 100% for <?= currency($eq['repair_cost']) ?>?"><?= csrf_field() ?>
+                        <button class="btn btn-xs w-full gap-1 <?= $eq['state'] === 'broken' ? 'btn-warning' : 'btn-outline' ?>" <?= $cash < $eq['repair_cost'] ? 'disabled' : '' ?>><i class="fa-solid fa-wrench" aria-hidden="true"></i> Repair <?= currency($eq['repair_cost']) ?></button>
+                    </form>
                     <?php endif ?>
-                    <form action="/equipment/sell/<?= $eq['id'] ?>" method="post" data-confirm="Sell <?= esc($eq['name']) ?> for <?= currency($eq['resale']) ?>?"><?= csrf_field() ?><button class="btn btn-ghost btn-xs text-error gap-1"><i class="fa-solid fa-coins"></i>Sell <?= currency($eq['resale']) ?></button></form>
+                    <form action="/equipment/sell/<?= (int) $eq['id'] ?>" method="post" data-confirm="Sell <?= esc($eq['name']) ?> for <?= currency($eq['resale']) ?>?"><?= csrf_field() ?>
+                        <button class="btn btn-xs btn-ghost text-error gap-1"><i class="fa-solid fa-coins" aria-hidden="true"></i> Sell <?= currency($eq['resale']) ?></button>
+                    </form>
                 </div>
             </div></div>
         <?php endforeach ?>
         </div>
-    </div>
-    <?php endif ?>
+    </section>
+    <?php endforeach ?>
 
     <!-- Shop -->
-    <div class="flex gap-2 mb-4">
-        <button class="btn btn-sm btn-primary shop-tab" data-show="all" onclick="filterShop('all')">All</button>
-        <button class="btn btn-sm btn-ghost shop-tab" data-show="groomers" onclick="filterShop('groomers')"><i class="fa-solid fa-truck-monster mr-1"></i>Groomers (<?= count($groomers) ?>)</button>
-        <button class="btn btn-sm btn-ghost shop-tab" data-show="snowmakers" onclick="filterShop('snowmakers')"><i class="fa-solid fa-snowflake mr-1"></i>Snowmakers (<?= count($snowmakers) ?>)</button>
-    </div>
-
-    <div id="shopGroomers">
-    <h2 class="text-lg font-bold mb-3"><i class="fa-solid fa-truck-monster mr-1"></i>Snow Groomers</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-    <?php foreach ($groomers as $key => $g) : ?>
-        <?php $canBuy = $__cash >= $g['cost']; ?>
-        <div class="card bg-base-100 shadow-sm hover:shadow-lg transition-all group">
-            <div class="bg-gradient-to-br from-success/5 to-success/15 p-6 text-center rounded-t-2xl">
-                <i class="fa-solid fa-truck-monster text-5xl text-success/40 group-hover:text-success/60 transition-colors"></i>
+    <section aria-labelledby="shop-h">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <h2 id="shop-h" class="text-lg font-bold">Shop<?php if ($discount) : ?> <span class="badge badge-success badge-sm align-middle">Alliance −<?= $discount ?>%</span><?php endif ?></h2>
+            <div class="join" role="group" aria-label="Show">
+                <?php foreach ($typeLabel as $type => $l) : ?>
+                <button type="button" class="btn btn-sm join-item shop-tab <?= $type === 'groomer' ? 'btn-primary' : '' ?>" data-type="<?= $type ?>" aria-pressed="<?= $type === 'groomer' ? 'true' : 'false' ?>"><?= $l ?> (<?= count($catalog[$type]) ?>)</button>
+                <?php endforeach ?>
             </div>
-            <div class="card-body p-4">
-                <div class="flex items-center justify-between mb-1">
-                    <span class="text-xs font-semibold text-base-content/40 uppercase tracking-wider"><?= $g['brand'] ?></span>
-                    <?php if ($key === 'pb100' || $key === 'prinoth_husky') : ?><span class="badge badge-success badge-xs">Starter</span><?php endif ?>
-                    <?php if ($key === 'pb800' || $key === 'prinoth_leitwolf') : ?><span class="badge badge-warning badge-xs">Premium</span><?php endif ?>
-                </div>
-                <h3 class="font-bold text-lg mb-1"><?= $g['name'] ?></h3>
-                <p class="text-xs text-base-content/50 mb-3 line-clamp-2"><?= $g['desc'] ?></p>
-                <div class="grid grid-cols-2 gap-2 text-xs mb-3">
-                    <div class="bg-base-200 rounded-lg p-2 text-center">
-                        <div class="font-bold text-base"><?= $g['capacity'] ?></div>
-                        <div class="text-base-content/50">Slopes</div>
+        </div>
+
+        <?php foreach ($catalog as $type => $items) : ?>
+        <div class="shop-panel grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3" data-type="<?= $type ?>" <?= $type === 'groomer' ? '' : 'hidden' ?>>
+            <?php foreach ($items as $c) : $canBuy = $cash >= $c['price']; ?>
+            <div class="card bg-base-100 shadow-sm"><div class="card-body p-4 gap-3">
+                <div>
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="text-xs font-semibold text-base-content/60 uppercase tracking-wider"><?= esc($c['brand']) ?></span>
+                        <?php if ($c['owned']) : ?><span class="badge badge-ghost badge-sm">You own <?= $c['owned'] ?></span><?php endif ?>
                     </div>
-                    <div class="bg-base-200 rounded-lg p-2 text-center">
-                        <div class="font-bold text-base"><?= currency($g['fuel']) ?></div>
-                        <div class="text-base-content/50">Per Day</div>
-                    </div>
+                    <h3 class="font-bold text-lg"><?= esc($c['name']) ?></h3>
+                    <p class="text-xs text-base-content/60 line-clamp-2"><?= esc($c['description']) ?></p>
                 </div>
-                <div class="border-t border-base-300 pt-3 flex items-center justify-between">
+                <dl class="grid grid-cols-2 gap-2 text-xs">
+                    <div class="bg-base-200 rounded-lg p-2 text-center"><dt class="text-base-content/60"><?= $type === 'groomer' ? 'Grooms per night' : 'Covers' ?></dt><dd class="font-bold"><?= (int) $c['capacity'] ?> slope<?= (int) $c['capacity'] === 1 ? '' : 's' ?></dd></div>
+                    <div class="bg-base-200 rounded-lg p-2 text-center"><dt class="text-base-content/60">Running cost</dt><dd class="font-bold"><?= currency($c['running_cost']) ?>/day</dd></div>
+                    <?php if ($type === 'snowmaker') : ?>
+                    <div class="bg-base-200 rounded-lg p-2 text-center"><dt class="text-base-content/60">Works at</dt><dd class="font-bold"><?= $c['max_temp'] === null ? 'Any temperature' : temp($c['max_temp']) . ' or colder' ?></dd></div>
+                    <div class="bg-base-200 rounded-lg p-2 text-center"><dt class="text-base-content/60">Uses per day</dt><dd class="font-bold"><?= number_format((int) $c['energy_kwh']) ?> kWh · <?= number_format((int) $c['water_liters'] / 1000, 1) ?> m³</dd></div>
+                    <?php else : ?>
+                    <div class="bg-base-200 rounded-lg p-2 text-center"><dt class="text-base-content/60">Needs</dt><dd class="font-bold">1 operator</dd></div>
+                    <div class="bg-base-200 rounded-lg p-2 text-center"><dt class="text-base-content/60">Cost per slope</dt><dd class="font-bold"><?= currency((int) round($c['price'] / max(1, (int) $c['capacity']))) ?></dd></div>
+                    <?php endif ?>
+                </dl>
+                <div class="flex items-center justify-between gap-2 mt-auto">
                     <div>
-                        <div class="text-xs text-base-content/40 line-through"><?= currency((int)($g['cost'] * 1.2)) ?></div>
-                        <div class="text-xl font-bold text-primary"><?= currency($g['cost']) ?></div>
+                        <?php if ($discount) : ?><div class="text-xs text-base-content/60 line-through"><?= currency((int) $c['cost']) ?></div><?php endif ?>
+                        <div class="text-xl font-bold"><?= currency($c['price']) ?></div>
                     </div>
-                    <form action="/equipment/buy" method="post" data-confirm="Buy <?= $g['name'] ?> for <?= currency($g['cost']) ?>?"><?= csrf_field() ?>
-                        <input type="hidden" name="model" value="<?= $key ?>">
-                        <input type="hidden" name="type" value="groomer">
-                        <button type="submit" class="btn btn-primary btn-sm gap-1" <?= !$canBuy ? 'disabled' : '' ?>>
-                            <i class="fa-solid fa-cart-plus"></i> <?= $canBuy ? 'Add to Fleet' : 'Not enough' ?>
-                        </button>
+                    <form action="/equipment/buy" method="post" data-confirm="Buy <?= esc($c['name']) ?> for <?= currency($c['price']) ?>?"><?= csrf_field() ?>
+                        <input type="hidden" name="model" value="<?= esc($c['model_key']) ?>">
+                        <button class="btn btn-primary btn-sm gap-1" <?= $canBuy ? '' : 'disabled' ?>><i class="fa-solid fa-cart-plus" aria-hidden="true"></i> <?= $canBuy ? 'Buy' : 'Need ' . currency($c['price'] - $cash) . ' more' ?></button>
                     </form>
-
                 </div>
-            </div>
+            </div></div>
+            <?php endforeach ?>
         </div>
-    <?php endforeach ?>
-    </div>
+        <?php endforeach ?>
+    </section>
 
-    </div>
-    <div id="shopSnowmakers">
-    <h2 class="text-lg font-bold mb-3"><i class="fa-solid fa-snowflake mr-1 text-info"></i>Snowmaking Machines</h2>
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    <?php foreach ($snowmakers as $key => $s) : ?>
-        <?php $canBuy = $__cash >= $s['cost']; ?>
-        <div class="card bg-base-100 shadow-sm hover:shadow-lg transition-all group">
-            <div class="bg-gradient-to-br from-info/5 to-info/15 p-6 text-center rounded-t-2xl">
-                <i class="fa-solid fa-snowflake text-5xl text-info/40 group-hover:text-info/60 transition-colors"></i>
-            </div>
-            <div class="card-body p-4">
-                <div class="flex items-center justify-between mb-1">
-                    <span class="text-xs font-semibold text-base-content/40 uppercase tracking-wider"><?= $s['brand'] ?></span>
-                    <?php if ($s['cost'] <= 25000) : ?><span class="badge badge-success badge-xs">Budget</span><?php endif ?>
-                    <?php if ($s['cost'] >= 95000 && $s['cost'] < 350000) : ?><span class="badge badge-warning badge-xs">Premium</span><?php endif ?>
-                    <?php if ($s['cost'] >= 350000) : ?><span class="badge badge-error badge-xs">All-Weather</span><?php endif ?>
-                </div>
-                <h3 class="font-bold text-lg mb-1"><?= $s['name'] ?></h3>
-                <p class="text-xs text-base-content/50 mb-3 line-clamp-2"><?= $s['desc'] ?></p>
-                <div class="grid grid-cols-2 gap-2 text-xs mb-3">
-                    <div class="bg-base-200 rounded-lg p-2 text-center">
-                        <div class="font-bold text-base"><?= (int) $s['capacity'] ?> slope<?= (int) $s['capacity'] === 1 ? '' : 's' ?></div>
-                        <div class="text-base-content/50">Covers</div>
-                    </div>
-                    <div class="bg-base-200 rounded-lg p-2 text-center">
-                        <div class="font-bold text-base"><?= currency($s['fuel']) ?>/day</div>
-                        <div class="text-base-content/50">Running cost</div>
-                    </div>
-                </div>
-                <div class="border-t border-base-300 pt-3 flex items-center justify-between">
-                    <div>
-                        <div class="text-xs text-base-content/40 line-through"><?= currency((int)($s['cost'] * 1.2)) ?></div>
-                        <div class="text-xl font-bold text-info"><?= currency($s['cost']) ?></div>
-                    </div>
-                    <form action="/equipment/buy" method="post" data-confirm="Buy <?= $s['name'] ?> for <?= currency($s['cost']) ?>?"><?= csrf_field() ?>
-                        <input type="hidden" name="model" value="<?= $key ?>">
-                        <input type="hidden" name="type" value="snowmaker">
-                        <button type="submit" class="btn btn-info btn-sm gap-1" <?= !$canBuy ? 'disabled' : '' ?>>
-                            <i class="fa-solid fa-cart-plus"></i> <?= $canBuy ? 'Add to Fleet' : 'Not enough' ?>
-                        </button>
-                    </form>
-
-                </div>
-            </div>
-        </div>
-    <?php endforeach ?>
-    </div>
-    </div>
-
-    <script>
-    function filterShop(type) {
-        document.querySelectorAll('.shop-tab').forEach(function(b){b.classList.remove('btn-primary');b.classList.add('btn-ghost');});
-        document.querySelector('.shop-tab[data-show="'+type+'"]').classList.add('btn-primary');
-        document.querySelector('.shop-tab[data-show="'+type+'"]').classList.remove('btn-ghost');
-        var g = document.getElementById('shopGroomers');
-        var s = document.getElementById('shopSnowmakers');
-        if(type==='groomers'){g.style.display='';s.style.display='none';}
-        else if(type==='snowmakers'){g.style.display='none';s.style.display='';}
-        else{g.style.display='';s.style.display='';}
-    }
-    </script>
-
-    <!-- Related Systems -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6 mb-6">
-        <a href="/grooming" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow"><div class="card-body p-3 flex-row items-center gap-3">
-            <i class="fa-solid fa-tractor text-success text-xl"></i>
-            <div><div class="text-sm font-bold">Grooming</div><div class="text-xs text-base-content/50">Assign groomers to sectors</div></div>
-            <i class="fa-solid fa-chevron-right text-base-content/30 ml-auto"></i>
-        </div></a>
-        <a href="/snowmaking" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow"><div class="card-body p-3 flex-row items-center gap-3">
-            <i class="fa-solid fa-snowflake text-info text-xl"></i>
-            <div><div class="text-sm font-bold">Snowmaking</div><div class="text-xs text-base-content/50">Use snowmakers to produce snow</div></div>
-            <i class="fa-solid fa-chevron-right text-base-content/30 ml-auto"></i>
-        </div></a>
-        <a href="/staff" class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow"><div class="card-body p-3 flex-row items-center gap-3">
-            <i class="fa-solid fa-users text-warning text-xl"></i>
-            <div><div class="text-sm font-bold">Staff</div><div class="text-xs text-base-content/50">Hire operators for your machines</div></div>
-            <i class="fa-solid fa-chevron-right text-base-content/30 ml-auto"></i>
-        </div></a>
-    </div>
-</div>
-<!-- Compare Bar -->
-<div id="compareBar" class="fixed bottom-0 left-0 right-0 bg-base-100 border-t border-base-300 shadow-xl p-3 z-50" style="display:none">
-    <div class="max-w-6xl mx-auto flex items-center justify-between">
-        <div class="flex items-center gap-2">
-            <i class="fa-solid fa-scale-balanced text-primary"></i>
-            <span class="text-sm font-semibold">Compare: <span id="compareCount">0</span> selected</span>
-            <div id="compareNames" class="flex gap-1"></div>
-        </div>
-        <div class="flex gap-2">
-            <button onclick="clearCompare()" class="btn btn-ghost btn-sm">Clear</button>
-            <button onclick="showCompare()" class="btn btn-primary btn-sm gap-1"><i class="fa-solid fa-table-columns"></i> Compare</button>
-        </div>
-    </div>
+    <details class="card bg-base-100 shadow-sm mt-6">
+        <summary class="card-body p-4 cursor-pointer font-semibold text-sm">How equipment works</summary>
+        <ul class="px-4 pb-4 text-sm text-base-content/80 space-y-1 list-disc pl-9">
+            <li>New machines arrive switched off. Switch them on here, or on the Grooming and Snowmaking pages.</li>
+            <li>A groomer runs each night only with an operator (one per machine, biggest machines first) and grooms the worst slopes first. Parked groomers cost nothing.</li>
+            <li>A snow gun runs only on days cold enough for its model and covers that many slopes. On warmer days it waits at no cost.</li>
+            <li>Running machines cost their running cost each day and wear 1–5% a day; at 0% they break. Repairs cost up to <?= (int) (Fleet::REPAIR_SHARE * 100) ?>% of the price depending on wear, and selling returns up to <?= (int) (Fleet::RESALE_SHARE * 100) ?>% depending on condition.</li>
+        </ul>
+    </details>
 </div>
 
-<!-- Compare Modal -->
-<dialog id="compareModal" class="modal modal-bottom sm:modal-middle" closedby="any" aria-labelledby="compareModalTitle">
-    <div class="modal-box max-w-4xl w-full">
-        <h3 class="font-bold text-lg mb-4" id="compareModalTitle"><i class="fa-solid fa-scale-balanced mr-2 text-primary" aria-hidden="true"></i>Equipment Comparison</h3>
-        <div class="overflow-x-auto">
-            <table class="table table-sm" id="compareTable">
-                <thead><tr><th>Spec</th></tr></thead>
-                <tbody></tbody>
-            </table>
-        </div>
-        <div class="modal-action">
-            <form method="dialog"><button class="btn btn-sm">Close</button></form>
-        </div>
-    </div>
-    <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
-
-
+<script>
+document.querySelectorAll('.shop-tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+        document.querySelectorAll('.shop-tab').forEach(function (t) {
+            var on = t === tab;
+            t.classList.toggle('btn-primary', on);
+            t.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        document.querySelectorAll('.shop-panel').forEach(function (p) { p.hidden = p.dataset.type !== tab.dataset.type; });
+    });
+});
+</script>
 <?= $this->endSection() ?>

@@ -3,149 +3,142 @@
 namespace App\Controllers;
 
 use App\Libraries\Fleet;
+use App\Libraries\Grooming;
+use App\Libraries\Snowmaking;
 
+/**
+ * /equipment: the shop and your fleet of groomers and snow guns. The numbers shown are the ones the
+ * nightly tick uses: a groomer only runs (and burns fuel) with an operator, a snow gun only on days
+ * cold enough for its model (App\Libraries\Grooming, App\Libraries\Snowmaking).
+ */
 class Equipment extends BaseController
 {
+    /** Alliance Bulk Procurement discount for this player, in percent */
+    private function discountPct(int $userId): int
+    {
+        $db = db_connect();
+        if (!$db->tableExists('alliance_members')) return 0;
+        $member = $db->table('alliance_members')->where('user_id', $userId)->get()->getRowArray();
+        if (!$member) return 0;
+        $perk = $db->table('alliance_unlocked_perks')->where('alliance_id', $member['alliance_id'])->where('perk_key', 'bulk_procurement')->get()->getRowArray();
+        return $perk ? match ((int) $perk['perk_level']) { 2 => 15, 3 => 20, default => 10 } : 0;
+    }
+
     public function index(): string
     {
+        helper('weather');
         $userId = auth()->id();
         $db = db_connect();
+        $discount = $this->discountPct($userId);
+        $costMult = ((int) getDifficultyConfig('cost_multiplier', '100')) / 100;
+        $baseTemp = (int) (getCurrentWeather()['base_temp'] ?? 0);
 
-        $groomers = $db->table('equipment_catalog')->where('equipment_type', 'groomer')->orderBy('sort_order')->get()->getResultArray();
-        $snowmakers = $db->table('equipment_catalog')->where('equipment_type', 'snowmaker')->orderBy('sort_order')->get()->getResultArray();
+        $equipment = $db->table('equipment')->where('user_id', $userId)->orderBy('equipment_type')->orderBy('id')->get()->getResultArray();
+        $staff = $db->table('staff')->where('user_id', $userId)->whereIn('role', ['groomer', 'snowmaker'])->where('status', 'active')->get()->getResultArray();
+        $operators = array_values(array_filter($staff, fn($s) => $s['role'] === 'groomer'));
+        $groomers = array_filter($equipment, fn($e) => $e['equipment_type'] === 'groomer');
+        $guns = array_filter($equipment, fn($e) => $e['equipment_type'] === 'snowmaker');
+        $fleet = Grooming::fleet($groomers, $operators);
+        $crewedIds = array_flip(array_map(fn($m) => (int) $m['id'], $fleet['machines']));
+        $crewByName = array_column(array_filter($staff, fn($s) => !empty($s['assigned_to'])), 'name', 'assigned_to');
 
-        $groomerCatalog = [];
-        foreach ($groomers as $g) {
-            $groomerCatalog[$g['model_key']] = ['brand' => $g['brand'], 'name' => $g['name'], 'desc' => $g['description'], 'capacity' => (int) $g['capacity'], 'fuel' => (int) $g['fuel_cost'], 'cost' => (int) $g['cost'], 'img' => $g['icon'], 'output_per_day' => (int) $g['output_per_day'], 'energy_kwh' => (int) $g['energy_kwh'], 'water_liters' => (int) $g['water_liters']];
-        }
-        $snowmakerCatalog = [];
-        foreach ($snowmakers as $s) {
-            $snowmakerCatalog[$s['model_key']] = ['brand' => $s['brand'], 'name' => $s['name'], 'desc' => $s['description'], 'capacity' => (int) $s['capacity'], 'fuel' => (int) $s['fuel_cost'], 'cost' => (int) $s['cost'], 'img' => $s['icon'], 'output_per_day' => (int) $s['output_per_day'], 'energy_kwh' => (int) $s['energy_kwh'], 'water_liters' => (int) $s['water_liters']];
-        }
-
-        $discountPct = 0;
-        if ($db->tableExists('alliance_members')) {
-            $allianceMember = $db->table('alliance_members')->where('user_id', $userId)->get()->getRowArray();
-            if ($allianceMember) {
-                $bulkPerk = $db->table('alliance_unlocked_perks')
-                    ->where('alliance_id', $allianceMember['alliance_id'])
-                    ->where('perk_key', 'bulk_procurement')
-                    ->get()->getRowArray();
-                if ($bulkPerk) {
-                    $discountPct = match((int)$bulkPerk['perk_level']) { 1 => 10, 2 => 15, 3 => 20, default => 10 };
-                    foreach ($groomerCatalog as &$gc) {
-                        $gc['original_cost'] = $gc['cost'];
-                        $gc['cost'] = (int) round($gc['cost'] * (1 - $discountPct / 100));
-                    }
-                    foreach ($snowmakerCatalog as &$sc) {
-                        $sc['original_cost'] = $sc['cost'];
-                        $sc['cost'] = (int) round($sc['cost'] * (1 - $discountPct / 100));
-                    }
-                }
-            }
-        }
-
-        $equipment = $db->table('equipment')->where('user_id', $userId)->get()->getResultArray();
         $prices = Fleet::prices();
         foreach ($equipment as &$e) {
             $e['repair_cost'] = Fleet::repairCost($e, $prices);
             $e['resale'] = Fleet::resaleValue($e, $prices);
+            $e['crew'] = $crewByName[$e['name']] ?? null;
+            $broken = $e['status'] === 'broken' || (int) $e['condition_pct'] <= 0;
+            if ($e['equipment_type'] === 'groomer') {
+                $e['state'] = $broken ? 'broken' : ($e['status'] !== 'active' ? 'off' : (isset($crewedIds[(int) $e['id']]) ? 'running' : 'no_operator'));
+            } else {
+                $e['state'] = $broken ? 'broken' : ($e['status'] !== 'active' ? 'off' : (Snowmaking::runs($e, $baseTemp) ? 'running' : 'idle'));
+            }
+            $e['daily_cost'] = $e['state'] === 'running' ? (int) round((int) $e['fuel_cost'] * $costMult) : 0;
         }
         unset($e);
-        $ownedGroomers = array_filter($equipment, fn($e) => $e['equipment_type'] === 'groomer');
-        $ownedSnowmakers = array_filter($equipment, fn($e) => $e['equipment_type'] === 'snowmaker');
-        $totalFuel = array_sum(array_column(array_filter($equipment, fn($e) => $e['status'] === 'active'), 'fuel_cost'));
+
+        $owned = array_count_values(array_column($equipment, 'model_key'));
+        $catalog = ['groomer' => [], 'snowmaker' => []];
+        foreach ($db->table('equipment_catalog')->orderBy('sort_order')->orderBy('cost')->get()->getResultArray() as $c) {
+            $c['price'] = (int) round((int) $c['cost'] * (1 - $discount / 100));
+            $c['owned'] = $owned[$c['model_key']] ?? 0;
+            $c['running_cost'] = (int) round((int) $c['fuel_cost'] * $costMult);
+            $c['max_temp'] = $c['equipment_type'] === 'snowmaker' ? Snowmaking::maxTemp($c) : null;
+            $catalog[$c['equipment_type']][] = $c;
+        }
+        foreach ($catalog as &$list) usort($list, fn($a, $b) => $a['price'] <=> $b['price']);
+        unset($list);
+
+        $slopes = $db->table('player_items')->where('user_id', $userId)->where('item_type', 'slope')->whereIn('status', ['open', 'broken'])->countAllResults();
+        $runningGuns = array_filter($equipment, fn($e) => $e['equipment_type'] === 'snowmaker' && $e['state'] === 'running');
 
         return view('equipment/index', [
-            'groomers' => $groomerCatalog,
-            'snowmakers' => $snowmakerCatalog,
-            'ownedGroomers' => $ownedGroomers,
-            'ownedSnowmakers' => $ownedSnowmakers,
-            'totalFuel' => $totalFuel,
+            'cash' => (int) ($db->table('player_finances')->select('cash')->where('user_id', $userId)->get()->getRow()->cash ?? 0),
             'equipment' => $equipment,
-            'allianceDiscountPct' => $discountPct,
+            'catalog' => $catalog,
+            'discount' => $discount,
+            'slopes' => $slopes,
+            'groomCapacity' => $fleet['capacity'],
+            'groomers' => count($groomers),
+            'operators' => count($operators),
+            'idleGroomers' => $fleet['idle_machines'],
+            'guns' => count($guns),
+            'gunCapacity' => count(Snowmaking::coverage($db->table('player_items')->where('user_id', $userId)->where('item_type', 'slope')->where('status', 'open')->get()->getResultArray(), $guns, $baseTemp)),
+            'runningGuns' => count($runningGuns),
+            'dailyCost' => array_sum(array_column($equipment, 'daily_cost')),
+            'fleetValue' => array_sum(array_column($equipment, 'resale')),
         ]);
-    }
-
-    private function getCatalogItem(string $modelKey): ?array
-    {
-        $db = db_connect();
-        $item = $db->table('equipment_catalog')->where('model_key', $modelKey)->get()->getRowArray();
-        if (!$item) return null;
-        return ['brand' => $item['brand'], 'name' => $item['name'], 'desc' => $item['description'], 'capacity' => (int) $item['capacity'], 'fuel' => (int) $item['fuel_cost'], 'cost' => (int) $item['cost'], 'img' => $item['icon'], 'type' => $item['equipment_type'], 'output_per_day' => (int) $item['output_per_day'], 'energy_kwh' => (int) $item['energy_kwh'], 'water_liters' => (int) $item['water_liters']];
     }
 
     public function buy()
     {
         $userId = auth()->id();
-        $modelKey = $this->request->getPost('model');
-
-        $item = $this->getCatalogItem($modelKey);
-        if (!$item) {
-            return redirect()->back()->with('error', 'Invalid equipment.');
-        }
-
         $db = db_connect();
-        $cost = (int) $item['cost'];
+        $item = $db->table('equipment_catalog')->where('model_key', (string) $this->request->getPost('model'))->get()->getRowArray();
+        if (!$item) return redirect()->to('/equipment')->with('error', 'Invalid equipment.');
 
-        // Apply Alliance Bulk Procurement discount
-        if ($db->tableExists('alliance_members')) {
-            $allianceMember = $db->table('alliance_members')->where('user_id', $userId)->get()->getRowArray();
-            if ($allianceMember) {
-                $bulkPerk = $db->table('alliance_unlocked_perks')
-                    ->where('alliance_id', $allianceMember['alliance_id'])
-                    ->where('perk_key', 'bulk_procurement')
-                    ->get()->getRowArray();
-                if ($bulkPerk) {
-                    $discountPct = match((int)$bulkPerk['perk_level']) { 1 => 10, 2 => 15, 3 => 20, default => 10 };
-                    $cost = (int) round($cost * (1 - $discountPct / 100));
-                }
-            }
+        $cost = (int) round((int) $item['cost'] * (1 - $this->discountPct($userId) / 100));
+
+        // Names identify a machine for crew assignment, so never reuse one that's still in the fleet
+        $taken = array_flip(array_column($db->table('equipment')->select('name')->where('user_id', $userId)->where('model_key', $item['model_key'])->get()->getResultArray(), 'name'));
+        for ($n = 1; isset($taken[$item['name'] . ' #' . $n]); $n++);
+        $name = $item['name'] . ' #' . $n;
+
+        $now = date('Y-m-d H:i:s');
+        $db->transStart();
+        $db->table('player_finances')->where('user_id', $userId)->where('cash >=', $cost)
+            ->set('cash', 'cash - ' . $cost, false)->set('total_expenses', 'total_expenses + ' . $cost, false)->update();
+        if ($db->affectedRows() !== 1) {
+            $db->transRollback();
+            return redirect()->to('/equipment')->with('error', 'Not enough cash: ' . esc($item['name']) . ' costs ' . currency($cost) . '.');
         }
-
-        $fin = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
-        $cash = (int) ($fin['cash'] ?? 0);
-        if ($cash < $cost) {
-            return redirect()->back()->with('error', 'Insufficient funds to purchase ' . $item['name'] . '.');
-        }
-
-        // Deduct purchase price
-        $db->table('player_finances')->where('user_id', $userId)->set('cash', "cash - {$cost}", false)->update();
-
-        $count = $db->table('equipment')->where('user_id', $userId)->where('model_key', $modelKey)->countAllResults();
-
         $db->table('equipment')->insert([
-            'user_id' => $userId,
-            'equipment_type' => $item['type'],
-            'model_key' => $modelKey,
-            'name' => $item['name'] . ' #' . ($count + 1),
-            'brand' => $item['brand'],
-            'capacity' => $item['capacity'],
-            'fuel_cost' => $item['fuel'],
-            'output_per_day' => $item['output_per_day'],
-            'energy_kwh' => $item['energy_kwh'],
-            'water_liters' => $item['water_liters'],
-            'condition_pct' => 100,
-            'status' => 'off',
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s'),
+            'user_id' => $userId, 'equipment_type' => $item['equipment_type'], 'model_key' => $item['model_key'], 'name' => $name,
+            'brand' => $item['brand'], 'capacity' => $item['capacity'], 'fuel_cost' => $item['fuel_cost'],
+            'output_per_day' => $item['output_per_day'], 'energy_kwh' => $item['energy_kwh'], 'water_liters' => $item['water_liters'],
+            'condition_pct' => 100, 'status' => 'off', 'created_at' => $now, 'updated_at' => $now,
         ]);
+        $db->table('financial_transactions')->insert([
+            'user_id' => $userId, 'game_day' => getGameDay(), 'category' => 'Equipment', 'description' => 'Bought ' . $name,
+            'amount' => $cost, 'type' => 'expense', 'created_at' => $now,
+        ]);
+        $db->transComplete();
 
-        log_activity($userId, 'Equipment', 'Purchased ' . $item['name'] . ' for ' . currency($item['cost']), $item['img']);
-        return redirect()->to('/equipment')->with('success', $item['name'] . ' purchased for ' . currency($item['cost']) . '!');
+        log_activity($userId, 'Equipment', 'Bought ' . $name . ' for ' . currency($cost), $item['icon'] ?: 'fa-solid fa-cart-plus');
+        $next = $item['equipment_type'] === 'groomer' ? 'Switch it on and make sure you have an operator for it.' : 'Switch it on to start covering slopes.';
+        return redirect()->to('/equipment')->with('success', esc($name) . ' bought for ' . currency($cost) . '. ' . $next);
     }
 
     public function toggle(int $id)
     {
-        $userId = auth()->id();
-        $db = db_connect();
-        $eq = $db->table('equipment')->where('id', $id)->where('user_id', $userId)->get()->getRowArray();
-        if (!$eq) return redirect()->back()->with('error', 'Not found.');
-        if ((int) $eq['condition_pct'] <= 0) return redirect()->back()->with('error', 'Broken - repair first.');
+        $eq = db_connect()->table('equipment')->where('id', $id)->where('user_id', auth()->id())->get()->getRowArray();
+        if (!$eq) return redirect()->to('/equipment')->with('error', 'Not found.');
+        if ((int) $eq['condition_pct'] <= 0 || $eq['status'] === 'broken') return redirect()->to('/equipment')->with('error', esc($eq['name']) . ' is broken: repair it first.');
 
-        $new = $eq['status'] === 'active' ? 'off' : 'active';
-        $db->table('equipment')->where('id', $id)->update(['status' => $new, 'updated_at' => date('Y-m-d H:i:s')]);
-        return redirect()->to('/equipment')->with('success', $eq['name'] . ' turned ' . $new . '.');
+        $on = $eq['status'] !== 'active';
+        db_connect()->table('equipment')->where('id', $id)->update(['status' => $on ? 'active' : 'off', 'updated_at' => date('Y-m-d H:i:s')]);
+        log_activity(auth()->id(), 'Equipment', $eq['name'] . ($on ? ' switched on' : ' switched off'), 'fa-solid fa-power-off');
+        return redirect()->to('/equipment')->with('success', esc($eq['name']) . ($on ? ' switched on.' : ' switched off.'));
     }
 
     public function repair(int $id)
