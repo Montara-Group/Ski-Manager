@@ -1,0 +1,5 @@
+Fix the demo page error (Unknown column created_at in Demo.php) and test it on staging.
+
+---
+
+Deploy the demo fix to production (back up first), then commit and push.
