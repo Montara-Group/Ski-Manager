@@ -24,29 +24,39 @@ class Demo extends BaseController
         $demoUsername = 'Demo Director ' . strtoupper(substr($token, 0, 4));
         $demoEmail = 'guest_' . $token . '@demo.ski-manager.net';
 
-        // 1. Create ephemeral guest user
-        $db->table('users')->insert([
-            'username'   => $demoUsername,
-            'status'     => 'demo',
-            'active'     => 1,
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s'),
-        ]);
-        $demoUserId = (int) $db->insertID();
+        // Create the guest and its mountain together, so a failure can't leave a half-made account
+        try {
+            $db->transStart();
+            // 1. Create ephemeral guest user
+            $db->table('users')->insert([
+                'username'   => $demoUsername,
+                'status'     => 'demo',
+                'active'     => 1,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+            $demoUserId = (int) $db->insertID();
 
-        // 2. Insert auth identity for CodeIgniter Shield
-        $db->table('auth_identities')->insert([
-            'user_id'    => $demoUserId,
-            'type'       => 'email_password',
-            'name'       => $demoUsername,
-            'secret'     => $demoEmail,
-            'secret2'    => password_hash($token, PASSWORD_DEFAULT),
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s'),
-        ]);
+            // 2. Insert auth identity for CodeIgniter Shield
+            $db->table('auth_identities')->insert([
+                'user_id'    => $demoUserId,
+                'type'       => 'email_password',
+                'name'       => $demoUsername,
+                'secret'     => $demoEmail,
+                'secret2'    => password_hash($token, PASSWORD_DEFAULT),
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
 
-        // 3. Seed pre-configured Park City mountain
-        self::seedDemoMountain($demoUserId);
+            // 3. Seed pre-configured Park City mountain
+            self::seedDemoMountain($demoUserId);
+            $db->transComplete();
+            if (!$db->transStatus()) throw new \RuntimeException('transaction failed');
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'Demo: could not create the demo mountain: ' . $e->getMessage());
+            return redirect()->to('/')->with('error', 'The demo mountain could not be set up right now. Please try again in a moment.');
+        }
 
         // 4. Authenticate session via Shield
         auth()->loginById($demoUserId);
@@ -74,7 +84,6 @@ class Demo extends BaseController
             'profile_completed' => 1,
             'total_income'      => 0,
             'total_expenses'    => 0,
-            'created_at'        => date('Y-m-d H:i:s'),
             'updated_at'        => date('Y-m-d H:i:s'),
         ]);
 
@@ -114,7 +123,7 @@ class Demo extends BaseController
 
         $slopeSegments = $db->table('map_segments')
             ->where('resort_map', 'ParkCity')
-            ->where('type', 'slope')
+            ->where('type', 'downhill')
             ->where('active', 1)
             ->limit(8)
             ->get()->getResultArray();
@@ -168,40 +177,27 @@ class Demo extends BaseController
             ]));
         }
 
-        // 4. Equipment
-        $db->table('equipment')->insert([
-            'user_id'        => $userId,
-            'equipment_type' => 'groomer',
-            'model_key'      => 'pb600',
-            'name'           => 'PistenBully 600',
-            'brand'          => 'Kässbohrer',
-            'capacity'       => 500,
-            'fuel_cost'      => 45,
-            'output_per_day' => 100,
-            'energy_kwh'     => 120,
-            'water_liters'   => 0,
-            'condition_pct'  => 100,
-            'status'         => 'active',
-            'created_at'     => date('Y-m-d H:i:s'),
-            'updated_at'     => date('Y-m-d H:i:s'),
-        ]);
-
-        $db->table('equipment')->insert([
-            'user_id'        => $userId,
-            'equipment_type' => 'snowmaker',
-            'model_key'      => 'tf10',
-            'name'           => 'TechnoAlpin TF10',
-            'brand'          => 'TechnoAlpin',
-            'capacity'       => 400,
-            'fuel_cost'      => 30,
-            'output_per_day' => 80,
-            'energy_kwh'     => 95,
-            'water_liters'   => 1200,
-            'condition_pct'  => 100,
-            'status'         => 'active',
-            'created_at'     => date('Y-m-d H:i:s'),
-            'updated_at'     => date('Y-m-d H:i:s'),
-        ]);
+        // 4. Equipment: a groomer and a snow gun from the shop catalog, switched on
+        foreach (['pb600', 'ta_tr9'] as $modelKey) {
+            $m = $db->table('equipment_catalog')->where('model_key', $modelKey)->get()->getRowArray();
+            if (!$m) continue;
+            $db->table('equipment')->insert([
+                'user_id'        => $userId,
+                'equipment_type' => $m['equipment_type'],
+                'model_key'      => $m['model_key'],
+                'name'           => $m['name'] . ' #1',
+                'brand'          => $m['brand'],
+                'capacity'       => $m['capacity'],
+                'fuel_cost'      => $m['fuel_cost'],
+                'output_per_day' => $m['output_per_day'],
+                'energy_kwh'     => $m['energy_kwh'],
+                'water_liters'   => $m['water_liters'],
+                'condition_pct'  => 100,
+                'status'         => 'active',
+                'created_at'     => date('Y-m-d H:i:s'),
+                'updated_at'     => date('Y-m-d H:i:s'),
+            ]);
+        }
 
         // 5. Default Lift Tickets
         $tickets = [
@@ -260,11 +256,19 @@ class Demo extends BaseController
             'staff', 'player_finances', 'financial_transactions',
             'ticket_sales', 'genepis', 'daily_bonus'
         ];
-        foreach ($tables as $t) {
-            $db->table($t)->where('user_id', $userId)->delete();
+        try {
+            $db->transStart();
+            foreach ($tables as $t) {
+                $db->table($t)->where('user_id', $userId)->delete();
+            }
+            self::seedDemoMountain($userId);
+            $db->transComplete();
+            if (!$db->transStatus()) throw new \RuntimeException('transaction failed');
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'Demo: could not reset the demo mountain: ' . $e->getMessage());
+            return redirect()->to('/dashboard')->with('error', 'The demo mountain could not be reset right now. Please try again.');
         }
-
-        self::seedDemoMountain($userId);
         return redirect()->to('/dashboard')->with('info', 'Demo Mountain reset to pristine factory starter setup.');
     }
 
