@@ -307,7 +307,7 @@ a.link:hover{opacity:0.8}
             <a href="/demo/reset" class="btn btn-ghost btn-xs text-primary-content hover:bg-white/10" onclick="return confirm('Reset mountain to starting template?')">
                 <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset
             </a>
-            <a href="/register?claim_demo=1" class="btn btn-warning btn-xs font-bold gap-1 shadow-sm text-neutral">
+            <a href="/demo/save" class="btn btn-warning btn-xs font-bold gap-1 shadow-sm text-neutral">
                 <i class="fa-solid fa-cloud-arrow-up"></i> Save My Resort & Claim Capital
             </a>
             <a href="/demo/exit" class="btn btn-ghost btn-xs text-primary-content/80 hover:text-white" title="Exit Demo">

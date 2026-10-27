@@ -20,8 +20,19 @@ class Account extends BaseController
      * Email a one-time code to the account address. Players who signed up with Google or Discord
      * never saw their (random) password, and others forget theirs; the code stands in for it.
      */
+    /**
+     * A demo account has no password anyone knows: changing its email, name or password here would
+     * leave it a demo that can't be signed back into. Send the player to save the demo instead.
+     */
+    private function demoRedirect()
+    {
+        if (!\App\Controllers\Demo::isDemoUser()) return null;
+        return redirect()->to('/demo/save')->with('error', 'This is a demo mountain. Save it to a permanent account first; you choose your username, email and password there.');
+    }
+
     public function sendCode()
     {
+        if ($demo = $this->demoRedirect()) return $demo;
         $purpose = (string) $this->request->getPost('purpose');
         if (!isset(self::CODE_PURPOSES[$purpose])) return redirect()->to('/settings');
         $user = auth()->user();
@@ -63,6 +74,7 @@ class Account extends BaseController
 
     public function changePassword()
     {
+        if ($demo = $this->demoRedirect()) return $demo;
         $current = $this->request->getPost('current_password');
         $new = $this->request->getPost('new_password');
         $confirm = $this->request->getPost('confirm_password');
@@ -95,6 +107,7 @@ class Account extends BaseController
 
     public function changeEmail()
     {
+        if ($demo = $this->demoRedirect()) return $demo;
         $email = strip_tags(trim($this->request->getPost('email')));
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -110,7 +123,7 @@ class Account extends BaseController
         $db->table('auth_identities')
             ->where('user_id', auth()->id())
             ->where('type', 'email_password')
-            ->update(['secret' => $email]);
+            ->update(['secret' => $email, 'updated_at' => date('Y-m-d H:i:s')]);
 
         log_activity(auth()->id(), 'Account', 'Changed email to ' . $email, 'fa-solid fa-envelope');
         return redirect()->to('/account')->with('success', 'Email updated.');
@@ -118,6 +131,7 @@ class Account extends BaseController
 
     public function changeUsername()
     {
+        if ($demo = $this->demoRedirect()) return $demo;
         $username = strip_tags(trim($this->request->getPost('username')));
 
         if (strlen($username) < 3 || strlen($username) > 30) {

@@ -10,6 +10,9 @@
     </div>
 
     <?php /* Flash messages are shown by the layout */ ?>
+    <?php if (\App\Controllers\Demo::isDemoUser()) : ?>
+    <div class="alert alert-warning mb-4"><i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i><span>You're playing a demo mountain. To keep it, <a href="/demo/save" class="link font-semibold">save it to a permanent account</a>: you choose your username, email and password there.</span></div>
+    <?php endif ?>
 
     <!-- Account -->
     <h3 class="text-sm font-semibold text-base-content/50 uppercase tracking-wider mb-3">Account</h3>

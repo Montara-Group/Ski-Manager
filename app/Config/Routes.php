@@ -56,6 +56,7 @@ $routes->get('demo', 'Demo::start');
 $routes->get('demo/reset', 'Demo::reset');
 $routes->get('demo/exit', 'Demo::exit');
 $routes->post('demo/claim', 'Demo::claim');
+$routes->get('demo/save', 'Demo::save');
 $routes->get('/about', 'About::index');
 $routes->get('alliances', 'Alliances::index');
 $routes->get('alliances/leaderboard', 'Alliances::leaderboard');

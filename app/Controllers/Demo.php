@@ -242,6 +242,25 @@ class Demo extends BaseController
         $db->table('daily_bonus')->insert(['user_id' => $userId, 'last_claim_day' => 0, 'streak' => 1]);
     }
 
+    /**
+     * The signed-in player is on a demo mountain: their session says so, or (if the session was lost)
+     * their account is still a demo one.
+     */
+    public static function isDemoUser(): bool
+    {
+        if (!auth()->loggedIn()) return false;
+        if (session()->get('is_demo')) return true;
+        return (string) (auth()->user()->status ?? '') === 'demo';
+    }
+
+    /** /demo/save: the form that turns the demo into a permanent account (/register sends signed-in players away) */
+    public function save()
+    {
+        if (!self::isDemoUser()) return redirect()->to(auth()->loggedIn() ? '/dashboard' : '/register');
+        session()->set('is_demo', true);
+        return view('register');
+    }
+
     public function reset(): ResponseInterface
     {
         if (!session()->get('is_demo') || !auth()->loggedIn()) {
@@ -283,7 +302,7 @@ class Demo extends BaseController
 
     public function claim(): ResponseInterface
     {
-        if (!session()->get('is_demo') || !auth()->loggedIn()) {
+        if (!self::isDemoUser()) {
             return redirect()->to('/register');
         }
 
@@ -326,7 +345,7 @@ class Demo extends BaseController
         // Promote the ephemeral user into a permanent account!
         $db->table('users')->where('id', $userId)->update([
             'username'   => $username,
-            'status'     => 'active',
+            'status'     => null,
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
 
