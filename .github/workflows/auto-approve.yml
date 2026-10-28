@@ -1,0 +1,100 @@
+name: Auto Approve & Auto Merge PRs
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches:
+      - main
+      - staging
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  auto-review:
+    name: Auto Review & Merge
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: Process Pull Request Approval
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+            const trustedUsers = ['MontaraGroup', 'Montara-Group'];
+
+            const isTrusted = trustedUsers.includes(author) ||
+                              (pr.head.repo && trustedUsers.includes(pr.head.repo.owner.login));
+
+            if (!isTrusted) {
+              console.log(`PR #${pr.number} from @${author} requires manual review.`);
+              return;
+            }
+
+            console.log(`Processing trusted PR #${pr.number} from @${author}...`);
+
+            // Check if already approved by github-actions[bot]
+            const reviews = await github.rest.pulls.listReviews({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number
+            });
+
+            const alreadyApproved = reviews.data.some(
+              r => r.user.login === 'github-actions[bot]' && r.state === 'APPROVED'
+            );
+
+            if (!alreadyApproved) {
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                event: 'APPROVE',
+                body: `✅ Auto-approved by CI Quality Gate for trusted author @${author}.`
+              });
+              console.log(`Approved PR #${pr.number}.`);
+            } else {
+              console.log(`PR #${pr.number} is already approved.`);
+            }
+
+            // Attempt to enable native GitHub auto-merge
+            const enableAutoMergeMutation = `
+              mutation($pullRequestId: ID!) {
+                enablePullRequestAutoMerge(input: {
+                  pullRequestId: $pullRequestId,
+                  mergeMethod: MERGE
+                }) {
+                  pullRequest {
+                    id
+                    autoMergeRequest {
+                      enabledAt
+                    }
+                  }
+                }
+              }
+            `;
+
+            try {
+              await github.graphql(enableAutoMergeMutation, {
+                pullRequestId: pr.node_id
+              });
+              console.log(`Native auto-merge enabled for PR #${pr.number}.`);
+            } catch (graphqlErr) {
+              console.log(`GraphQL auto-merge note: ${graphqlErr.message}`);
+              // Fallback to direct merge if requirements are already satisfied
+              try {
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  merge_method: 'merge'
+                });
+                console.log(`Direct merge executed for PR #${pr.number}.`);
+              } catch (restErr) {
+                console.log(`Direct merge deferred (waiting for CI checks or rules): ${restErr.message}`);
+              }
+            }

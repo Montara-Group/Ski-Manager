@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
-    types:
-      - closed
   workflow_dispatch:
 
 permissions:
@@ -53,29 +48,26 @@ jobs:
           fetch-depth: 0
 
       - name: Update CHANGELOG.md
-        if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'staging'
+        if: github.event_name == 'push' && !contains(github.event.head_commit.message, '[skip ci]')
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Ensure CHANGELOG.md exists
           touch CHANGELOG.md
-
-          # Generate changelog entry from merged commits
           echo "## Release $(date +'%Y-%m-%d %H:%M')" > new_entry.txt
           echo "" >> new_entry.txt
-          git log origin/main..HEAD --pretty=format:"* %s (%h)" >> new_entry.txt
+          git log -n 5 --pretty=format:"* %s (%h)" >> new_entry.txt
           echo -e "\n" >> new_entry.txt
           cat CHANGELOG.md >> new_entry.txt
           mv new_entry.txt CHANGELOG.md
 
-          # Generate styled timeline card for /updates page
-          python3 scripts/update_changelog_view.py
+          if [ -f "scripts/update_changelog_view.py" ]; then
+            python3 scripts/update_changelog_view.py || true
+          fi
 
-          git add CHANGELOG.md app/Views/updates/index.php
+          git add CHANGELOG.md app/Views/updates/index.php 2>/dev/null || true
           git commit -m "chore(changelog): update CHANGELOG.md and updates view [skip ci]" || echo "No changes"
-          git pull origin main --rebase
-          git push origin main
+          git push origin main || echo "Changelog push skipped"
 
       - name: Deploy to Production Server
         uses: appleboy/ssh-action@v1.0.3

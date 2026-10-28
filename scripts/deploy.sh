@@ -122,7 +122,7 @@ fi
 # 8. Reload Bytecode Cache (PHP-FPM) and Reverse Proxy (OpenResty)
 echo "Reloading runtime workers..."
 if docker ps --format '{{.Names}}' | grep -q "${PHP_CONTAINER}"; then
-    docker exec "${PHP_CONTAINER}" kill -USR2 1 2>/dev/null || true
+    docker kill -s USR2 "${PHP_CONTAINER}" 2>/dev/null || docker exec "${PHP_CONTAINER}" kill -USR2 1 2>/dev/null || true
 fi
 
 if docker ps --format '{{.Names}}' | grep -q "${OPENRESTY_CONTAINER}"; then
@@ -150,19 +150,6 @@ if [ "${HEALTH_CHECK_PASSED}" = "false" ]; then
     echo "WARNING: Health check did not return 200. Inspect server logs at ${HOST_PATH}/writable/logs/"
     # If health check fails on production, exit with error so CI/CD pipeline alerts
     exit 1
-fi
-
-# 10. Global npm CLI tool check / update on VPS
-echo "Checking and maintaining global npm CLI on VPS..."
-if command -v npm &>/dev/null; then
-    echo "Host npm version: $(npm -v)"
-    npm install -g npm@latest || true
-fi
-
-if docker ps --format '{{.Names}}' | grep -q "${PHP_CONTAINER}"; then
-    if docker exec "${PHP_CONTAINER}" which npm &>/dev/null; then
-        docker exec "${PHP_CONTAINER}" npm install -g npm@latest || true
-    fi
 fi
 
 echo "=========================================================="
