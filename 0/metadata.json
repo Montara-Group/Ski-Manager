@@ -1,0 +1,44 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M607Q7ZQP8YEQ3051808JHXQ",
+  "session_id": "184e3529-6715-46a3-ad53-0905aa200869",
+  "strategy": "manual-commit",
+  "created_at": "2026-10-28T03:09:26.373531Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "app/Controllers/ResortAnalysis.php",
+    "app/Views/resort_analysis/index.php",
+    "app/Views/resort_analysis/view.php"
+  ],
+  "agent": "Claude Code",
+  "model": "claude-opus-5-5",
+  "turn_id": "efa0d0b845b3",
+  "checkpoint_transcript_start": 6151,
+  "transcript_lines_at_start": 6151,
+  "compact_transcript_start": 1017,
+  "token_usage": {
+    "input_tokens": 78,
+    "cache_creation_tokens": 784109,
+    "cache_read_tokens": 13898582,
+    "output_tokens": 43013,
+    "api_call_count": 37
+  },
+  "redaction": {
+    "replacements": 254,
+    "layers": {
+      "betterleaks": 26,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 40,
+      "credentialed_uri": 0,
+      "entropy": 188,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  },
+  "session_metrics": {
+    "turn_count": 9
+  }
+}
