@@ -97,3 +97,4 @@ The game engine runs daily via cron (processes salaries, revenue, weather, const
 
 All rights reserved. Source code available for reference and contribution.
 <!-- ci test -->
+<!-- Deployment pipeline verified: Wed Oct 28 22:49:47 UTC 2026 -->
