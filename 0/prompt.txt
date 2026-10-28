@@ -1,0 +1,5 @@
+get site ready for adsense
+
+---
+
+Deploy & push
