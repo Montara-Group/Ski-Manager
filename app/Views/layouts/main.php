@@ -201,7 +201,16 @@ a.link:hover{opacity:0.8}
     }
 }
 </style>
+<?php
+    // AdSense policy: no ads on screens without publisher content (sign-in, sign-up, activation,
+    // locked features). Pages can also opt out with a "no_ads" section.
+    $__path = trim(service('request')->getUri()->getPath(), '/');
+    $__noAds = (bool) preg_match('#^(login|register|logout|auth|verify-magic-link|demo/save|complete-profile)(/|$)#', $__path);
+    if (!$__noAds) { ob_start(); echo $this->renderSection('no_ads'); $__noAds = trim((string) ob_get_clean()) !== ''; }
+    ?>
+    <?php if (!$__noAds) : ?>
     <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5636695863753930" crossorigin="anonymous"></script>
+    <?php endif ?>
     <script async src="https://fundingchoicesmessages.google.com/i/pub-5636695863753930?ers=1"></script><script>(function() {function signalGooglefcPresent() {if (!window.frames['googlefcPresent']) {if (document.body) {const iframe = document.createElement('iframe'); iframe.style = 'width: 0; height: 0; border: none; z-index: -1000; left: -1000px; top: -1000px;'; iframe.style.display = 'none'; iframe.name = 'googlefcPresent'; document.body.appendChild(iframe);} else {setTimeout(signalGooglefcPresent, 0);}}}signalGooglefcPresent();})();</script>
 </head>
 <body class="min-h-screen flex flex-col bg-base-200"><a href="#main-content" class="skip-link">Skip to main content</a>
@@ -763,8 +772,20 @@ function acceptCookies(level){
 }
 (function(){
     var saved=localStorage.getItem('cookie_consent');
-    if(saved){acceptCookies(saved);}
-    else{document.getElementById('cookieConsent').style.display='block';}
+    if(saved){acceptCookies(saved);return;}
+    // Where Google's consent message runs (EEA, UK, Switzerland: gdprApplies), it asks for consent
+    // itself, so don't ask twice. Elsewhere, or if it hasn't answered within 2s, show this banner.
+    var decided=false, banner=document.getElementById('cookieConsent');
+    function show(){if(!decided){decided=true;banner.style.display='block';}}
+    var fallback=setTimeout(show,2000);
+    (function waitForTcf(tries){
+        if(typeof window.__tcfapi!=='function'){if(tries<20)setTimeout(function(){waitForTcf(tries+1);},100);return;}
+        window.__tcfapi('addEventListener',2,function(tcData,ok){
+            if(decided||!ok||!tcData)return;
+            if(tcData.gdprApplies){decided=true;clearTimeout(fallback);}
+            else{clearTimeout(fallback);show();}
+        });
+    })(0);
 })();
 </script>
 <?php if (function_exists("featureEnabled") && featureEnabled("tooltips")) : ?>

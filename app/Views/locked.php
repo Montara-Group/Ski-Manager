@@ -1,5 +1,6 @@
 <?= $this->extend('layouts/main') ?>
 <?= $this->section('title') ?>Locked<?= $this->endSection() ?>
+<?= $this->section('no_ads') ?>1<?= $this->endSection() ?>
 <?= $this->section('content') ?>
 <div class="max-w-lg mx-auto p-4 lg:p-8">
     <div class="card bg-base-100 shadow-xl border border-base-300">

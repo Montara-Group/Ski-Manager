@@ -2,6 +2,12 @@
 # Ski Manager - Robots Exclusion & AI Agent Policy (RFC 9309)
 # ==============================================================================
 
+# Google AdSense crawlers: read pages to match ads to their content (they don't index anything)
+User-agent: Mediapartners-Google
+User-agent: AdsBot-Google
+User-agent: AdsBot-Google-Mobile
+Allow: /
+
 # General Crawlers & Search Engines
 User-agent: *
 Allow: /
