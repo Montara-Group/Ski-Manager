@@ -1,3 +1,11 @@
+## Release 2026-10-28 22:51
+
+* ci: dispatch deployment workflow automatically upon bot merge (71f61a8)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (0faf400)
+* ci: add PR auto-approval workflow and modernize container runtime signals (2b3cdbd)
+* Get the site ready for AdSense review (6a02ccf)
+* Read the SMTP password per request, not from the worker's environment (40041d2)
+
 ## Release 2026-10-28 22:48
 
 * ci: add PR auto-approval workflow and modernize container runtime signals (2b3cdbd)
