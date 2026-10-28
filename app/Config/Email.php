@@ -20,6 +20,9 @@ class Email extends BaseConfig
     public function __construct()
     {
         parent::__construct();
-        $this->SMTPPass = getenv('SMTP_PASSWORD') ?: '';
+        // env() reads this request's .env values first. getenv() reads the PHP-FPM worker's process
+        // environment, which keeps whatever value the worker first saw: after a password change,
+        // long-lived workers kept sending the old one.
+        $this->SMTPPass = (string) (env('SMTP_PASSWORD') ?: '');
     }
 }
