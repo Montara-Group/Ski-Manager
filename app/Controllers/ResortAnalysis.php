@@ -2,228 +2,278 @@
 
 namespace App\Controllers;
 
+use App\Libraries\Economy;
+use App\Libraries\Grooming;
+use App\Libraries\Snowmaking;
+use App\Libraries\Weather;
+
+/**
+ * /resort-analysis: a paid (Génépis) consultant's report. It reads what the nightly tick measured
+ * yesterday (player_finances.last_tick: income, costs, demand, ticket price effect, lift capacity,
+ * building occupancy) plus the resort as it stands, scores seven areas and lists what to do next,
+ * most urgent first, each with a link to the page that fixes it.
+ */
 class ResortAnalysis extends BaseController
 {
     private const COST_GENEPIS = 20;
+
+    public const AREAS = [
+        'profit' => ['Profit', 'fa-coins', 'text-success'],
+        'demand' => ['Skiers & prices', 'fa-person-skiing', 'text-info'],
+        'lifts' => ['Lifts', 'fa-cable-car', 'text-primary'],
+        'slopes' => ['Slopes & grooming', 'fa-mountain', 'text-info'],
+        'buildings' => ['Buildings', 'fa-hotel', 'text-secondary'],
+        'staff' => ['Staff', 'fa-users', 'text-warning'],
+        'cash' => ['Cash & debt', 'fa-building-columns', 'text-success'],
+    ];
 
     public function index(): string
     {
         $locked = checkFeatureUnlock('resort_analysis'); if ($locked) return $locked;
         $userId = auth()->id();
         $db = db_connect();
-        $reports = $db->table('resort_reports')->where('user_id', $userId)->orderBy('game_day', 'DESC')->get()->getResultArray();
-        $genepis = $db->table('genepis')->where('user_id', $userId)->get()->getRowArray();
-        $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime(getSeasonStartDate())) / 86400) + 1);
-        $todayReport = $db->table('resort_reports')->where('user_id', $userId)->where('game_day', $gameDay)->where('created_at >=', getSeasonStartDate() . ' 00:00:00')->get()->getRowArray();
+        $reports = $db->table('resort_reports')->where('user_id', $userId)->orderBy('id', 'DESC')->get()->getResultArray();
+        foreach ($reports as &$r) $r['data'] = json_decode((string) $r['report_data'], true) ?: [];
+        unset($r);
 
         return view('resort_analysis/index', [
             'reports' => $reports,
-            'genepis' => $genepis,
-            'gameDay' => $gameDay,
-            'todayReport' => $todayReport,
+            'balance' => (int) ($db->table('genepis')->select('balance')->where('user_id', $userId)->get()->getRow()->balance ?? 0),
+            'gameDay' => getGameDay(),
+            'todayReport' => $this->todayReport($userId),
             'cost' => self::COST_GENEPIS,
         ]);
     }
 
+    /** This season's report for today's game day, if one was ordered */
+    private function todayReport(int $userId): ?array
+    {
+        return db_connect()->table('resort_reports')->where('user_id', $userId)->where('game_day', getGameDay())
+            ->where('created_at >=', getSeasonStartDate() . ' 00:00:00')->get()->getRowArray();
+    }
+
     public function order()
     {
+        $locked = checkFeatureUnlock('resort_analysis'); if ($locked) return redirect()->to('/resort-analysis');
         $userId = auth()->id();
         $db = db_connect();
-        $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime(getSeasonStartDate())) / 86400) + 1);
-
-        $existing = $db->table('resort_reports')->where('user_id', $userId)->where('game_day', $gameDay)->where('created_at >=', getSeasonStartDate() . ' 00:00:00')->get()->getRowArray();
-        if ($existing) return redirect()->to('/resort-analysis')->with('error', 'You already ordered a report for today.');
-
-        $genepis = $db->table('genepis')->where('user_id', $userId)->get()->getRowArray();
-        if (($genepis['balance'] ?? 0) < self::COST_GENEPIS) {
-            return redirect()->to('/resort-analysis')->with('error', 'Not enough Génépis. You need ' . self::COST_GENEPIS . '.');
+        if ($existing = $this->todayReport($userId)) {
+            return redirect()->to('/resort-analysis/view/' . $existing['id'])->with('error', 'You already have today\'s report. A new one is available tomorrow.');
         }
 
-        $db->table('genepis')->where('user_id', $userId)->set('balance', 'balance - ' . self::COST_GENEPIS, false)->update();
-        $db->table('genepis_log')->insert([
-            'user_id' => $userId, 'amount' => -self::COST_GENEPIS,
-            'reason' => 'Resort Analysis Report', 'created_at' => date('Y-m-d H:i:s'),
-        ]);
-
-        $reportData = $this->generateReport($userId, $db);
-
+        $reportData = $this->generateReport($userId);
+        $db->transStart();
+        // Pay only if the balance covers it, in one statement, so a double click can't overspend
+        $db->table('genepis')->where('user_id', $userId)->where('balance >=', self::COST_GENEPIS)
+            ->set('balance', 'balance - ' . self::COST_GENEPIS, false)->set('total_spent', 'total_spent + ' . self::COST_GENEPIS, false)->update();
+        if ($db->affectedRows() !== 1) {
+            $db->transRollback();
+            return redirect()->to('/resort-analysis')->with('error', 'Not enough Génépis: a report costs ' . self::COST_GENEPIS . '.');
+        }
+        $db->table('genepis_log')->insert(['user_id' => $userId, 'amount' => -self::COST_GENEPIS, 'reason' => 'Resort Analysis Report', 'created_at' => date('Y-m-d H:i:s')]);
         $db->table('resort_reports')->insert([
-            'user_id' => $userId,
-            'game_day' => $gameDay,
-            'status' => 'ready',
-            'report_data' => json_encode($reportData),
+            'user_id' => $userId, 'game_day' => getGameDay(), 'status' => 'ready',
+            'report_data' => json_encode($reportData), 'created_at' => date('Y-m-d H:i:s'),
         ]);
+        $id = $db->insertID();
+        $db->transComplete();
 
-        log_activity($userId, 'resort_analysis', 'Ordered resort analysis report for ' . self::COST_GENEPIS . ' Génépis');
-
-        return redirect()->to('/resort-analysis')->with('success', 'Report generated! Check the results below.');
+        log_activity($userId, 'resort_analysis', 'Ordered a resort analysis report for ' . self::COST_GENEPIS . ' Génépis', 'fa-solid fa-clipboard-check');
+        return redirect()->to('/resort-analysis/view/' . $id)->with('success', 'Your report is ready.');
     }
 
     public function view(int $id)
     {
-        $userId = auth()->id();
-        $db = db_connect();
-        $report = $db->table('resort_reports')->where('id', $id)->where('user_id', $userId)->get()->getRowArray();
+        $report = db_connect()->table('resort_reports')->where('id', $id)->where('user_id', auth()->id())->get()->getRowArray();
         if (!$report) return redirect()->to('/resort-analysis')->with('error', 'Report not found.');
-
-        $data = json_decode($report['report_data'], true);
-        return view('resort_analysis/view', ['report' => $report, 'data' => $data]);
+        return view('resort_analysis/view', ['report' => $report, 'data' => json_decode((string) $report['report_data'], true) ?: []]);
     }
 
-    private function generateReport(int $userId, $db): array
+    private function generateReport(int $userId): array
     {
-        $finance = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
+        helper('weather');
+        $db = db_connect();
+        $hidden = array_map('trim', explode(',', (string) getDifficultyConfig('hidden_pages', '')));
+        $finance = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray() ?? [];
+        $tick = json_decode((string) ($finance['last_tick'] ?? ''), true) ?: null;
         $items = $db->table('player_items')->where('user_id', $userId)->get()->getResultArray();
         $staff = $db->table('staff')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
         $buildings = $db->table('buildings')->where('user_id', $userId)->get()->getResultArray();
         $equipment = $db->table('equipment')->where('user_id', $userId)->get()->getResultArray();
-        $parking = $db->table('parking')->where('user_id', $userId)->get()->getResultArray();
-        $terrainParks = $db->table('terrain_parks')->where('user_id', $userId)->get()->getResultArray();
-        $energy = $db->table('energy_management')->where('user_id', $userId)->get()->getResultArray();
-        $water = $db->table('water_management')->where('user_id', $userId)->get()->getResultArray();
-        $insurance = $db->table('insurance')->where('user_id', $userId)->get()->getResultArray();
         $loans = $db->table('loans')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
+        $weather = getCurrentWeather();
 
-        $slopes = array_filter($items, fn($i) => $i['item_type'] === 'slope');
-        $lifts = array_filter($items, fn($i) => $i['item_type'] === 'lift');
-        $openSlopes = array_filter($slopes, fn($i) => $i['status'] === 'open');
-        $openLifts = array_filter($lifts, fn($i) => $i['status'] === 'open');
-
-        $avgCondition = count($items) > 0 ? round(array_sum(array_column($items, 'condition_pct')) / count($items)) : 0;
-        $avgMorale = count($staff) > 0 ? round(array_sum(array_column($staff, 'morale')) / count($staff)) : 0;
-        $avgEquipCond = count($equipment) > 0 ? round(array_sum(array_column($equipment, 'condition_pct')) / count($equipment)) : 0;
-
-        $totalSalary = array_sum(array_column($staff, 'salary'));
-        $activeInsurance = count(array_filter($insurance, fn($i) => ($i['active'] ?? 0) == 1));
-        $totalDebt = array_sum(array_column($loans, 'remaining'));
-
-        $recommendations = [];
-        $scores = [];
-
-        // Infrastructure
-        $infraScore = min(100, count($openSlopes) * 15 + count($openLifts) * 20);
-        $scores['infrastructure'] = $infraScore;
-        if (count($slopes) === 0) $recommendations[] = ['type' => 'critical', 'area' => 'Infrastructure', 'text' => 'You have no slopes! Build at least one slope on the trail map to start attracting visitors.'];
-        if (count($lifts) === 0) $recommendations[] = ['type' => 'critical', 'area' => 'Infrastructure', 'text' => 'No lifts built. Visitors need lifts to access your slopes.'];
-        if ($avgCondition < 50) $recommendations[] = ['type' => 'warning', 'area' => 'Infrastructure', 'text' => 'Average infrastructure condition is ' . $avgCondition . '%. Repair slopes and lifts to avoid closures.'];
-        if (count($slopes) > 0 && count($lifts) === 0) $recommendations[] = ['type' => 'warning', 'area' => 'Infrastructure', 'text' => 'You have slopes but no lifts. Build a lift to increase visitor throughput.'];
-
-        // Staffing
-        $staffScore = min(100, count($staff) * 12);
-        $scores['staffing'] = $staffScore;
-        if (count($staff) === 0) $recommendations[] = ['type' => 'critical', 'area' => 'Staffing', 'text' => 'No active staff. Hire ski patrol, groomers, and mechanics to keep your resort running.'];
-        if ($avgMorale < 50 && count($staff) > 0) $recommendations[] = ['type' => 'warning', 'area' => 'Staffing', 'text' => 'Staff morale is low (' . $avgMorale . '%). Boost morale to prevent staff quitting.'];
-        $roles = array_unique(array_column($staff, 'role'));
-        if (count($staff) > 0 && !in_array('groomer', $roles)) $recommendations[] = ['type' => 'info', 'area' => 'Staffing', 'text' => 'Consider hiring a Groomer to maintain slope conditions.'];
-        if (count($staff) > 0 && !in_array('ski_patrol', $roles)) $recommendations[] = ['type' => 'info', 'area' => 'Staffing', 'text' => 'Ski Patrol staff improve safety ratings and visitor confidence.'];
-
-        // Finances
-        $finScore = 50;
+        $slopes = array_values(array_filter($items, fn($i) => $i['item_type'] === 'slope'));
+        $lifts = array_values(array_filter($items, fn($i) => $i['item_type'] === 'lift'));
+        $openSlopes = array_values(array_filter($slopes, fn($i) => $i['status'] === 'open'));
+        $openLifts = array_values(array_filter($lifts, fn($i) => $i['status'] === 'open'));
+        $avg = fn(array $rows, string $col) => $rows ? (int) round(array_sum(array_column($rows, $col)) / count($rows)) : 0;
         $cash = (int) ($finance['cash'] ?? 0);
-        if ($cash > 200000) $finScore = 90;
-        elseif ($cash > 100000) $finScore = 70;
-        elseif ($cash > 50000) $finScore = 50;
-        elseif ($cash > 10000) $finScore = 30;
-        else $finScore = 10;
-        $scores['finances'] = $finScore;
-        if ($cash < 10000) $recommendations[] = ['type' => 'critical', 'area' => 'Finances', 'text' => 'Cash reserves critically low (' . currency($cash) . '). Consider taking a loan or reducing expenses.'];
-        if ($totalDebt > $cash * 2) $recommendations[] = ['type' => 'warning', 'area' => 'Finances', 'text' => 'Total debt (' . currency($totalDebt) . ') exceeds twice your cash. Focus on paying down loans.'];
-        if ($totalSalary > $cash * 0.1 && $cash > 0) $recommendations[] = ['type' => 'info', 'area' => 'Finances', 'text' => 'Daily salary costs are ' . currency($totalSalary) . '. Make sure revenue covers staffing expenses.'];
+        $recs = [];
+        $add = function (string $type, string $area, string $text, string $link = '') use (&$recs) { $recs[] = compact('type', 'area', 'text', 'link'); };
+        $sections = [];
 
-        // Amenities
-        $amenityScore = min(100, count($buildings) * 15 + count($parking) * 10 + count($terrainParks) * 12);
-        $scores['amenities'] = $amenityScore;
-        if (count($buildings) === 0) $recommendations[] = ['type' => 'warning', 'area' => 'Amenities', 'text' => 'No buildings. Restaurants and hotels generate passive income and improve visitor satisfaction.'];
-        if (count($parking) === 0) $recommendations[] = ['type' => 'info', 'area' => 'Amenities', 'text' => 'No parking facilities. Visitors may be turned away during busy days.'];
-        if (count($terrainParks) === 0) $recommendations[] = ['type' => 'info', 'area' => 'Amenities', 'text' => 'Terrain parks attract younger visitors and boost reputation.'];
+        // --- Profit (yesterday, from the tick) ---
+        $income = (int) ($tick['income'] ?? 0);
+        $expenses = (int) ($tick['expenses'] ?? 0);
+        $profit = $income - $expenses;
+        $costLines = array_filter([
+            'Lift and slope running costs' => (int) ($tick['lift_slope_running'] ?? 0),
+            'Salaries' => (int) ($tick['salaries'] ?? 0),
+            'Building upkeep' => (int) ($tick['building_upkeep'] ?? 0),
+            'Other costs (equipment, loans, energy, insurance…)' => (int) ($tick['other_costs'] ?? 0),
+        ]);
+        arsort($costLines);
+        if ($tick === null) {
+            $sections['profit'] = ['score' => null, 'summary' => 'No day has been played yet: the first figures arrive after tonight\'s update.', 'metrics' => []];
+        } else {
+            $margin = $income > 0 ? $profit / $income : ($expenses > 0 ? -1 : 0);
+            $sections['profit'] = [
+                'score' => (int) max(0, min(100, round(50 + $margin * 125))),
+                'summary' => $profit >= 0 ? 'Yesterday made ' . currency($profit) . ' profit (' . (int) round($margin * 100) . '% of income).' : 'Yesterday lost ' . currency(-$profit) . '.',
+                'metrics' => array_merge([['Income', currency($income)], ['Costs', currency($expenses)]], array_map(fn($k, $v) => [$k, currency($v)], array_keys(array_slice($costLines, 0, 3, true)), array_slice($costLines, 0, 3))),
+            ];
+            if ($profit < 0) {
+                $add('critical', 'Profit', 'You lost ' . currency(-$profit) . ' yesterday. The biggest cost was ' . strtolower((string) array_key_first($costLines)) . ' (' . currency((int) reset($costLines)) . '). Close lifts and slopes nobody needs, or raise income first.', '/finances');
+            }
+        }
 
-        // Equipment
-        $equipScore = count($equipment) > 0 ? min(100, $avgEquipCond) : 0;
-        $scores['equipment'] = $equipScore;
-        if (count($equipment) === 0) $recommendations[] = ['type' => 'info', 'area' => 'Equipment', 'text' => 'No equipment owned. Groomers and snowmakers improve slope quality.'];
-        if ($avgEquipCond < 40 && count($equipment) > 0) $recommendations[] = ['type' => 'warning', 'area' => 'Equipment', 'text' => 'Equipment condition is low (' . $avgEquipCond . '%). Repair or replace aging equipment.'];
+        // --- Skiers & ticket prices ---
+        $demand = (int) ($tick['demand'] ?? 0);
+        $priceDemand = (float) ($tick['price_demand'] ?? 1);
+        $turnedAway = (int) ($tick['turned_away'] ?? 0);
+        $visitors = (int) ($tick['visitors'] ?? 0);
+        if ($tick === null || $demand <= 0) {
+            $sections['demand'] = ['score' => $tick === null ? null : 0, 'summary' => $tick === null ? 'Not measured yet.' : 'No skiers wanted to come yesterday: open slopes are what attract them.', 'metrics' => []];
+            if ($tick !== null && !$openSlopes) $add('critical', 'Skiers & prices', 'No open slopes, so no skiers. Build or open slopes on the trail map.', '/map');
+        } else {
+            $lostToPrice = (int) round($demand * (1 - $priceDemand));
+            $sections['demand'] = [
+                'score' => (int) round(100 * min(1, $priceDemand) * ($visitors + $turnedAway > 0 ? $visitors / ($visitors + $turnedAway) : 1)),
+                'summary' => number_format($visitors) . ' skiers came, out of ' . number_format($demand) . ' who wanted to.',
+                'metrics' => [['Skiers who wanted to come', number_format($demand)], ['Put off by ticket prices', number_format($lostToPrice)],
+                    ['Turned away (lifts full)', number_format($turnedAway)], ['Earned per skier', currency((int) round((float) ($tick['per_visit'] ?? 0)))]],
+            ];
+            if ($priceDemand < 0.8) $add('warning', 'Skiers & prices', 'Ticket prices put off ' . (int) round((1 - $priceDemand) * 100) . '% of skiers (' . number_format($lostToPrice) . ' people). Lowering prices may earn more in total.', '/tickets');
+            elseif ($priceDemand >= 0.98 && $turnedAway === 0) $add('info', 'Skiers & prices', 'Almost nobody is put off by your ticket prices: you can likely raise them a little.', '/tickets');
+        }
 
-        // Resources
-        $activeEnergy = array_filter($energy, fn($e) => $e['status'] === 'active');
-        $activeWater = array_filter($water, fn($w) => $w['status'] === 'active');
-        $resScore = min(100, count($activeEnergy) * 25 + count($activeWater) * 25);
-        $scores['resources'] = $resScore;
-        if (count($energy) === 0) $recommendations[] = ['type' => 'warning', 'area' => 'Resources', 'text' => 'No energy sources. Build a power grid connection or generator to power your operations.'];
-        if (count($water) === 0) $recommendations[] = ['type' => 'info', 'area' => 'Resources', 'text' => 'No water sources. Required for snowmaking operations.'];
+        // --- Lifts ---
+        $liftCap = (int) ($tick['lift_capacity'] ?? Economy::liftDailyCapacity($openLifts));
+        $brokenLifts = count(array_filter($lifts, fn($l) => $l['status'] === 'broken'));
+        $hasMechanic = (bool) array_filter($staff, fn($s) => $s['role'] === 'mechanic');
+        $liftCond = $avg($openLifts, 'condition_pct');
+        $sections['lifts'] = [
+            'score' => !$lifts ? 0 : (int) round(min(100, $liftCond) * ($turnedAway > 0 ? max(0.4, $visitors / max(1, $visitors + $turnedAway)) : 1) * (count($openLifts) / count($lifts))),
+            'summary' => !$lifts ? 'No lifts yet.' : count($openLifts) . ' of ' . count($lifts) . ' lifts open, carrying up to ' . number_format($liftCap) . ' skiers a day.',
+            'metrics' => [['Open lifts', count($openLifts) . ' / ' . count($lifts)], ['Daily capacity', number_format($liftCap)], ['Average condition', $liftCond . '%'], ['Broken', (string) $brokenLifts]],
+        ];
+        if (!$lifts) $add('critical', 'Lifts', 'You have no lifts: skiers need them to reach your slopes. Build one on the trail map.', '/map');
+        if ($turnedAway > 0) $add('critical', 'Lifts', number_format($turnedAway) . ' skiers were turned away because your lifts were full. Build another lift or a bigger one.', '/map');
+        if ($brokenLifts) $add('warning', 'Lifts', $brokenLifts . ' lift' . ($brokenLifts === 1 ? ' is' : 's are') . ' broken. Lifts are restored by off-season maintenance.', '/off-season');
+        if ($lifts && !$hasMechanic && $liftCond < 80) $add('info', 'Lifts', 'Lifts wear up to 2% a day. A mechanic cuts that by 1% a day for every lift.', '/staff/hire');
 
-        // Safety
-        $safetyScore = min(100, $activeInsurance * 15 + (in_array('ski_patrol', $roles) ? 30 : 0));
-        $scores['safety'] = $safetyScore;
-        if ($activeInsurance === 0) $recommendations[] = ['type' => 'warning', 'area' => 'Safety', 'text' => 'No active insurance policies. You are exposed to liability and accident costs.'];
+        // --- Slopes & grooming ---
+        $operators = array_values(array_filter($staff, fn($s) => $s['role'] === 'groomer'));
+        $fleet = Grooming::fleet(array_filter($equipment, fn($e) => $e['equipment_type'] === 'groomer'), $operators);
+        $groomable = count(array_filter($slopes, [Grooming::class, 'groomable']));
+        $brokenSlopes = count(array_filter($slopes, fn($s) => $s['status'] === 'broken'));
+        $slopeCond = $avg($openSlopes, 'condition_pct');
+        $thinBase = (int) ($weather['snow_base'] ?? 99) < Weather::THIN_BASE;
+        $covered = count(Snowmaking::coverage($openSlopes, array_filter($equipment, fn($e) => $e['equipment_type'] === 'snowmaker'), (int) ($weather['base_temp'] ?? 0)));
+        $sections['slopes'] = [
+            'score' => !$slopes ? 0 : (int) round(Economy::conditionFactor($slopeCond) * 100 * (count($openSlopes) / count($slopes))),
+            'summary' => !$slopes ? 'No slopes yet.' : count($openSlopes) . ' of ' . count($slopes) . ' slopes open at ' . $slopeCond . '% average condition; skiers come less to worn slopes.',
+            'metrics' => [['Open slopes', count($openSlopes) . ' / ' . count($slopes)], ['Average condition', $slopeCond . '%'],
+                ['Groomed each night', $fleet['capacity'] . ' slopes'], ['Covered by snow guns', $thinBase ? $covered . ' of ' . count($openSlopes) : 'not needed (deep base)']],
+        ];
+        if (!$slopes) $add('critical', 'Slopes & grooming', 'You have no slopes: they are what bring skiers. Build one on the trail map.', '/map');
+        if ($brokenSlopes) $add('warning', 'Slopes & grooming', $brokenSlopes . ' slope' . ($brokenSlopes === 1 ? '' : 's') . ' wore down to 0% and closed. Grooming brings them back.', '/grooming');
+        if ($fleet['idle_machines'] > 0) $add('warning', 'Slopes & grooming', $fleet['idle_machines'] . ' groomer' . ($fleet['idle_machines'] === 1 ? ' has' : 's have') . ' no operator and stay parked. Hire groomer operators.', '/staff/hire');
+        elseif ($slopes && $fleet['capacity'] === 0) $add('warning', 'Slopes & grooming', 'Nothing grooms your slopes, so they only wear down. Buy a groomer and hire an operator.', '/equipment');
+        elseif ($slopes && $fleet['capacity'] < min($groomable, (int) ceil(count($slopes) / 2))) $add('info', 'Slopes & grooming', 'Your groomers reach ' . $fleet['capacity'] . ' slopes a night but ' . $groomable . ' need it. Another groomer would keep them in better shape.', '/equipment');
+        if ($thinBase && $openSlopes && $covered < count($openSlopes) && !in_array('snowmaking', $hidden, true)) $add('info', 'Slopes & grooming', 'The natural snow base is thin: ' . (count($openSlopes) - $covered) . ' open slope' . (count($openSlopes) - $covered === 1 ? '' : 's') . ' without a snow gun wear faster.', '/snowmaking');
 
-        $overallScore = count($scores) > 0 ? round(array_sum($scores) / count($scores)) : 0;
+        // --- Buildings (occupancy from the tick) ---
+        $occupancy = is_array($tick['occupancy'] ?? null) ? $tick['occupancy'] : [];
+        $avgOcc = $occupancy ? array_sum($occupancy) / count($occupancy) : null;
+        $sections['buildings'] = [
+            'score' => !$buildings ? 40 : ($avgOcc === null ? null : (int) round(100 * min(1, $avgOcc / 0.85))),
+            'summary' => !$buildings ? 'No buildings: restaurants, rentals and hotels earn from your skiers.' : ($avgOcc === null ? count($buildings) . ' buildings; occupancy is measured on a played day.' : count($buildings) . ' buildings, ' . (int) round($avgOcc * 100) . '% full on average, earning ' . currency((int) ($tick['buildings'] ?? 0)) . ' yesterday.'),
+            'metrics' => array_map(fn($type, $u) => [ucwords(str_replace('_', ' ', $type)) . ' occupancy', (int) round($u * 100) . '%'], array_keys($occupancy), $occupancy),
+        ];
+        $buildingPage = ['restaurant' => '/restaurants', 'rental' => '/rentals', 'hotel' => '/hotels'];
+        if (!$buildings && $visitors > 0) $add('info', 'Buildings', 'You have skiers but no buildings. A restaurant or ski rental earns from every visitor.', '/restaurants');
+        foreach ($occupancy as $type => $u) {
+            $label = str_replace('_', ' ', $type);
+            if ($u >= 0.95) $add('info', 'Buildings', 'Your ' . $label . 's are full (' . (int) round($u * 100) . '%): another one or an upgrade would earn more.', $buildingPage[$type] ?? '');
+            elseif ($u < 0.3) $add('warning', 'Buildings', 'Your ' . $label . 's are only ' . (int) round($u * 100) . '% full: you have more than your skiers need, and each still costs upkeep.', $buildingPage[$type] ?? '');
+        }
+
+        // --- Staff ---
+        $morale = $avg($staff, 'morale');
+        $unassigned = count(array_filter($staff, fn($s) => empty($s['assigned_to']) && $s['role'] !== 'groomer'));
+        $sections['staff'] = [
+            'score' => !$staff ? 30 : $morale,
+            'summary' => !$staff ? 'No staff.' : count($staff) . ' staff at ' . $morale . '% average morale, costing ' . currency((int) ($tick['salaries'] ?? array_sum(array_column($staff, 'salary')))) . ' a day.',
+            'metrics' => [['Staff', (string) count($staff)], ['Average morale', $morale . '%'], ['Not assigned', (string) $unassigned]],
+        ];
+        if (!$staff) $add('warning', 'Staff', 'You have no staff. Groomer operators, mechanics and ski patrol keep the resort running.', '/staff/hire');
+        elseif ($morale < 50) $add('warning', 'Staff', 'Staff morale is ' . $morale . '%: unhappy staff quit. Check their workload and pay.', '/staff');
+        if ($unassigned > 0) $add('info', 'Staff', $unassigned . ' staff member' . ($unassigned === 1 ? ' isn\'t assigned to anything and only gets' : 's aren\'t assigned to anything and only get') . ' paid. Assign them or let them go.', '/staff');
+
+        // --- Cash & debt ---
+        $dailyLoan = array_sum(array_map(fn($l) => min((int) $l['daily_payment'], (int) $l['remaining']), $loans));
+        $debt = array_sum(array_column($loans, 'remaining'));
+        $runway = $expenses > 0 ? $cash / $expenses : null;
+        $sections['cash'] = [
+            'score' => $cash < 0 ? 0 : ($profit >= 0 && $tick !== null ? 100 : (int) min(100, round(($runway ?? 30) / 30 * 100))) - ($income > 0 && $dailyLoan > $income * 0.5 ? 30 : 0),
+            'summary' => 'Cash ' . currency($cash) . ($debt ? ', owing ' . currency($debt) . ' (' . currency($dailyLoan) . ' a day)' : ', no loans') . '.',
+            'metrics' => [['Cash', currency($cash)], ['Owed', currency($debt)], ['Loan repayments a day', currency($dailyLoan)], ['Days of costs in cash', $runway === null ? '—' : (string) (int) floor(max(0, $runway))]],
+        ];
+        if ($cash < 0) $add('critical', 'Cash & debt', 'Your cash is negative. Cut costs before anything else breaks down.', '/finances');
+        elseif ($profit < 0 && $runway !== null && $runway < 14) $add('critical', 'Cash & debt', 'At yesterday\'s loss your cash lasts about ' . (int) floor($runway) . ' more days.', '/finances');
+        if ($income > 0 && $dailyLoan > $income * 0.5) $add('warning', 'Cash & debt', 'Loan repayments take ' . (int) round($dailyLoan / $income * 100) . '% of your income. Pay one off early when you can.', '/bank');
+
+        $order = ['critical' => 0, 'warning' => 1, 'info' => 2];
+        usort($recs, fn($a, $b) => $order[$a['type']] <=> $order[$b['type']]);
+        $scored = array_filter(array_column($sections, 'score'), fn($s) => $s !== null);
+        $scores = array_map(fn($s) => $s['score'] === null ? null : max(0, min(100, (int) $s['score'])), $sections);
+        foreach ($sections as $k => &$s) $s['score'] = $scores[$k];
+        unset($s);
 
         return [
-            'overall_score' => $overallScore,
-            'scores' => $scores,
-            'recommendations' => $recommendations,
+            'version' => 2,
+            'measured_day' => $tick['game_day'] ?? null,
+            'overall_score' => $scored ? (int) round(array_sum(array_map(fn($v) => max(0, min(100, $v)), $scored)) / count($scored)) : 0,
+            'scores' => array_filter($scores, fn($v) => $v !== null),
+            'sections' => $sections,
+            'recommendations' => $recs,
             'stats' => [
-                'cash' => $cash,
-                'slopes' => count($slopes),
-                'open_slopes' => count($openSlopes),
-                'lifts' => count($lifts),
-                'open_lifts' => count($openLifts),
-                'staff' => count($staff),
-                'avg_morale' => $avgMorale,
-                'buildings' => count($buildings),
-                'equipment' => count($equipment),
-                'avg_equip_condition' => $avgEquipCond,
-                'avg_infra_condition' => $avgCondition,
-                'parking' => count($parking),
-                'terrain_parks' => count($terrainParks),
-                'energy_sources' => count($activeEnergy),
-                'water_sources' => count($activeWater),
-                'insurance' => $activeInsurance,
-                'total_debt' => $totalDebt,
-                'daily_salary' => $totalSalary,
+                'cash' => $cash, 'slopes' => count($slopes), 'open_slopes' => count($openSlopes), 'lifts' => count($lifts), 'open_lifts' => count($openLifts),
+                'staff' => count($staff), 'avg_morale' => $morale, 'buildings' => count($buildings), 'equipment' => count($equipment),
+                'avg_equip_condition' => $avg($equipment, 'condition_pct'), 'avg_infra_condition' => $avg(array_merge($openSlopes, $openLifts), 'condition_pct'),
+                'parking' => 0, 'terrain_parks' => 0, 'energy_sources' => 0, 'water_sources' => 0, 'insurance' => 0,
+                'total_debt' => $debt, 'daily_salary' => (int) ($tick['salaries'] ?? array_sum(array_column($staff, 'salary'))),
+                'income' => $income, 'expenses' => $expenses, 'visitors' => $visitors, 'demand' => $demand,
             ],
         ];
     }
+
     public function pdf(int $id)
     {
-        $userId = auth()->id();
-        $db = db_connect();
-        $report = $db->table("resort_reports")->where("id", $id)->where("user_id", $userId)->get()->getRowArray();
-        if (!$report) return redirect()->to("/resort-analysis")->with("error", "Report not found.");
+        $report = db_connect()->table('resort_reports')->where('id', $id)->where('user_id', auth()->id())->get()->getRowArray();
+        if (!$report) return redirect()->to('/resort-analysis')->with('error', 'Report not found.');
+        $data = json_decode((string) $report['report_data'], true) ?: [];
 
-        $data = json_decode($report["report_data"], true);
-
-        $html = view("resort_analysis/pdf", ["report" => $report, "data" => $data]);
-
-        $dompdf = new \Dompdf\Dompdf(["defaultFont" => "Helvetica"]);
-        $dompdf->loadHtml($html);
-        $dompdf->addInfo("Title", "Ski Manager Resort Analysis - Day " . $report["game_day"]);
-        $dompdf->addInfo("Author", "Ski Manager - ski-manager.net");
-        $dompdf->addInfo("Subject", "Resort Analysis Report");
-        $dompdf->addInfo("Keywords", "ski resort, analysis, management, report");
-        $dompdf->addInfo("Creator", "Ski Manager v2");
+        $dompdf = new \Dompdf\Dompdf(['defaultFont' => 'Helvetica']);
+        $dompdf->loadHtml(view('resort_analysis/pdf', ['report' => $report, 'data' => $data]));
+        $dompdf->addInfo('Title', 'Ski Manager Resort Analysis - Day ' . $report['game_day']);
+        $dompdf->addInfo('Author', 'Ski Manager - ski-manager.net');
         $dompdf->render();
 
-        $filename = "Resort_Analysis_Day_" . $report["game_day"] . ".pdf";
-        $tmpFile = WRITEPATH . "tmp_" . uniqid() . ".pdf";
-        $outFile = WRITEPATH . "tmp_" . uniqid() . "_v2.pdf";
-
-        try {
-            file_put_contents($tmpFile, $dompdf->output());
-            exec("qpdf --force-version=2.0 --linearize --object-streams=generate " . escapeshellarg($tmpFile) . " " . escapeshellarg($outFile) . " 2>&1", $qpdfOut, $qpdfCode);
-            if ($qpdfCode === 0 && file_exists($outFile)) {
-                header("Content-Type: application/pdf");
-                header("Content-Disposition: attachment; filename=\"" . $filename . "\"");
-                readfile($outFile);
-            } else {
-                header("Content-Type: application/pdf");
-                header("Content-Disposition: attachment; filename=\"" . $filename . "\"");
-                readfile($tmpFile);
-            }
-        } finally {
-            if (file_exists($tmpFile)) @unlink($tmpFile);
-            if (file_exists($outFile)) @unlink($outFile);
-        }
-        exit;
+        return $this->response->setContentType('application/pdf')
+            ->setHeader('Content-Disposition', 'attachment; filename="Resort_Analysis_Day_' . (int) $report['game_day'] . '.pdf"')
+            ->setBody($dompdf->output());
     }
 }

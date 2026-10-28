@@ -70,7 +70,7 @@
 <!-- Header Banner -->
 <div class="banner clearfix">
     <div class="meta">
-        Day <?= $report['game_day'] ?> - Season <?= (int) ceil($report['game_day'] / getSeasonLength()) ?><br>
+        Day <?= (int) $report['game_day'] ?><br>
         <?= date('F j, Y', strtotime($report['created_at'])) ?><br>
         <?= date('g:i A', strtotime($report['created_at'])) ?>
     </div>
@@ -90,9 +90,11 @@
 <table class="cat-grid" cellspacing="6">
     <tr>
         <?php
-        $catLabels = ['infrastructure' => 'Infra', 'staffing' => 'Staff', 'finances' => 'Finance', 'amenities' => 'Amenity', 'equipment' => 'Equip', 'resources' => 'Resource', 'safety' => 'Safety'];
+        $catLabels = array_map(fn($a) => $a[0], \App\Controllers\ResortAnalysis::AREAS) + ['infrastructure' => 'Infra', 'staffing' => 'Staff', 'finances' => 'Finance', 'amenities' => 'Amenity', 'equipment' => 'Equip', 'resources' => 'Resource', 'safety' => 'Safety'];
         $catIcons = ['infrastructure' => 'Mountain', 'staffing' => 'Team', 'finances' => 'Money', 'amenities' => 'Facility', 'equipment' => 'Tools', 'resources' => 'Power', 'safety' => 'Shield'];
-        foreach ($data['scores'] as $cat => $score) :
+        $ordered = array_intersect_key(\App\Controllers\ResortAnalysis::AREAS, $data['scores']);
+        foreach (($ordered ? array_merge($ordered, $data['scores']) : $data['scores']) as $cat => $score) :
+            if (is_array($score)) continue;
             $color = $score >= 70 ? '#059669' : ($score >= 40 ? '#d97706' : '#dc2626');
             $bgColor = $score >= 70 ? '#f0fdf4' : ($score >= 40 ? '#fffbeb' : '#fef2f2');
         ?>
@@ -105,6 +107,18 @@
     </tr>
 </table>
 
+<?php if (!empty($data['sections'])) : ?>
+<!-- Area details -->
+<h2>Area by Area</h2>
+<table class="snap-table">
+    <?php foreach (array_keys(array_intersect_key(\App\Controllers\ResortAnalysis::AREAS, $data['sections'])) as $key) : $sec = $data['sections'][$key]; ?>
+    <tr>
+        <td class="snap-label" style="width:28%"><b><?= esc(\App\Controllers\ResortAnalysis::AREAS[$key][0] ?? ucfirst($key)) ?></b><?= $sec['score'] !== null ? ' &middot; ' . (int) $sec['score'] . '%' : '' ?></td>
+        <td><?= esc($sec['summary']) ?><?php if (!empty($sec['metrics'])) : ?><br><span class="snap-label"><?= esc(implode(' · ', array_map(fn($m) => $m[0] . ': ' . $m[1], $sec['metrics']))) ?></span><?php endif ?></td>
+    </tr>
+    <?php endforeach ?>
+</table>
+<?php else : ?>
 <!-- Resort Snapshot -->
 <h2>Resort Snapshot</h2>
 <table class="snap-table">
@@ -144,6 +158,7 @@
         <td class="snap-label"></td><td></td>
     </tr>
 </table>
+<?php endif ?>
 
 <!-- Recommendations -->
 <h2>Expert Recommendations (<?= count($data['recommendations']) ?>)</h2>
@@ -156,8 +171,8 @@
     <?php foreach ($data['recommendations'] as $i => $rec) : ?>
         <div class="rec rec-<?= $rec['type'] ?>">
             <span class="rec-badge rec-badge-<?= $rec['type'] ?>"><?= strtoupper($rec['type']) ?></span>
-            <span class="rec-area"><?= $rec['area'] ?></span>
-            <div class="rec-text"><?= $rec['text'] ?></div>
+            <span class="rec-area"><?= esc($rec['area']) ?></span>
+            <div class="rec-text"><?= esc($rec['text']) ?></div>
         </div>
     <?php endforeach ?>
 <?php endif ?>

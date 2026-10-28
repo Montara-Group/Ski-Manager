@@ -1,77 +1,94 @@
 <?= $this->extend('layouts/main') ?>
+<?= $this->section('title') ?>Resort Analysis · Day <?= (int) $report['game_day'] ?><?= $this->endSection() ?>
 <?= $this->section('content') ?>
-<div class="container mx-auto p-4 max-w-5xl">
-    <div class="flex items-center gap-3 mb-6">
-        <a href="/resort-analysis" class="btn btn-ghost btn-sm"><i class="fa-solid fa-arrow-left"></i></a>
-        <h1 class="text-2xl font-bold"><i class="fa-solid fa-clipboard-check mr-2 text-primary"></i> Resort Analysis - Day <?= $report["game_day"] ?></h1>
-        <a href="/resort-analysis/pdf/<?= $report["id"] ?>" class="btn btn-outline btn-sm gap-1 ml-auto"><i class="fa-solid fa-file-pdf text-error"></i> Download PDF</a>
-    </div>
-
-    <!-- Overall Score -->
-    <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body flex-row items-center gap-6">
-        <div class="radial-progress text-<?= $data['overall_score'] >= 70 ? 'success' : ($data['overall_score'] >= 40 ? 'warning' : 'error') ?>" style="--value:<?= $data['overall_score'] ?>;--size:6rem;--thickness:5px;" role="progressbar">
-            <span class="text-xl font-bold"><?= $data['overall_score'] ?>%</span>
-        </div>
+<?php
+use App\Controllers\ResortAnalysis as RA;
+$overall = (int) ($data['overall_score'] ?? 0);
+$tone = fn(?int $s) => $s === null ? 'base-content' : ($s >= 70 ? 'success' : ($s >= 40 ? 'warning' : 'error'));
+$v1Labels = ['infrastructure' => ['Infrastructure', 'fa-road', 'text-info'], 'staffing' => ['Staffing', 'fa-users', 'text-warning'], 'finances' => ['Finances', 'fa-coins', 'text-success'],
+    'amenities' => ['Amenities', 'fa-building', 'text-primary'], 'equipment' => ['Equipment', 'fa-toolbox', 'text-warning'], 'resources' => ['Resources', 'fa-bolt', 'text-error'], 'safety' => ['Safety', 'fa-shield-halved', 'text-success']];
+$recIcon = ['critical' => ['fa-circle-xmark text-error', 'badge-error', 'Urgent'], 'warning' => ['fa-triangle-exclamation text-warning', 'badge-warning', 'Important'], 'info' => ['fa-lightbulb text-info', 'badge-info', 'Idea']];
+$recs = $data['recommendations'] ?? [];
+?>
+<div class="max-w-5xl mx-auto p-4 lg:p-8">
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+        <a href="/resort-analysis" class="btn btn-ghost btn-sm btn-circle" aria-label="Back to resort analysis"><i class="fa-solid fa-chevron-left"></i></a>
         <div>
-            <h2 class="text-xl font-bold">Overall Score: <?= $data['overall_score'] ?>%</h2>
-            <p class="text-sm text-base-content/60"><?= $data['overall_score'] >= 80 ? 'Excellent! Your resort is performing well.' : ($data['overall_score'] >= 60 ? 'Good foundation, but room for improvement.' : ($data['overall_score'] >= 40 ? 'Your resort needs attention in several areas.' : 'Significant improvements needed across the board.')) ?></p>
+            <h1 class="text-2xl font-bold"><i class="fa-solid fa-clipboard-check mr-2 text-primary" aria-hidden="true"></i>Resort analysis · day <?= (int) $report['game_day'] ?></h1>
+            <p class="text-sm text-base-content/60">Ordered <?= date('M j, Y', strtotime($report['created_at'])) ?><?= !empty($data['measured_day']) ? ' · based on day ' . (int) $data['measured_day'] . '\'s results' : '' ?></p>
         </div>
-    </div></div>
-
-    <!-- Category Scores -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <?php
-        $catLabels = ['infrastructure' => ['Infrastructure', 'fa-road', 'text-info'], 'staffing' => ['Staffing', 'fa-users', 'text-warning'], 'finances' => ['Finances', 'fa-coins', 'text-success'], 'amenities' => ['Amenities', 'fa-building', 'text-primary'], 'equipment' => ['Equipment', 'fa-toolbox', 'text-warning'], 'resources' => ['Resources', 'fa-bolt', 'text-error'], 'safety' => ['Safety', 'fa-shield-halved', 'text-success']];
-        foreach ($data['scores'] as $cat => $score) :
-            $label = $catLabels[$cat] ?? [ucfirst($cat), 'fa-circle', ''];
-        ?>
-        <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center">
-            <i class="fa-solid <?= $label[1] ?> <?= $label[2] ?> text-xl mb-1"></i>
-            <div class="text-2xl font-bold"><?= $score ?>%</div>
-            <div class="text-xs text-base-content/50"><?= $label[0] ?></div>
-            <progress class="progress <?= $score >= 70 ? 'progress-success' : ($score >= 40 ? 'progress-warning' : 'progress-error') ?> w-full mt-1" value="<?= $score ?>" max="100"></progress>
-        </div></div>
-        <?php endforeach ?>
+        <a href="/resort-analysis/pdf/<?= (int) $report['id'] ?>" class="btn btn-outline btn-sm gap-1 ml-auto"><i class="fa-solid fa-file-pdf text-error" aria-hidden="true"></i> PDF</a>
     </div>
 
-    <!-- Key Stats -->
-    <div class="card bg-base-100 shadow-sm mb-6"><div class="card-body">
-        <h2 class="card-title text-base mb-3"><i class="fa-solid fa-chart-bar mr-1"></i> Snapshot</h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-            <div class="flex justify-between"><span class="text-base-content/50">Cash</span><span class="font-semibold"><?= currency($data['stats']['cash']) ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Slopes</span><span class="font-semibold"><?= $data['stats']['open_slopes'] ?>/<?= $data['stats']['slopes'] ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Lifts</span><span class="font-semibold"><?= $data['stats']['open_lifts'] ?>/<?= $data['stats']['lifts'] ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Staff</span><span class="font-semibold"><?= $data['stats']['staff'] ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Avg Morale</span><span class="font-semibold"><?= $data['stats']['avg_morale'] ?>%</span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Buildings</span><span class="font-semibold"><?= $data['stats']['buildings'] ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Equipment</span><span class="font-semibold"><?= $data['stats']['equipment'] ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Infra Condition</span><span class="font-semibold"><?= $data['stats']['avg_infra_condition'] ?>%</span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Parking</span><span class="font-semibold"><?= $data['stats']['parking'] ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Terrain Parks</span><span class="font-semibold"><?= $data['stats']['terrain_parks'] ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Energy Sources</span><span class="font-semibold"><?= $data['stats']['energy_sources'] ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Water Sources</span><span class="font-semibold"><?= $data['stats']['water_sources'] ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Insurance</span><span class="font-semibold"><?= $data['stats']['insurance'] ?> policies</span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Total Debt</span><span class="font-semibold text-error"><?= currency($data['stats']['total_debt']) ?></span></div>
-            <div class="flex justify-between"><span class="text-base-content/50">Daily Salary</span><span class="font-semibold"><?= currency($data['stats']['daily_salary']) ?></span></div>
+    <?php if (session('success')) : ?><div class="alert alert-success mb-4" role="status"><span><?= esc(session('success')) ?></span></div><?php endif ?>
+    <?php if (session('error')) : ?><div class="alert alert-error mb-4" role="alert"><span><?= esc(session('error')) ?></span></div><?php endif ?>
+
+    <!-- Overall -->
+    <div class="card bg-base-100 shadow-sm mb-4"><div class="card-body p-5 flex-row items-center gap-5">
+        <div class="radial-progress text-<?= $tone($overall) ?> shrink-0" style="--value:<?= $overall ?>;--size:5.5rem;--thickness:6px" role="img" aria-label="Overall score <?= $overall ?> out of 100"><span class="text-xl font-bold"><?= $overall ?></span></div>
+        <div>
+            <h2 class="text-lg font-bold"><?= $overall >= 80 ? 'Running very well' : ($overall >= 60 ? 'Solid, with clear wins available' : ($overall >= 40 ? 'Several things holding you back' : 'Needs attention now')) ?></h2>
+            <p class="text-sm text-base-content/70">
+                <?php $c = count(array_filter($recs, fn($r) => $r['type'] === 'critical')); $w = count(array_filter($recs, fn($r) => $r['type'] === 'warning')); ?>
+                <?= $c ? $c . ' urgent issue' . ($c === 1 ? '' : 's') . ', ' : '' ?><?= $w ? $w . ' important, ' : '' ?><?= count($recs) ?> recommendation<?= count($recs) === 1 ? '' : 's' ?> in total.
+            </p>
         </div>
     </div></div>
 
-    <!-- Recommendations -->
-    <h2 class="text-xl font-semibold mb-3"><i class="fa-solid fa-lightbulb mr-1 text-warning"></i> Recommendations (<?= count($data['recommendations']) ?>)</h2>
-    <?php if (empty($data['recommendations'])) : ?>
-        <div class="alert alert-success"><i class="fa-solid fa-check-circle"></i><span>No recommendations - your resort is in great shape!</span></div>
-    <?php else : ?>
-        <div class="space-y-2">
-        <?php foreach ($data['recommendations'] as $rec) : ?>
-            <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 flex-row items-start gap-3">
-                <i class="fa-solid <?= $rec['type'] === 'critical' ? 'fa-circle-xmark text-error' : ($rec['type'] === 'warning' ? 'fa-triangle-exclamation text-warning' : 'fa-circle-info text-info') ?> text-lg mt-0.5"></i>
-                <div>
-                    <div class="flex items-center gap-2"><span class="badge badge-xs <?= $rec['type'] === 'critical' ? 'badge-error' : ($rec['type'] === 'warning' ? 'badge-warning' : 'badge-info') ?>"><?= ucfirst($rec['type']) ?></span><span class="text-xs font-semibold text-base-content/50"><?= $rec['area'] ?></span></div>
-                    <p class="text-sm mt-1"><?= $rec['text'] ?></p>
+    <!-- What to do -->
+    <section class="mb-6" aria-labelledby="todo-h">
+        <h2 id="todo-h" class="text-lg font-bold mb-3">What to do next</h2>
+        <?php if (!$recs) : ?>
+            <div class="alert alert-success"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>Nothing stands out: your resort is in great shape.</span></div>
+        <?php else : ?>
+            <div class="space-y-2">
+            <?php foreach ($recs as $rec) : [$icon, $badge, $label] = $recIcon[$rec['type']] ?? $recIcon['info']; ?>
+                <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 flex-row items-start gap-3">
+                    <i class="fa-solid <?= $icon ?> text-lg mt-0.5" aria-hidden="true"></i>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2"><span class="badge badge-sm <?= $badge ?>"><?= $label ?></span><span class="text-xs text-base-content/60"><?= esc($rec['area']) ?></span></div>
+                        <p class="text-sm mt-1"><?= esc($rec['text']) ?></p>
+                    </div>
+                    <?php if (!empty($rec['link'])) : ?><a href="<?= esc($rec['link'], 'attr') ?>" class="btn btn-ghost btn-xs shrink-0">Go <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a><?php endif ?>
+                </div></div>
+            <?php endforeach ?>
+            </div>
+        <?php endif ?>
+    </section>
+
+    <!-- Areas -->
+    <section aria-labelledby="areas-h">
+        <h2 id="areas-h" class="text-lg font-bold mb-3">Area by area</h2>
+        <?php if (!empty($data['sections'])) : ?>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <?php foreach (array_intersect_key(RA::AREAS, $data['sections']) as $key => [$name, $icon, $color]) : $sec = $data['sections'][$key]; $s = $sec['score']; ?>
+            <div class="card bg-base-100 shadow-sm"><div class="card-body p-4 gap-2">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-semibold"><i class="fa-solid <?= $icon ?> <?= $color ?> mr-2" aria-hidden="true"></i><?= $name ?></h3>
+                    <span class="font-bold text-<?= $tone($s) ?>"><?= $s === null ? '—' : $s . '/100' ?></span>
                 </div>
+                <?php if ($s !== null) : ?><progress class="progress progress-<?= $tone($s) ?> w-full h-1.5" value="<?= $s ?>" max="100" aria-label="<?= $name ?> score"></progress><?php endif ?>
+                <p class="text-sm text-base-content/80"><?= esc($sec['summary']) ?></p>
+                <?php if (!empty($sec['metrics'])) : ?>
+                <dl class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <?php foreach ($sec['metrics'] as [$k, $v]) : ?><dt class="text-base-content/60"><?= esc($k) ?></dt><dd class="text-right font-semibold"><?= esc($v) ?></dd><?php endforeach ?>
+                </dl>
+                <?php endif ?>
             </div></div>
-        <?php endforeach ?>
+            <?php endforeach ?>
         </div>
-    <?php endif ?>
+        <?php else : /* reports from before the October 2026 rework */ ?>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <?php foreach (($data['scores'] ?? []) as $cat => $s) : [$name, $icon, $color] = $v1Labels[$cat] ?? [ucfirst($cat), 'fa-circle', '']; ?>
+            <div class="card bg-base-100 shadow-sm"><div class="card-body p-3 text-center">
+                <i class="fa-solid <?= $icon ?> <?= $color ?> text-xl" aria-hidden="true"></i>
+                <div class="text-2xl font-bold"><?= (int) $s ?></div>
+                <div class="text-xs text-base-content/60"><?= $name ?></div>
+            </div></div>
+            <?php endforeach ?>
+        </div>
+        <p class="text-xs text-base-content/60 mt-2">This is an older report format. New reports are based on your resort's daily results.</p>
+        <?php endif ?>
+    </section>
 </div>
 <?= $this->endSection() ?>
