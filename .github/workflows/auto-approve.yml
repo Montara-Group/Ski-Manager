@@ -10,6 +10,7 @@ on:
 permissions:
   pull-requests: write
   contents: write
+  actions: write
 
 jobs:
   auto-review:
@@ -37,7 +38,7 @@ jobs:
 
             console.log(`Processing trusted PR #${pr.number} from @${author}...`);
 
-            // Check if already approved by github-actions[bot]
+            // 1. Submit review approval if not already approved
             const reviews = await github.rest.pulls.listReviews({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -61,40 +62,56 @@ jobs:
               console.log(`PR #${pr.number} is already approved.`);
             }
 
-            // Attempt to enable native GitHub auto-merge
-            const enableAutoMergeMutation = `
-              mutation($pullRequestId: ID!) {
-                enablePullRequestAutoMerge(input: {
-                  pullRequestId: $pullRequestId,
-                  mergeMethod: MERGE
-                }) {
-                  pullRequest {
-                    id
-                    autoMergeRequest {
-                      enabledAt
+            // 2. Execute or enable merge
+            let merged = false;
+            try {
+              const mergeRes = await github.rest.pulls.merge({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                merge_method: 'merge'
+              });
+              merged = mergeRes.data.merged;
+              console.log(`Direct merge executed for PR #${pr.number}.`);
+            } catch (restErr) {
+              console.log(`Direct merge deferred: ${restErr.message}`);
+              // Fallback to enabling native GitHub auto-merge
+              const enableAutoMergeMutation = `
+                mutation($pullRequestId: ID!) {
+                  enablePullRequestAutoMerge(input: {
+                    pullRequestId: $pullRequestId,
+                    mergeMethod: MERGE
+                  }) {
+                    pullRequest {
+                      id
                     }
                   }
                 }
-              }
-            `;
-
-            try {
-              await github.graphql(enableAutoMergeMutation, {
-                pullRequestId: pr.node_id
-              });
-              console.log(`Native auto-merge enabled for PR #${pr.number}.`);
-            } catch (graphqlErr) {
-              console.log(`GraphQL auto-merge note: ${graphqlErr.message}`);
-              // Fallback to direct merge if requirements are already satisfied
+              `;
               try {
-                await github.rest.pulls.merge({
+                await github.graphql(enableAutoMergeMutation, {
+                  pullRequestId: pr.node_id
+                });
+                console.log(`Native auto-merge enabled for PR #${pr.number}.`);
+              } catch (graphqlErr) {
+                console.log(`Auto-merge setup note: ${graphqlErr.message}`);
+              }
+            }
+
+            // 3. If successfully merged, immediately dispatch the target environment deployment
+            if (merged) {
+              const targetBranch = pr.base.ref;
+              const workflowFile = targetBranch === 'main' ? 'production-release.yml' : 'staging-deploy.yml';
+              console.log(`Dispatching deployment workflow ${workflowFile} on branch ${targetBranch}...`);
+              try {
+                await github.rest.actions.createWorkflowDispatch({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  pull_number: pr.number,
-                  merge_method: 'merge'
+                  workflow_id: workflowFile,
+                  ref: targetBranch
                 });
-                console.log(`Direct merge executed for PR #${pr.number}.`);
-              } catch (restErr) {
-                console.log(`Direct merge deferred (waiting for CI checks or rules): ${restErr.message}`);
+                console.log(`Successfully dispatched ${workflowFile}!`);
+              } catch (dispatchErr) {
+                console.log(`Dispatch note: ${dispatchErr.message}`);
               }
             }
