@@ -43,20 +43,10 @@ Events::on('pre_system', static function (): void {
      * Sentry Application Monitoring
      * --------------------------------------------------------------------
      */
-    $sentryDsn = getenv('SENTRY_DSN');
-    if (!empty($sentryDsn) && class_exists('\\Sentry\\ClientBuilder')) {
-        \Sentry\init([
-            'dsn'                  => $sentryDsn,
-            'environment'          => ENVIRONMENT,
-            'release'              => 'ski-manager@' . (getenv('APP_REVISION') ?: '1.0.0'),
-            'traces_sample_rate'   => 1.0,
-            'profiles_sample_rate' => 1.0,
-            'send_default_pii'     => false,
-            'ignore_exceptions'    => [
-                \CodeIgniter\Exceptions\PageNotFoundException::class,
-            ],
-        ]);
+    if (function_exists('initSentry')) {
+        initSentry();
     }
+
 
     /*
      * --------------------------------------------------------------------
