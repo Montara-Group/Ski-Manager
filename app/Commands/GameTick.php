@@ -13,6 +13,16 @@ class GameTick extends BaseCommand
 
     public function run(array $params)
     {
+        $checkInId = null;
+        if (class_exists('\\Sentry\\ClientBuilder') && !empty(getenv('SENTRY_DSN'))) {
+            try {
+                $checkInId = \Sentry\captureCheckIn(
+                    'gametick-cron',
+                    \Sentry\CheckInStatus::inProgress()
+                );
+            } catch (\Throwable $t) {}
+        }
+
         if (function_exists('isMaintenanceMode') && isMaintenanceMode()) {
             CLI::write('Maintenance mode is active — Season 2 development underway. Game tick paused to safeguard player finances.', 'yellow');
             return;
@@ -878,6 +888,9 @@ class GameTick extends BaseCommand
                 $db->resetTransStatus();
                 CLI::write("  ERROR processing user {$userId}: " . $e->getMessage(), "red");
                 log_message("error", "GameTick user {$userId} failed: " . $e->getMessage());
+                if (class_exists('\\Sentry\\SentrySdk')) {
+                    \Sentry\captureException($e);
+                }
             }
         }
 
@@ -891,6 +904,17 @@ class GameTick extends BaseCommand
             $db->table('notifications')->where('created_at <', date('Y-m-d H:i:s', strtotime('-90 days')))->delete();
         } catch (\Throwable $e) {
             // Non-blocking maintenance cleanup
+        }
+
+        if ($checkInId !== null) {
+            try {
+                \Sentry\captureCheckIn(
+                    'gametick-cron',
+                    \Sentry\CheckInStatus::ok(),
+                    null,
+                    $checkInId
+                );
+            } catch (\Throwable $t) {}
         }
 
         CLI::write('Game tick complete!', 'green');

@@ -79,7 +79,19 @@ echo "Syncing code with origin/${BRANCH}..."
 git fetch origin "${BRANCH}"
 git reset --hard "origin/${BRANCH}"
 
-# 5. Project NPM Dependencies & Asset Compilation
+# 5. PHP Dependencies (Composer)
+if [ -f "composer.json" ]; then
+    echo "Updating composer dependencies..."
+    if docker ps --format '{{.Names}}' | grep -q "${PHP_CONTAINER}" && docker exec "${PHP_CONTAINER}" which composer &>/dev/null; then
+        echo "Running 'composer install' inside ${PHP_CONTAINER}..."
+        docker exec -w "${CONTAINER_PATH}" "${PHP_CONTAINER}" composer install --no-dev --optimize-autoloader --no-interaction || true
+    elif command -v composer &>/dev/null; then
+        echo "Running 'composer install' on host..."
+        composer install --no-dev --optimize-autoloader --no-interaction || true
+    fi
+fi
+
+# 6. Project NPM Dependencies & Asset Compilation
 if [ -f "package.json" ]; then
     echo "Updating project npm dependencies in $(pwd)..."
     if command -v npm &>/dev/null; then
