@@ -40,6 +40,26 @@ Events::on('pre_system', static function (): void {
 
     /*
      * --------------------------------------------------------------------
+     * Sentry Application Monitoring
+     * --------------------------------------------------------------------
+     */
+    $sentryDsn = getenv('SENTRY_DSN');
+    if (!empty($sentryDsn) && class_exists('\\Sentry\\ClientBuilder')) {
+        \Sentry\init([
+            'dsn'                  => $sentryDsn,
+            'environment'          => ENVIRONMENT,
+            'release'              => 'ski-manager@' . (getenv('APP_REVISION') ?: '1.0.0'),
+            'traces_sample_rate'   => 1.0,
+            'profiles_sample_rate' => 1.0,
+            'send_default_pii'     => false,
+            'ignore_exceptions'    => [
+                \CodeIgniter\Exceptions\PageNotFoundException::class,
+            ],
+        ]);
+    }
+
+    /*
+     * --------------------------------------------------------------------
      * Debug Toolbar Listeners.
      * --------------------------------------------------------------------
      * If you delete, they will no longer be collected.
@@ -84,6 +104,18 @@ Events::on('post_controller_constructor', static function () {
                 session()->set('resort_map', $resortMap);
             }
         }
+    }
+
+    // Attach authenticated player details to Sentry error context
+    if (class_exists('\\Sentry\\SentrySdk') && function_exists('auth') && auth()->loggedIn()) {
+        $user = auth()->user();
+        \Sentry\configureScope(static function (\Sentry\State\Scope $scope) use ($user): void {
+            $scope->setUser([
+                'id'       => (string) $user->id,
+                'email'    => $user->email ?? 'unknown',
+                'username' => $user->username ?? 'unknown',
+            ]);
+        });
     }
 });
 
