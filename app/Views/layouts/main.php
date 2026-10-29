@@ -2,6 +2,38 @@
 <html lang="en" dir="ltr" data-theme="carboncloud">
 <head>
     <meta charset="UTF-8">
+    <!-- Sentry Observability & Session Replay -->
+    <?php $__sentryDsn = getenv('SENTRY_DSN') ?: 'https://c2891eb7f1bd5f0b4f9ad8f08f4ae137@o4511424329220096.ingest.us.sentry.io/4512337095032832'; ?>
+    <?php if (!empty($__sentryDsn)) : ?>
+    <script
+      src="https://browser.sentry-cdn.com/8.38.0/bundle.tracing.replay.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      if (window.Sentry) {
+        Sentry.init({
+          dsn: <?= json_encode($__sentryDsn) ?>,
+          environment: <?= json_encode(ENVIRONMENT ?? 'production') ?>,
+          integrations: [
+            Sentry.browserTracingIntegration(),
+            Sentry.replayIntegration({
+              maskAllText: false,
+              blockAllMedia: false,
+            }),
+          ],
+          tracesSampleRate: 1.0,
+          replaysSessionSampleRate: 0.1,
+          replaysOnErrorSampleRate: 1.0,
+        });
+        <?php if (function_exists('auth') && auth()->loggedIn()) : ?>
+        Sentry.setUser({
+          id: <?= json_encode((string) auth()->id()) ?>,
+          username: <?= json_encode(auth()->user()->username ?? 'player') ?>,
+        });
+        <?php endif; ?>
+      }
+    </script>
+    <?php endif; ?>
     <!-- Google Consent Mode v2 -->
     <script>
     window.dataLayer = window.dataLayer || [];
