@@ -29,6 +29,10 @@ class AgentTracing
         string $agentName,
         ?string $taskName = null
     ): ?Transaction {
+        if (function_exists('initSentry')) {
+            initSentry();
+        }
+
         if (! class_exists('\\Sentry\\ClientBuilder')) {
             return null;
         }
