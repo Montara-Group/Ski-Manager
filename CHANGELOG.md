@@ -1,3 +1,11 @@
+## Release 2026-10-30 18:11
+
+* Return a clean 400 for malformed URLs instead of a 500 (8ce5410)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (c1eec7b)
+* Let visitors with an unfinished sign-in start the demo (5325e26)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (fc700b0)
+* Add guides, a candidate market, per-lift mechanics and demo cleanup; fix onboarding (102ef52)
+
 ## Release 2026-10-30 18:03
 
 * Let visitors with an unfinished sign-in start the demo (5325e26)
