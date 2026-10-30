@@ -1,3 +1,11 @@
+## Release 2026-10-30 03:35
+
+* Add guides, a candidate market, per-lift mechanics and demo cleanup; fix onboarding (102ef52)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (66a9e98)
+* Keep a delivered activation code valid across logins (b7fa428)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (64f07f4)
+* Fix lift repairs, tick cash races, staff training and account deletion (c79b6fd)
+
 ## Release 2026-10-30 03:11
 
 * Keep a delivered activation code valid across logins (b7fa428)
