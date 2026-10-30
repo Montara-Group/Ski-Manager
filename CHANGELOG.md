@@ -1,3 +1,11 @@
+## Release 2026-10-30 01:25
+
+* Show what each hire actually does and start new hires on a free post (d2b2359)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (8727f0f)
+* ci: remove PR auto-merge to require manual PR review (d9cada5)
+* Merge pull request #12 from MontaraGroup/staging (db329fb)
+* Merge pull request #11 from Montara-Group/fix/cli-sentry-init (6130a6f)
+
 ## Release 2026-10-29 03:11
 
 * ci: remove PR auto-merge to require manual PR review (d9cada5)
