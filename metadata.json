@@ -1,0 +1,41 @@
+{
+  "cli_version": "0.12.2",
+  "checkpoint_id": "01M656EPCSK76C3WZGJF4E65HH",
+  "strategy": "manual-commit",
+  "branch": "feature/enhance-terrain-parks",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "app/Controllers/Staff.php",
+    "app/Views/staff/hire.php"
+  ],
+  "sessions": [
+    {
+      "metadata": "/0/metadata.json",
+      "transcript": "/0/full.jsonl",
+      "compact_transcript": "/0/transcript.jsonl",
+      "content_hash": "/0/content_hash.txt",
+      "prompt": "/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 64,
+    "cache_creation_tokens": 517526,
+    "cache_read_tokens": 16201259,
+    "output_tokens": 30485,
+    "api_call_count": 31
+  },
+  "redaction": {
+    "replacements": 276,
+    "layers": {
+      "betterleaks": 26,
+      "connection_string": 0,
+      "credential_key": 0,
+      "credential_value": 40,
+      "credentialed_uri": 0,
+      "entropy": 210,
+      "key_context": 0,
+      "provider_token": 0,
+      "shell_stdin": 0
+    }
+  }
+}
