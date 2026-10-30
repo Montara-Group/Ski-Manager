@@ -1,3 +1,11 @@
+## Release 2026-10-30 03:11
+
+* Keep a delivered activation code valid across logins (b7fa428)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (64f07f4)
+* Fix lift repairs, tick cash races, staff training and account deletion (c79b6fd)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (6dcc210)
+* Redesign the hire page around what the resort needs (213e4ae)
+
 ## Release 2026-10-30 03:03
 
 * Fix lift repairs, tick cash races, staff training and account deletion (c79b6fd)
