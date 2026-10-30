@@ -1,0 +1,5 @@
+redo/revamp the hire page
+
+---
+
+Deploy & push
