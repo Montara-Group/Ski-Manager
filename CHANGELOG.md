@@ -1,3 +1,11 @@
+## Release 2026-10-30 02:41
+
+* Redesign the hire page around what the resort needs (213e4ae)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (f7117f4)
+* Show what each hire actually does and start new hires on a free post (d2b2359)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (8727f0f)
+* ci: remove PR auto-merge to require manual PR review (d9cada5)
+
 ## Release 2026-10-30 01:25
 
 * Show what each hire actually does and start new hires on a free post (d2b2359)
