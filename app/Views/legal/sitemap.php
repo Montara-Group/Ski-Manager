@@ -15,6 +15,7 @@
                 <li><a href="/" class="link link-hover">Home</a></li>
                 <li><a href="/about" class="link link-hover">About</a></li>
                 <li><a href="/updates" class="link link-hover">Game Updates</a></li>
+                <li><a href="/guides" class="link link-hover">Guides</a></li>
                 <li><a href="/faq" class="link link-hover">FAQ</a></li>
                 <li><a href="/contact" class="link link-hover">Contact</a></li>
                 <li><a href="/leaderboard" class="link link-hover">Leaderboard</a></li>

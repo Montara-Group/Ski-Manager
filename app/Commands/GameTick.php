@@ -268,9 +268,11 @@ class GameTick extends BaseCommand
             $items = $db->table('player_items')->where('user_id', $userId)->where('status', 'open')->get()->getResultArray();
             // Snow guns protect the slopes they cover from a thin natural base (cold days only)
             $snowCovered = $v2 ? \App\Libraries\Snowmaking::coverage(array_filter($items, fn($i) => $i['item_type'] === 'slope'), $activeSnowmakers, $baseTemp) : [];
+            // A mechanic looks after the lift they're assigned to (assigned_to holds the lift's name)
+            $mechanicLifts = array_flip(array_column($assignedByRole['mechanic'] ?? [], 'assigned_to'));
             foreach ($items as $item) {
                 $decay = rand(0, 2);
-                if ($item['item_type'] === 'lift' && $countAssigned('mechanic') > 0) {
+                if ($item['item_type'] === 'lift' && isset($mechanicLifts[$item['name'] ?? 'Lift #' . $item['id']])) {
                     $decay = max(0, $decay - 1);
                 }
                 // v2: slopes wear by difficulty and weather (App\Libraries\Grooming); groomers restore them below

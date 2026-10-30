@@ -65,7 +65,7 @@ class Staff extends BaseController
     public const EFFECTS = [
         'ski_patrol' => 'Assigned to a slope: +2% skiers each, and fewer accidents (each costs 2,500–8,000 €).',
         'instructor' => 'Assigned to a slope: +3% skiers each, and up to 10 ski lessons a day at 50 € (about 8% of your skiers want one).',
-        'mechanic' => 'Assigned to a lift: every lift wears 1% a day less. One mechanic covers all your lifts.',
+        'mechanic' => 'Assigned to a lift: that lift wears 1% a day less, so it needs repairs less often. One mechanic per lift.',
         'groomer' => 'Drives one groomer each night, restoring your worst slopes; higher levels restore more.',
         'snowmaker' => 'Assigned to a snow gun: that gun wears 1% a day less.',
         'receptionist' => 'Assigned to a hotel: hotels earn up to 15% more with one receptionist per hotel.',
@@ -96,20 +96,27 @@ class Staff extends BaseController
                 $key === 'groomer' => $groomers === 0 ? ['none', 'Buy a groomer first.'] : (count($mine) < $groomers
                     ? ['needed', $groomers === 1 ? 'Your groomer has no driver.' : ($groomers - count($mine)) . ' of your ' . $groomers . ' groomers ' . ($groomers - count($mine) === 1 ? 'has' : 'have') . ' no driver.']
                     : ['enough', 'Every groomer has a driver.']),
-                $key === 'mechanic' => $lifts === 0 ? ['none', 'Build a lift first.'] : ($assigned > 0 ? ['enough', 'One mechanic already covers all your lifts.'] : ['needed', 'Your lifts wear faster without one.']),
+                $key === 'mechanic' && $lifts > 0 && $r['idle'] === 0 && $assigned < $lifts => ['needed', $lifts === 1 ? 'Your lift has no mechanic.' : ($lifts - $assigned) . ' of your ' . $lifts . ' lifts ' . ($lifts - $assigned === 1 ? 'has' : 'have') . ' no mechanic.'],
                 in_array($key, ['receptionist', 'chef'], true) => $posts === 0 ? ['none', 'Build a ' . ($key === 'chef' ? 'restaurant' : 'hotel') . ' first.']
                     : ($assigned < $posts ? ['needed', ($posts - $assigned) . ' ' . ($key === 'chef' ? 'restaurant' : 'hotel') . ($posts - $assigned === 1 ? ' has' : 's have') . ' none.'] : ['enough', 'Every ' . ($key === 'chef' ? 'restaurant' : 'hotel') . ' has one.']),
                 $key === 'park_crew' && $posts > 0 && $assigned >= 4 => ['enough', 'Parks can\'t wear any slower.'],
                 $r['idle'] > 0 => ['enough', 'You already have ' . $r['idle'] . ' with nothing to do. Assign them first.'],
-                $posts === 0 => ['none', match ($key) { 'ski_patrol', 'instructor' => 'Build a slope first.', 'snowmaker' => 'Buy a snow gun first.', 'medic' => 'Build a ski patrol station first.', 'park_crew' => 'Build a terrain park first.', default => 'No post for this role yet.' }],
+                $posts === 0 => ['none', match ($key) { 'ski_patrol', 'instructor' => 'Build a slope first.', 'mechanic' => 'Build a lift first.', 'snowmaker' => 'Buy a snow gun first.', 'medic' => 'Build a ski patrol station first.', 'park_crew' => 'Build a terrain park first.', default => 'No post for this role yet.' }],
                 $assigned >= $posts => ['enough', 'Every post is filled.'],
                 default => ['useful', $r['free'] . ' free post' . ($r['free'] === 1 ? '' : 's') . '.'],
             };
         }
         unset($r);
 
+        $candidates = \App\Libraries\Candidates::today($userId, $roles);
+        foreach ($candidates as &$list) {
+            foreach ($list as &$c) $c['daily'] = (int) round((int) $c['salary'] * $costMult);
+        }
+        unset($list, $c);
+
         return view('staff/hire', [
             'roles' => $roles,
+            'candidates' => $candidates,
             'cash' => (int) ($db->table('player_finances')->select('cash')->where('user_id', $userId)->get()->getRow()->cash ?? 0),
             'payroll' => (int) round(array_sum(array_column($staff, 'salary')) * $costMult),
             'staffCount' => count($staff),
@@ -118,21 +125,18 @@ class Staff extends BaseController
 
     public function doHire()
     {
-        $role = (string) $this->request->getPost('role');
         $userId = auth()->id();
         if (!$userId) return redirect()->to("/login")->with("error", "Please log in first.");
-
         $roles = $this->getRoles();
-        if (!isset($roles[$role])) {
-            return redirect()->back()->with('error', 'Invalid role.');
+        $db = db_connect();
+        $c = $db->table('staff_candidates')->where('id', (int) $this->request->getPost('candidate'))->where('user_id', $userId)
+            ->where('game_day', getGameDay())->where('hired', 0)->get()->getRowArray();
+        if (!$c || !isset($roles[$c['role']])) {
+            return redirect()->to('/staff/hire')->with('error', 'That candidate is no longer available. Today\'s candidates are listed below.');
         }
-
-        $firstNames = ['Alex', 'Marie', 'Pierre', 'Sophie', 'Lucas', 'Emma', 'Hugo', 'Lea', 'Thomas', 'Camille', 'Max', 'Clara', 'Jules', 'Alice', 'Liam', 'Chloe', 'Nina', 'Oscar', 'Ines', 'Felix'];
-        $lastNames = ['Dupont', 'Martin', 'Bernard', 'Dubois', 'Moreau', 'Laurent', 'Simon', 'Michel', 'Lefebvre', 'Roux', 'Blanc', 'Fournier', 'Morel', 'Girard', 'Huber', 'Lindqvist', 'Rossi', 'Keller'];
-        $name = $firstNames[array_rand($firstNames)] . ' ' . $lastNames[array_rand($lastNames)];
+        $role = $c['role'];
 
         // Start the new hire on the first free post for the role, so they work (and keep their morale) from tonight
-        $db = db_connect();
         $taken = array_flip(array_column($this->staffModel->select('assigned_to')->where('user_id', $userId)->where('role', $role)
             ->where('status', 'active')->where('assigned_to IS NOT NULL')->findAll(), 'assigned_to'));
         $post = null;
@@ -140,15 +144,23 @@ class Staff extends BaseController
             if (!isset($taken[$t])) { $post = $t; break; }
         }
 
+        $db->transStart();
+        // Taking the candidate off the list is what reserves them, so a double click can't hire them twice
+        $db->table('staff_candidates')->where('id', $c['id'])->where('hired', 0)->update(['hired' => 1]);
+        if ($db->affectedRows() !== 1) {
+            $db->transRollback();
+            return redirect()->to('/staff/hire')->with('error', $c['name'] . ' has already been hired.');
+        }
         $this->staffModel->insert([
-            'user_id' => $userId, 'name' => $name, 'role' => $role, 'level' => 1,
-            'salary' => $roles[$role]['salary'], 'morale' => rand(70, 100), 'experience' => 0,
+            'user_id' => $userId, 'name' => $c['name'], 'role' => $role, 'level' => (int) $c['level'],
+            'salary' => (int) $c['salary'], 'morale' => (int) $c['morale'], 'experience' => 0,
             'assigned_to' => $post, 'status' => 'active',
         ]);
-        log_activity($userId, 'Staff', 'Hired ' . $name . ' as ' . $roles[$role]['name'] . ($post ? ' (' . $post . ')' : ''), 'fa-solid fa-user-plus');
+        $db->transComplete();
+        log_activity($userId, 'Staff', 'Hired ' . $c['name'] . ' as ' . $roles[$role]['name'] . ($post ? ' (' . $post . ')' : ''), 'fa-solid fa-user-plus');
 
         $where = $post ? ' and assigned to ' . $post . '.' : '. There is no free post for them yet, so they\'ll lose morale until you give them one.';
-        return redirect()->to('/staff/hire')->with('success', esc($name) . ' hired as ' . esc($roles[$role]['name']) . esc($where));
+        return redirect()->to('/staff/hire')->with('success', $c['name'] . ' hired as ' . $roles[$role]['name'] . $where);
     }
 
     public function fire(int $id)

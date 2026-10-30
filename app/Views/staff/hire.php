@@ -16,11 +16,12 @@ $groupOf = [];
 foreach ($groups as $g => [, $keys]) foreach ($keys as $k) $groupOf[$k] = $g;
 $needed = array_filter($roles, fn($r) => $r['verdict'] === 'needed');
 $useful = array_filter($roles, fn($r) => $r['verdict'] === 'useful');
-$hireForm = function (string $key, array $r, string $btn) {
-    $warn = in_array($r['verdict'], ['enough', 'none'], true) ? ' ' . esc($r['why']) : '';
-    return '<form action="/staff/hire" method="post" data-confirm="Hire a ' . esc($r['name']) . ' for ' . currency($r['daily']) . ' a day?' . $warn . '">'
-        . csrf_field() . '<input type="hidden" name="role" value="' . esc($key, 'attr') . '">'
-        . '<button class="btn btn-sm gap-1 ' . $btn . '"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Hire</button></form>';
+// Hire opens the role's candidate list (Candidates::today); when the day's list is used up, say so
+$hireForm = function (string $key, array $r, string $btn) use ($candidates) {
+    $n = count($candidates[$key] ?? []);
+    if ($n === 0) return '<button class="btn btn-sm btn-ghost" disabled>None left today</button>';
+    return '<button type="button" class="btn btn-sm gap-1 ' . $btn . '" onclick="document.getElementById(\'cand-' . esc($key, 'attr') . '\').showModal()">'
+        . '<i class="fa-solid fa-user-plus" aria-hidden="true"></i> Hire</button>';
 };
 ?>
 <div class="max-w-5xl mx-auto p-4 lg:p-8">
@@ -31,7 +32,7 @@ $hireForm = function (string $key, array $r, string $btn) {
             <a href="/staff" class="btn btn-ghost btn-sm btn-circle" aria-label="Back to staff"><i class="fa-solid fa-chevron-left"></i></a>
             <div>
                 <h1 class="text-2xl font-bold">Hire staff</h1>
-                <p class="text-sm text-base-content/60">No hiring fee. You pay a daily salary from tonight.</p>
+                <p class="text-sm text-base-content/60">Pick from today's candidates. No hiring fee: you pay their daily salary from tonight.</p>
             </div>
         </div>
         <dl class="flex gap-5 text-sm">
@@ -106,10 +107,41 @@ $hireForm = function (string $key, array $r, string $btn) {
     </div>
     <p id="roleEmpty" class="text-sm text-base-content/60 text-center py-6" hidden>No roles would help right now.</p>
 
+    <!-- Candidate lists, one dialog per role -->
+    <?php foreach ($roles as $key => $r) : if (empty($candidates[$key])) continue; $dim = in_array($r['verdict'], ['enough', 'none'], true); ?>
+    <dialog id="cand-<?= esc($key, 'attr') ?>" class="modal modal-bottom sm:modal-middle" aria-labelledby="cand-h-<?= esc($key, 'attr') ?>">
+        <div class="modal-box">
+            <h3 id="cand-h-<?= esc($key, 'attr') ?>" class="font-bold text-lg"><?= esc($r['name']) ?> candidates</h3>
+            <p class="text-sm text-base-content/70 mt-1">Standard salary <?= currency($r['daily']) ?>/day. New candidates arrive tomorrow.<?= $dim ? ' Note: ' . esc($r['why']) : '' ?></p>
+            <ul class="divide-y divide-base-300 mt-3">
+            <?php foreach ($candidates[$key] as $c) : $diff = $r['daily'] > 0 ? (int) round(($c['daily'] / $r['daily'] - 1) * 100) : 0; ?>
+                <li class="py-3 flex flex-wrap items-center gap-3">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold"><?= esc($c['name']) ?> <span class="badge badge-sm badge-ghost ml-1"><?= esc(\App\Libraries\Candidates::label($c['trait'])) ?></span></div>
+                        <div class="text-xs text-base-content/70 mt-1 flex flex-wrap gap-x-3">
+                            <span><?= currency($c['daily']) ?>/day<?= $diff ? ' (' . ($diff > 0 ? '+' : '−') . abs($diff) . '%)' : '' ?></span>
+                            <span>Morale <?= (int) $c['morale'] ?>%</span>
+                            <?php if ($key === 'groomer') : ?><span>Level <?= (int) $c['level'] ?></span><?php endif ?>
+                        </div>
+                    </div>
+                    <form action="/staff/hire" method="post"><?= csrf_field() ?>
+                        <input type="hidden" name="candidate" value="<?= (int) $c['id'] ?>">
+                        <button class="btn btn-sm btn-primary gap-1"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Hire</button>
+                    </form>
+                </li>
+            <?php endforeach ?>
+            </ul>
+            <div class="modal-action"><form method="dialog"><button class="btn btn-sm">Close</button></form></div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+    <?php endforeach ?>
+
     <details class="card bg-base-100 shadow-sm mt-6">
         <summary class="card-body p-4 cursor-pointer font-semibold text-sm">How staff work</summary>
         <ul class="px-4 pb-4 text-sm text-base-content/80 space-y-1 list-disc pl-9">
-            <li>New hires start at level 1 on the first free post for their role. Reassign them on the <a href="/staff" class="link link-primary">staff page</a>.</li>
+            <li>Each role has a few candidates a day, asking for different salaries and starting with different morale; experienced groomer operators start above level 1. New candidates arrive every game day.</li>
+            <li>New hires start on the first free post for their role. Reassign them on the <a href="/staff" class="link link-primary">staff page</a>.</li>
             <li>Salaries are paid every night, whether or not the staff member has work.</li>
             <li>Most roles only help while assigned to a post (a slope, lift, building, snow gun or park).</li>
             <li>Morale drops a little every day; working staff lose less than idle ones. Below 10% they may quit.</li>

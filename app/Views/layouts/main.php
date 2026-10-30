@@ -24,6 +24,45 @@
           tracesSampleRate: 1.0,
           replaysSessionSampleRate: 0.1,
           replaysOnErrorSampleRate: 1.0,
+          beforeSend: function (event, hint) {
+            // Third-party scripts (Google Funding Choices, Hotjar) reject promises
+            // with `undefined` when their in-flight requests are aborted (e.g. on
+            // page navigation). These carry no stack trace and are not actionable.
+            // Drop an event only when ALL of the following hold, so rejections from
+            // our own code (including string reasons) are still reported:
+            //  - it came from the global onunhandledrejection handler
+            //  - the actual rejection reason is `undefined` (not a string)
+            //  - there is no stack trace
+            //  - a failed/aborted fetch/XHR breadcrumb to a known vendor URL exists
+            var VENDOR_URL_PATTERNS = [
+              /^https:\/\/fundingchoicesmessages\.google\.com\//,
+              /^https:\/\/content\.hotjar\.io\//,
+            ];
+            var ex = event && event.exception && event.exception.values && event.exception.values[0];
+            var isUndefinedRejection =
+              !!hint &&
+              Object.prototype.hasOwnProperty.call(hint, 'originalException') &&
+              hint.originalException === undefined;
+            var isStackless = !(ex && ex.stacktrace && ex.stacktrace.frames && ex.stacktrace.frames.length);
+            var hasFailedVendorRequest = (event.breadcrumbs || []).some(function (crumb) {
+              if (!crumb || (crumb.category !== 'xhr' && crumb.category !== 'fetch')) return false;
+              var data = crumb.data || {};
+              var failed = crumb.level === 'error' || data.status_code === 0;
+              return failed && typeof data.url === 'string' && VENDOR_URL_PATTERNS.some(function (re) {
+                return re.test(data.url);
+              });
+            });
+            if (
+              ex &&
+              ex.mechanism && ex.mechanism.type === 'onunhandledrejection' &&
+              isUndefinedRejection &&
+              isStackless &&
+              hasFailedVendorRequest
+            ) {
+              return null;
+            }
+            return event;
+          },
         });
         <?php if (function_exists('auth') && auth()->loggedIn()) : ?>
         Sentry.setUser({
@@ -627,6 +666,7 @@ a.link:hover{opacity:0.8}
                 <div>
                     <h6 class="">Resources</h6>
                     <ul class="space-y-2 text-sm">
+                        <li><a href="/guides">Guides</a></li>
                         <li><a href="/faq">FAQ</a></li>
                         <li><a href="/contact">Contact</a></li>
                         <li><a href="/bugs">Report a Bug</a></li>
@@ -824,7 +864,32 @@ function acceptCookies(level){
 <style>[data-tip]{position:relative;cursor:help}[data-tip]:hover::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:#1d232a;color:#a6adbb;padding:6px 10px;border-radius:6px;font-size:11px;white-space:nowrap;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.3);pointer-events:none}[data-tip]:hover::before{content:"";position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);border:4px solid transparent;border-top-color:#1d232a;z-index:9999}</style>
 <?php endif ?>
 
-<script>if("serviceWorker" in navigator && location.hostname === "ski-manager.net"){navigator.serviceWorker.register("/sw.js");}</script>
+<script>
+if ("serviceWorker" in navigator && location.hostname === "ski-manager.net") {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("/sw.js").catch(function (err) {
+      var name = (err && err.name) || "Error";
+      var message = (err && err.message) || String(err);
+      console.warn("Service worker registration failed", err);
+      if (window.Sentry) {
+        try {
+          window.Sentry.addBreadcrumb({
+            category: "service-worker",
+            level: "warning",
+            message: "Service worker registration failed",
+            data: { name: name, message: message }
+          });
+          window.Sentry.captureMessage("Service worker registration failed: " + name + ": " + message, {
+            level: "warning",
+            tags: { "sw.registration": "failed" },
+            extra: { errorName: name, errorMessage: message }
+          });
+        } catch (e) {}
+      }
+    });
+  });
+}
+</script>
 
 <script>
 let processedAlertIds = new Set();

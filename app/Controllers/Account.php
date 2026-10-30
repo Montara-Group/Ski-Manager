@@ -179,27 +179,7 @@ class Account extends BaseController
             return redirect()->back()->with('error', 'Incorrect password. Account deletion aborted.');
         }
 
-        $userId = auth()->id();
-        $db = db_connect();
-
-        // Every table with a user_id column, so tables added later are never missed (a fixed list here
-        // went stale and also named tournaments, which has no user_id). Map segments and the admin
-        // audit log record who made something rather than belong to the player, so they're kept.
-        $keep = ['users', 'map_segments', 'admin_audit_log', 'auth_identities', 'auth_logins', 'auth_remember_tokens'];
-        $tables = array_column($db->query(
-            "SELECT TABLE_NAME AS t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'user_id'"
-        )->getResultArray(), 't');
-        $db->transStart();
-        foreach (array_diff($tables, $keep) as $table) {
-            $db->table($table)->where('user_id', $userId)->delete();
-        }
-        $db->table('tournaments')->where('host_id', $userId)->delete();
-        $db->table('resort_likes')->where('resort_user_id', $userId)->delete();
-        $db->table('auth_identities')->where('user_id', $userId)->delete();
-        $db->table('auth_logins')->where('user_id', $userId)->delete();
-        $db->table('auth_remember_tokens')->where('user_id', $userId)->delete();
-        $db->table('users')->where('id', $userId)->delete();
-        $db->transComplete();
+        \App\Libraries\AccountPurge::purge((int) auth()->id());
 
         auth()->logout();
         return redirect()->to('/')->with('message', 'Account deleted successfully.');

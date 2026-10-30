@@ -254,6 +254,8 @@ $routes->post('/tickets/update', 'Tickets::updatePrice');
 $routes->post('/tournaments/cancel/(:num)', 'Tournaments::cancel/$1');
 $routes->post('/tournaments/host', 'Tournaments::host');
 $routes->get("/faq", "Faq::index");
+$routes->get('/guides', 'Guides::index');
+$routes->get('/guides/(:segment)', 'Guides::show/$1');
 $routes->get("/disclaimer", "Legal::disclaimer");
 service("auth")->routes($routes);
 $routes->get("/sitemap", "Legal::sitemap");
