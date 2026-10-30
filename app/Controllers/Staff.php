@@ -259,22 +259,57 @@ class Staff extends BaseController
         return $targets;
     }
 
+    public const TRAIN_COST_PER_LEVEL = 5000;
+
+    /**
+     * Highest level worth training to. Only groomer operators use their level (Grooming::restore:
+     * RESTORE_BASE + RESTORE_PER_LEVEL x average level, capped at RESTORE_MAX), so training other
+     * roles cost money for nothing.
+     */
+    public static function maxUsefulLevel(string $role): int
+    {
+        if ($role !== 'groomer') return 1;
+        return (int) ceil((\App\Libraries\Grooming::RESTORE_MAX - \App\Libraries\Grooming::RESTORE_BASE) / \App\Libraries\Grooming::RESTORE_PER_LEVEL);
+    }
+
+    public static function trainCost(array $member): int
+    {
+        return self::TRAIN_COST_PER_LEVEL * (int) $member['level'];
+    }
+
     public function train(int $id)
     {
         $userId = auth()->id();
-        $member = $this->staffModel->where('id', $id)->where('user_id', $userId)->first();
+        $member = $this->staffModel->where('id', $id)->where('user_id', $userId)->where('status', 'active')->first();
         if (!$member) return redirect()->back()->with('error', 'Staff not found.');
-        if ((int) $member['level'] >= 10) return redirect()->back()->with('error', $member['name'] . ' is already max level.');
+        if ((int) $member['level'] >= self::maxUsefulLevel($member['role'])) {
+            return redirect()->to('/staff')->with('error', $member['role'] === 'groomer'
+                ? esc($member['name']) . ' is already at the level where training stops helping.'
+                : 'Training has no effect for this role: only groomer operators get better with level.');
+        }
 
-        $cost = 5000 * (int) $member['level'];
+        $cost = self::trainCost($member);
         $db = db_connect();
-        $finance = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
-        if ((int)($finance['cash'] ?? 0) < $cost) return redirect()->back()->with('error', 'Not enough cash. Need ' . currency($cost) . '.');
-
-        $db->table('player_finances')->where('user_id', $userId)->set('cash', 'cash - ' . $cost, false)->update();
-        $this->staffModel->update($id, ['level' => (int) $member['level'] + 1]);
+        $db->transStart();
+        $db->table('player_finances')->where('user_id', $userId)->where('cash >=', $cost)
+            ->set('cash', 'cash - ' . $cost, false)->set('total_expenses', 'total_expenses + ' . $cost, false)->update();
+        if ($db->affectedRows() !== 1) {
+            $db->transRollback();
+            return redirect()->to('/staff')->with('error', 'Not enough cash: training costs ' . currency($cost) . '.');
+        }
+        // Only raise the level we charged for, so a double submit can't pay twice for one level
+        $db->table('staff')->where('id', $id)->where('level', (int) $member['level'])->set('level', 'level + 1', false)->update();
+        if ($db->affectedRows() !== 1) {
+            $db->transRollback();
+            return redirect()->to('/staff')->with('error', esc($member['name']) . ' was already trained.');
+        }
+        $db->table('financial_transactions')->insert([
+            'user_id' => $userId, 'game_day' => getGameDay(), 'category' => 'Staff', 'description' => 'Trained ' . $member['name'] . ' to level ' . ((int) $member['level'] + 1),
+            'amount' => $cost, 'type' => 'expense', 'created_at' => date('Y-m-d H:i:s'),
+        ]);
+        $db->transComplete();
 
         log_activity($userId, 'Staff', $member['name'] . ' trained to Lv.' . ((int) $member['level'] + 1) . ' for ' . currency($cost), 'fa-solid fa-graduation-cap');
-        return redirect()->to('/staff')->with('success', $member['name'] . ' trained to Lv.' . ((int) $member['level'] + 1) . '! (-' . currency($cost) . ')');
+        return redirect()->to('/staff')->with('success', esc($member['name']) . ' trained to Lv.' . ((int) $member['level'] + 1) . ' for ' . currency($cost) . '.');
     }
 }

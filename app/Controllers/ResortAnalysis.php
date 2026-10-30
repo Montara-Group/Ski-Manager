@@ -170,8 +170,8 @@ class ResortAnalysis extends BaseController
         ];
         if (!$lifts) $add('critical', 'Lifts', 'You have no lifts: skiers need them to reach your slopes. Build one on the trail map.', '/map');
         if ($turnedAway > 0) $add('critical', 'Lifts', number_format($turnedAway) . ' skiers were turned away because your lifts were full. Build another lift or a bigger one.', '/map');
-        if ($brokenLifts) $add('warning', 'Lifts', $brokenLifts . ' lift' . ($brokenLifts === 1 ? ' is' : 's are') . ' broken. Lifts are restored by off-season maintenance.', '/off-season');
-        if ($lifts && !$hasMechanic && $liftCond < 80) $add('info', 'Lifts', 'Lifts wear up to 2% a day. A mechanic cuts that by 1% a day for every lift.', '/staff/hire');
+        if ($brokenLifts) $add('warning', 'Lifts', $brokenLifts . ' lift' . ($brokenLifts === 1 ? ' is' : 's are') . ' broken. Repair ' . ($brokenLifts === 1 ? 'it' : 'them') . ' on the resort page to reopen.', '/resort');
+        if ($lifts && !$hasMechanic && $liftCond < 80) $add('info', 'Lifts', 'Lifts wear up to 2% a day and cost money to repair. A mechanic cuts that by 1% a day for every lift.', '/staff/hire');
 
         // --- Slopes & grooming ---
         $operators = array_values(array_filter($staff, fn($s) => $s['role'] === 'groomer'));

@@ -142,9 +142,11 @@
 
                     <!-- Actions -->
                     <div class="flex gap-1">
-                        <form action="/staff/train/<?= $member['id'] ?>" method="post" class="flex-1" data-confirm="Train <?= esc($member['name']) ?> for <?= currency(5000) ?>? They'll level up."><?= csrf_field() ?>
-                            <button class="btn btn-xs w-full btn-outline btn-info gap-1"><i class="fa-solid fa-graduation-cap"></i>Train</button>
+                        <?php if ((int) $member['level'] < \App\Controllers\Staff::maxUsefulLevel($member['role'])) : $__train = \App\Controllers\Staff::trainCost($member); ?>
+                        <form action="/staff/train/<?= $member['id'] ?>" method="post" class="flex-1" data-confirm="Train <?= esc($member['name']) ?> to Lv.<?= (int) $member['level'] + 1 ?> for <?= currency($__train) ?>? Each level restores a little more slope condition per night."><?= csrf_field() ?>
+                            <button class="btn btn-xs w-full btn-outline btn-info gap-1"><i class="fa-solid fa-graduation-cap"></i>Train <?= currency($__train) ?></button>
                         </form>
+                        <?php else : ?><span class="flex-1"></span><?php endif ?>
                         <form action="/staff/fire/<?= $member['id'] ?>" method="post" data-confirm="Fire <?= esc($member['name']) ?>?"><?= csrf_field() ?>
                             <button class="btn btn-xs btn-ghost text-error"><i class="fa-solid fa-user-minus"></i></button>
                         </form>

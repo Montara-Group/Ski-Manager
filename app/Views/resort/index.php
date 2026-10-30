@@ -144,9 +144,16 @@ $diffColors = ['green' => 'badge-success', 'blue' => 'badge-info', 'red' => 'bad
                                         <?php else : ?><span class="badge badge-info badge-sm">Building</span><?php endif ?>
                                     </td>
                                     <td>
+                                        <?php if ($lift['status'] !== 'broken') : ?>
                                         <form action="/resort/toggle/<?= $lift['id'] ?>" method="post" class="inline"><?= csrf_field() ?>
                                             <button class="btn btn-ghost btn-xs" aria-label="Toggle on/off"><i class="fa-solid fa-power-off" aria-hidden="true"></i></button>
                                         </form>
+                                        <?php endif ?>
+                                        <?php if ((int) $lift['condition_pct'] < 100 && in_array($lift['status'], ['open', 'closed', 'broken'], true)) : $__repair = \App\Controllers\Resort::liftRepairCost($lift); ?>
+                                        <form action="/resort/repair/<?= $lift['id'] ?>" method="post" class="inline" data-confirm="Repair <?= esc($lift['name']) ?> to 100% for <?= currency($__repair) ?>?"><?= csrf_field() ?>
+                                            <button class="btn btn-xs gap-1 <?= $lift['status'] === 'broken' ? 'btn-warning' : 'btn-ghost' ?>" aria-label="Repair <?= esc($lift['name']) ?> for <?= currency($__repair) ?>" title="Repair to 100% (<?= currency($__repair) ?>)"><i class="fa-solid fa-wrench" aria-hidden="true"></i><?= $lift['status'] === 'broken' ? ' ' . currency($__repair) : '' ?></button>
+                                        </form>
+                                        <?php endif ?>
                                         <?php $__salvage = \App\Controllers\ResortMap::salvageValue($lift); ?>
                                         <form action="/map/demolish/<?= $lift['id'] ?>" method="post" class="inline" onsubmit="return confirm('Demolish <?= esc($lift['name'], 'js') ?>? You get <?= esc(currency($__salvage), 'js') ?> back (25% salvage). This can\'t be undone.')"><?= csrf_field() ?>
                                             <button class="btn btn-ghost btn-xs text-error" aria-label="Demolish <?= esc($lift['name']) ?>" title="Demolish (<?= currency($__salvage) ?> refund)"><i class="fa-solid fa-trash-can" aria-hidden="true"></i></button>

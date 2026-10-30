@@ -182,24 +182,24 @@ class Account extends BaseController
         $userId = auth()->id();
         $db = db_connect();
 
-        $tables = [
-            'staff', 'buildings', 'snow_cannons', 'night_skiing', 'equipment',
-            'marketing_campaigns', 'loans', 'regulations', 'insurance', 'achievements',
-            'daily_bonus', 'player_finances', 'financial_transactions', 'activity_log',
-            'lift_tickets', 'ticket_sales', 'player_items', 'genepis', 'genepis_log',
-            'environmental', 'energy_management', 'water_management', 'vip_guests',
-            'tournaments', 'alliance_members', 'alliance_applications', 'resort_reports',
-            'parking', 'terrain_parks', 'scenic_lifts', 'dashboard_widgets', 'tutorial_progress',
-        ];
-
-        foreach ($tables as $table) {
-            try { $db->table($table)->where('user_id', $userId)->delete(); } catch (\Throwable $e) {}
+        // Every table with a user_id column, so tables added later are never missed (a fixed list here
+        // went stale and also named tournaments, which has no user_id). Map segments and the admin
+        // audit log record who made something rather than belong to the player, so they're kept.
+        $keep = ['users', 'map_segments', 'admin_audit_log', 'auth_identities', 'auth_logins', 'auth_remember_tokens'];
+        $tables = array_column($db->query(
+            "SELECT TABLE_NAME AS t FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'user_id'"
+        )->getResultArray(), 't');
+        $db->transStart();
+        foreach (array_diff($tables, $keep) as $table) {
+            $db->table($table)->where('user_id', $userId)->delete();
         }
-
+        $db->table('tournaments')->where('host_id', $userId)->delete();
+        $db->table('resort_likes')->where('resort_user_id', $userId)->delete();
         $db->table('auth_identities')->where('user_id', $userId)->delete();
         $db->table('auth_logins')->where('user_id', $userId)->delete();
         $db->table('auth_remember_tokens')->where('user_id', $userId)->delete();
         $db->table('users')->where('id', $userId)->delete();
+        $db->transComplete();
 
         auth()->logout();
         return redirect()->to('/')->with('message', 'Account deleted successfully.');

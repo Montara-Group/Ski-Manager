@@ -831,11 +831,10 @@ class GameTick extends BaseCommand
             // ==============================
             // UPDATE FINANCES
             // ==============================
+            // Apply the day as a change to the current balance: the cash read at the start may be stale
+            // if the player bought or sold something while the tick was running
             $newCash = $cash + $dayIncome - $dayExpenses;
             $financeUpdate = [
-                'cash' => $newCash,
-                'total_income' => (int) $finance['total_income'] + $dayIncome,
-                'total_expenses' => (int) $finance['total_expenses'] + $dayExpenses,
                 'daily_visitors' => $visitors,
                 'updated_at' => date('Y-m-d H:i:s'),
             ];
@@ -847,7 +846,11 @@ class GameTick extends BaseCommand
                     'other_income' => $dayIncome - $known, 'other_costs' => $dayExpenses - $knownCost,
                 ]);
             }
-            $db->table('player_finances')->where('user_id', $userId)->update($financeUpdate);
+            $db->table('player_finances')->where('user_id', $userId)
+                ->set('cash', 'cash + ' . ((int) $dayIncome - (int) $dayExpenses), false)
+                ->set('total_income', 'total_income + ' . (int) $dayIncome, false)
+                ->set('total_expenses', 'total_expenses + ' . (int) $dayExpenses, false)
+                ->update($financeUpdate);
 
             // ==============================
             // FINANCIAL TRANSACTIONS LOG

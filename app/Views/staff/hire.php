@@ -113,7 +113,7 @@ $hireForm = function (string $key, array $r, string $btn) {
             <li>Salaries are paid every night, whether or not the staff member has work.</li>
             <li>Most roles only help while assigned to a post (a slope, lift, building, snow gun or park).</li>
             <li>Morale drops a little every day; working staff lose less than idle ones. Below 10% they may quit.</li>
-            <li>Training raises a level. For groomer operators each level restores a little more slope condition per night.</li>
+            <li>Only groomer operators get better with training: each level restores a little more slope condition per night, up to level <?= \App\Controllers\Staff::maxUsefulLevel('groomer') ?>.</li>
         </ul>
     </details>
 </div>

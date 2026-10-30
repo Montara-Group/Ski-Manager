@@ -231,6 +231,7 @@ $routes->post('/night-skiing/sell/(:num)', 'NightSkiing::sell/$1');
 $routes->post("/night-skiing/toggle-all", "NightSkiing::toggleAll");
 $routes->post('/night-skiing/toggle/(:num)', 'NightSkiing::toggle/$1');
 $routes->post('/resort/toggle/(:num)', 'Resort::toggleItem/$1');
+$routes->post('/resort/repair/(:num)', 'Resort::repairLift/$1');
 $routes->post("/resort/open-all", "Resort::openAll");
 $routes->post("/resort/close-all", "Resort::closeAll");
 $routes->post('/scenic-lifts/designate', 'ScenicLifts::designate');
