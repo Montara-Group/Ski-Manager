@@ -1,3 +1,11 @@
+## Release 2026-10-30 03:03
+
+* Fix lift repairs, tick cash races, staff training and account deletion (c79b6fd)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (6dcc210)
+* Redesign the hire page around what the resort needs (213e4ae)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (f7117f4)
+* Show what each hire actually does and start new hires on a free post (d2b2359)
+
 ## Release 2026-10-30 02:41
 
 * Redesign the hire page around what the resort needs (213e4ae)
