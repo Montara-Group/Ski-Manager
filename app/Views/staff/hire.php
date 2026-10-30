@@ -2,82 +2,136 @@
 <?= $this->section('title') ?>Hire Staff<?= $this->endSection() ?>
 <?= $this->section('content') ?>
 <?php
-$categories = [
-    'Slopes & lifts' => ['groomer', 'mechanic', 'ski_patrol', 'medic', 'snowmaker', 'park_crew'],
-    'Guests & buildings' => ['instructor', 'chef', 'receptionist', 'manager'],
+$groups = [
+    'slopes' => ['Slopes & lifts', ['groomer', 'mechanic', 'ski_patrol', 'medic', 'snowmaker', 'park_crew']],
+    'guests' => ['Guests & buildings', ['instructor', 'chef', 'receptionist', 'manager']],
 ];
 $verdicts = [
-    'needed' => ['badge-error', 'Needed'], 'useful' => ['badge-success', 'Useful'],
-    'enough' => ['badge-ghost', 'Enough for now'], 'none' => ['badge-ghost', 'No post yet'],
+    'needed' => ['badge-error', 'Needed', 'fa-circle-exclamation text-error'],
+    'useful' => ['badge-success', 'Useful', 'fa-circle-check text-success'],
+    'enough' => ['badge-ghost', 'Enough for now', 'fa-circle-minus text-base-content/60'],
+    'none' => ['badge-ghost', 'No post yet', 'fa-lock text-base-content/60'],
 ];
+$groupOf = [];
+foreach ($groups as $g => [, $keys]) foreach ($keys as $k) $groupOf[$k] = $g;
 $needed = array_filter($roles, fn($r) => $r['verdict'] === 'needed');
+$useful = array_filter($roles, fn($r) => $r['verdict'] === 'useful');
+$hireForm = function (string $key, array $r, string $btn) {
+    $warn = in_array($r['verdict'], ['enough', 'none'], true) ? ' ' . esc($r['why']) : '';
+    return '<form action="/staff/hire" method="post" data-confirm="Hire a ' . esc($r['name']) . ' for ' . currency($r['daily']) . ' a day?' . $warn . '">'
+        . csrf_field() . '<input type="hidden" name="role" value="' . esc($key, 'attr') . '">'
+        . '<button class="btn btn-sm gap-1 ' . $btn . '"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Hire</button></form>';
+};
 ?>
 <div class="max-w-5xl mx-auto p-4 lg:p-8">
+
+    <!-- Header -->
     <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div class="flex items-center gap-3">
             <a href="/staff" class="btn btn-ghost btn-sm btn-circle" aria-label="Back to staff"><i class="fa-solid fa-chevron-left"></i></a>
             <div>
-                <h1 class="text-2xl font-bold"><i class="fa-solid fa-user-plus mr-2 text-primary" aria-hidden="true"></i>Hire staff</h1>
-                <p class="text-sm text-base-content/60">No hiring fee: you pay a daily salary from tonight. New hires start at level 1 on the first free post.</p>
+                <h1 class="text-2xl font-bold">Hire staff</h1>
+                <p class="text-sm text-base-content/60">No hiring fee. You pay a daily salary from tonight.</p>
             </div>
         </div>
-        <div class="text-sm text-right">
-            <div>Cash <span class="font-bold <?= $cash < 0 ? 'text-error' : 'text-success' ?>"><?= currency($cash) ?></span></div>
-            <div class="text-base-content/60"><?= $staffCount ?> staff · <?= currency($payroll) ?>/day</div>
-        </div>
+        <dl class="flex gap-5 text-sm">
+            <div><dt class="text-xs text-base-content/60">Cash</dt><dd class="font-bold <?= $cash < 0 ? 'text-error' : '' ?>"><?= currency($cash) ?></dd></div>
+            <div><dt class="text-xs text-base-content/60">Staff</dt><dd class="font-bold"><?= $staffCount ?></dd></div>
+            <div><dt class="text-xs text-base-content/60">Salaries</dt><dd class="font-bold"><?= currency($payroll) ?>/day</dd></div>
+        </dl>
     </div>
 
-    <?php if (session('success')) : ?><div class="alert alert-success mb-4" role="status"><span><?= session('success') ?></span></div><?php endif ?>
+    <?php if (session('success')) : ?><div class="alert alert-success mb-4" role="status"><i class="fa-solid fa-user-check" aria-hidden="true"></i><span><?= session('success') ?></span></div><?php endif ?>
     <?php if (session('error')) : ?><div class="alert alert-error mb-4" role="alert"><span><?= esc(session('error')) ?></span></div><?php endif ?>
 
-    <?php if ($needed) : ?>
-    <div class="alert alert-warning mb-4">
-        <i class="fa-solid fa-user-clock" aria-hidden="true"></i>
-        <span><b>Your resort needs:</b> <?= esc(implode(', ', array_map(fn($r) => $r['name'], $needed))) ?>.</span>
-    </div>
-    <?php endif ?>
-
-    <?php foreach ($categories as $catName => $keys) : ?>
-    <section class="mb-6" aria-labelledby="cat-<?= md5($catName) ?>">
-        <h2 id="cat-<?= md5($catName) ?>" class="text-sm font-semibold text-base-content/60 uppercase tracking-wider mb-3"><?= $catName ?></h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <?php foreach ($keys as $key) : if (!isset($roles[$key])) continue; $r = $roles[$key]; [$badge, $label] = $verdicts[$r['verdict']]; $dim = in_array($r['verdict'], ['enough', 'none'], true); ?>
-            <div class="card bg-base-100 shadow-sm <?= $r['verdict'] === 'needed' ? 'border border-error/40' : '' ?>"><div class="card-body p-4 gap-2">
-                <div class="flex items-start gap-3">
-                    <div class="w-12 h-12 rounded-xl bg-base-200 flex items-center justify-center shrink-0"><i class="<?= esc($r['icon'], 'attr') ?> text-xl <?= esc($r['color'], 'attr') ?>" aria-hidden="true"></i></div>
+    <!-- What the resort needs -->
+    <section class="card bg-base-100 shadow-sm mb-6" aria-labelledby="needs-h"><div class="card-body p-5">
+        <h2 id="needs-h" class="font-bold mb-1"><?= $needed ? 'Your resort needs' : 'Every key post is covered' ?></h2>
+        <?php if (!$needed) : ?>
+            <p class="text-sm text-base-content/70"><?= $useful ? 'Nothing is urgent. ' . count($useful) . ' role' . (count($useful) === 1 ? ' would' : 's would') . ' still help: see below.' : 'Nothing is missing right now. Build more (slopes, buildings, machines) to open new posts.' ?></p>
+        <?php else : ?>
+            <ul class="divide-y divide-base-300">
+            <?php foreach ($needed as $key => $r) : ?>
+                <li class="flex flex-wrap items-center gap-3 py-2">
+                    <div class="w-10 h-10 rounded-lg bg-error/10 flex items-center justify-center shrink-0"><i class="<?= esc($r['icon'], 'attr') ?> text-lg <?= esc($r['color'], 'attr') ?>" aria-hidden="true"></i></div>
                     <div class="flex-1 min-w-0">
-                        <div class="flex items-center justify-between gap-2">
-                            <h3 class="font-bold"><?= esc($r['name']) ?></h3>
-                            <span class="badge badge-sm <?= $badge ?> shrink-0"><?= $label ?></span>
-                        </div>
-                        <p class="text-sm text-base-content/80 mt-1"><?= esc($r['effect']) ?></p>
+                        <div class="font-semibold"><?= esc($r['name']) ?></div>
+                        <div class="text-sm text-base-content/70"><?= esc($r['why']) ?></div>
                     </div>
-                </div>
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-base-content/60">
-                    <span>You have <b class="text-base-content"><?= $r['have'] ?></b><?= $r['have'] ? ' (' . $r['assigned'] . ' working)' : '' ?></span>
-                    <?php if ($key !== 'manager') : ?><span><?= $r['posts'] ?> post<?= $r['posts'] === 1 ? '' : 's' ?></span><?php endif ?>
-                    <span class="<?= $r['verdict'] === 'needed' ? 'text-error' : '' ?>"><?= esc($r['why']) ?></span>
-                </div>
-                <form action="/staff/hire" method="post" class="flex items-center justify-between gap-2 border-t border-base-300 pt-2 mt-1"
-                      data-confirm="Hire a <?= esc($r['name']) ?> for <?= currency($r['daily']) ?> a day?<?= $dim ? ' ' . esc($r['why']) : '' ?>"><?= csrf_field() ?>
-                    <input type="hidden" name="role" value="<?= esc($key) ?>">
-                    <span class="font-bold"><?= currency($r['daily']) ?><span class="font-normal text-xs text-base-content/60">/day</span></span>
-                    <button class="btn btn-sm gap-1 <?= $dim ? 'btn-ghost' : 'btn-primary' ?>"><i class="fa-solid fa-user-plus" aria-hidden="true"></i> Hire</button>
-                </form>
-            </div></div>
-        <?php endforeach ?>
-        </div>
-    </section>
-    <?php endforeach ?>
+                    <span class="text-sm font-semibold"><?= currency($r['daily']) ?><span class="font-normal text-base-content/60">/day</span></span>
+                    <?= $hireForm($key, $r, 'btn-primary') ?>
+                </li>
+            <?php endforeach ?>
+            </ul>
+        <?php endif ?>
+    </div></section>
 
-    <details class="card bg-base-100 shadow-sm">
+    <!-- Filters -->
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 class="text-lg font-bold">All roles</h2>
+        <div class="min-w-0 overflow-x-auto"><div class="join" role="group" aria-label="Filter roles">
+            <?php foreach (['all' => 'All', 'useful' => 'Worth hiring', 'slopes' => 'Slopes & lifts', 'guests' => 'Guests & buildings'] as $f => $label) : ?>
+            <button type="button" class="btn btn-sm join-item role-filter <?= $f === 'all' ? 'btn-primary' : '' ?>" data-filter="<?= $f ?>" aria-pressed="<?= $f === 'all' ? 'true' : 'false' ?>"><?= $label ?></button>
+            <?php endforeach ?>
+        </div></div>
+    </div>
+
+    <!-- Role cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="roleGrid">
+    <?php foreach ($groups as $g => [, $keys]) : foreach ($keys as $key) : if (!isset($roles[$key])) continue;
+        $r = $roles[$key]; [$badge, $label, $icon] = $verdicts[$r['verdict']]; $dim = in_array($r['verdict'], ['enough', 'none'], true); ?>
+        <article class="role-card card bg-base-100 shadow-sm <?= $r['verdict'] === 'needed' ? 'border border-error/40' : '' ?>"
+                 data-group="<?= $g ?>" data-worth="<?= $dim ? '0' : '1' ?>"><div class="card-body p-4 gap-3">
+            <div class="flex items-start gap-3">
+                <div class="w-12 h-12 rounded-xl bg-base-200 flex items-center justify-center shrink-0 <?= $dim ? 'opacity-50' : '' ?>"><i class="<?= esc($r['icon'], 'attr') ?> text-xl <?= esc($r['color'], 'attr') ?>" aria-hidden="true"></i></div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="font-bold"><?= esc($r['name']) ?></h3>
+                        <span class="badge badge-sm <?= $badge ?> shrink-0"><?= $label ?></span>
+                    </div>
+                    <p class="text-sm text-base-content/80 mt-1"><?= esc($r['effect']) ?></p>
+                </div>
+            </div>
+            <p class="text-xs flex items-start gap-1.5 <?= $r['verdict'] === 'needed' ? 'text-error' : 'text-base-content/70' ?>"><i class="fa-solid <?= $icon ?> mt-0.5" aria-hidden="true"></i><span><?= esc($r['why']) ?></span></p>
+            <div class="flex items-center justify-between gap-2 border-t border-base-300 pt-3">
+                <dl class="flex gap-4 text-xs">
+                    <div><dt class="text-base-content/60">Salary</dt><dd class="font-semibold"><?= currency($r['daily']) ?>/day</dd></div>
+                    <div><dt class="text-base-content/60">You have</dt><dd class="font-semibold"><?= $r['have'] ?><?= $r['have'] ? ' (' . $r['assigned'] . ' working)' : '' ?></dd></div>
+                    <?php if ($key !== 'manager') : ?><div><dt class="text-base-content/60">Posts</dt><dd class="font-semibold"><?= $r['posts'] ?></dd></div><?php endif ?>
+                </dl>
+                <?= $hireForm($key, $r, $dim ? 'btn-ghost' : 'btn-primary') ?>
+            </div>
+        </div></article>
+    <?php endforeach; endforeach ?>
+    </div>
+    <p id="roleEmpty" class="text-sm text-base-content/60 text-center py-6" hidden>No roles would help right now.</p>
+
+    <details class="card bg-base-100 shadow-sm mt-6">
         <summary class="card-body p-4 cursor-pointer font-semibold text-sm">How staff work</summary>
         <ul class="px-4 pb-4 text-sm text-base-content/80 space-y-1 list-disc pl-9">
+            <li>New hires start at level 1 on the first free post for their role. Reassign them on the <a href="/staff" class="link link-primary">staff page</a>.</li>
             <li>Salaries are paid every night, whether or not the staff member has work.</li>
-            <li>Most roles only help while assigned to a post (a slope, lift, building, snow gun or park). Assign or reassign them on the <a href="/staff" class="link link-primary">staff page</a>.</li>
+            <li>Most roles only help while assigned to a post (a slope, lift, building, snow gun or park).</li>
             <li>Morale drops a little every day; working staff lose less than idle ones. Below 10% they may quit.</li>
             <li>Training raises a level. For groomer operators each level restores a little more slope condition per night.</li>
         </ul>
     </details>
 </div>
+
+<script>
+(function () {
+    var buttons = document.querySelectorAll('.role-filter'), cards = document.querySelectorAll('.role-card'), empty = document.getElementById('roleEmpty');
+    buttons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var f = btn.dataset.filter, shown = 0;
+            buttons.forEach(function (b) { var on = b === btn; b.classList.toggle('btn-primary', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+            cards.forEach(function (c) {
+                var show = f === 'all' || (f === 'useful' ? c.dataset.worth === '1' : c.dataset.group === f);
+                c.hidden = !show; if (show) shown++;
+            });
+            empty.hidden = shown > 0;
+        });
+    });
+})();
+</script>
 <?= $this->endSection() ?>

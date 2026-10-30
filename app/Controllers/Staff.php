@@ -94,7 +94,7 @@ class Staff extends BaseController
                 'have' => count($mine), 'assigned' => $assigned, 'idle' => count($mine) - $assigned, 'posts' => $posts, 'free' => max(0, $posts - $assigned)];
             [$r['verdict'], $r['why']] = match (true) {
                 $key === 'groomer' => $groomers === 0 ? ['none', 'Buy a groomer first.'] : (count($mine) < $groomers
-                    ? ['needed', ($groomers - count($mine)) . ' of your ' . $groomers . ' groomers ' . ($groomers - count($mine) === 1 ? 'has' : 'have') . ' no driver.']
+                    ? ['needed', $groomers === 1 ? 'Your groomer has no driver.' : ($groomers - count($mine)) . ' of your ' . $groomers . ' groomers ' . ($groomers - count($mine) === 1 ? 'has' : 'have') . ' no driver.']
                     : ['enough', 'Every groomer has a driver.']),
                 $key === 'mechanic' => $lifts === 0 ? ['none', 'Build a lift first.'] : ($assigned > 0 ? ['enough', 'One mechanic already covers all your lifts.'] : ['needed', 'Your lifts wear faster without one.']),
                 in_array($key, ['receptionist', 'chef'], true) => $posts === 0 ? ['none', 'Build a ' . ($key === 'chef' ? 'restaurant' : 'hotel') . ' first.']
