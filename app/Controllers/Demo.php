@@ -117,7 +117,7 @@ class Demo extends BaseController
             'units'             => 'metric',
             'daily_visitors'    => 480,
             'difficulty'        => 'standard',
-            'allow_tours'       => 1,
+            'allow_tours'       => featureEnabled('demo_v2') ? 0 : 1,
             'resort_map'        => 'ParkCity',
             'profile_completed' => 1,
             'total_income'      => 0,
@@ -424,6 +424,9 @@ class Demo extends BaseController
                 'secret2'    => password_hash($password, PASSWORD_DEFAULT),
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
+
+            // Demos are closed to tours; a saved resort is open by default, like any other
+            $db->table('player_finances')->where('user_id', $userId)->update(['allow_tours' => 1]);
 
             $db->transCommit();
         } catch (\Throwable $e) {

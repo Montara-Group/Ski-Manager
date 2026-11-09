@@ -102,10 +102,12 @@ class Home extends BaseController
     {
         $db = db_connect();
 
-        $playerCount = $db->table('users')->where('id !=', 1)->countAllResults(false);
+        // Demo guests aren't players yet, so they don't count (flag: demo_v2)
+        $notDemo = featureEnabled('demo_v2') ? " AND (u.status IS NULL OR u.status <> 'demo')" : '';
+        $playerCount = (int) $db->query("SELECT COUNT(*) AS n FROM users u WHERE u.id != 1{$notDemo}")->getRow()->n;
         $totalSlopes = $db->table('player_items')->where('item_type', 'slope')->countAllResults(false);
         $topPlayer = $db->query(
-            "SELECT u.username, pf.cash FROM player_finances pf JOIN users u ON u.id = pf.user_id WHERE u.id != 1 ORDER BY pf.cash DESC LIMIT 1"
+            "SELECT u.username, pf.cash FROM player_finances pf JOIN users u ON u.id = pf.user_id WHERE u.id != 1{$notDemo} ORDER BY pf.cash DESC LIMIT 1"
         )->getRowArray();
         $weather = getCurrentWeather();
 

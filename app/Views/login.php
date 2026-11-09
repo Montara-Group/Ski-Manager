@@ -7,7 +7,11 @@
 $weather = function_exists('getCurrentWeather') ? getCurrentWeather() : null;
 $season = function_exists('getSeasonNumber') ? (int) getSeasonNumber() : 1;
 $seasonDay = !empty($weather['game_day']) ? (int) $weather['game_day'] : null;
-$players = db_connect()->table('users')->where('id !=', 1)->countAllResults();
+$__playersQuery = db_connect()->table('users')->where('id !=', 1);
+if (featureEnabled('demo_v2')) {
+    $__playersQuery->groupStart()->where('status IS NULL')->orWhere('status !=', 'demo')->groupEnd();
+}
+$players = $__playersQuery->countAllResults();
 
 $page = [
     'actionUrl' => url_to('login'),

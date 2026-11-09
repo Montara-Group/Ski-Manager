@@ -14,6 +14,9 @@ class Tour extends BaseController
 
         $owner = $db->table('users')->where('id', $userId)->get()->getRowArray();
         if (!$owner) return redirect()->to('/leaderboard')->with('error', 'Player not found.');
+        if (($owner['status'] ?? '') === 'demo' && featureEnabled('demo_v2')) {
+            return redirect()->to('/leaderboard')->with('error', 'This resort is not open for tours.');
+        }
 
         $items = $db->table('player_items')->where('user_id', $userId)->get()->getResultArray();
         $slopes = array_filter($items, fn($i) => $i['item_type'] === 'slope');
