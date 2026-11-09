@@ -194,7 +194,7 @@ export function createMapEngine(props: ResortMapProps, callbacks: MapEngineCallb
     ];
 
     map = L.map(container, {
-      crs: L.CRS.Simple,
+      crs: L.SimpleCRS || (L.CRS && L.CRS.Simple),
       minZoom: -3,
       maxZoom: 4,
       zoomSnap: 0.25,
@@ -225,7 +225,7 @@ export function createMapEngine(props: ResortMapProps, callbacks: MapEngineCallb
     map.zoomControl?.getContainer()?.addEventListener('click', markMoved);
 
     // Map Event Listeners for Editor
-    map.on('mousemove', (e: any) => {
+    map.on('pointermove', (e: any) => {
       if (!editorMode) return;
       const isAppending =
         editorMode === 'draw' || editorMode === 'sector_boundary' || (editorMode === 'edit' && appendInEditMode);
@@ -497,14 +497,14 @@ export function createMapEngine(props: ResortMapProps, callbacks: MapEngineCallb
 
       hitLine.bindTooltip(tooltipHtml, { sticky: true });
 
-      hitLine.on('mouseover', () => {
+      hitLine.on('pointerover', () => {
         if (editorMode) return;
         if (!selectedSegId || String(selectedSegId) !== String(seg.id)) {
           line.setStyle({ weight: weight + 3, opacity: 1 });
         }
       });
 
-      hitLine.on('mouseout', () => {
+      hitLine.on('pointerout', () => {
         if (editorMode) return;
         if (!selectedSegId || String(selectedSegId) !== String(seg.id)) {
           line.setStyle({ weight, opacity });
