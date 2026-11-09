@@ -209,6 +209,9 @@ $routes->group('api/v1/app', ['namespace' => 'App\Controllers\Api\V1\App'], stat
         $routes->post('equipment/repair/(:num)', 'Equipment::repairAction/$1');
         $routes->post('equipment/(:num)/sell', 'Equipment::sellAction/$1');
         $routes->post('equipment/sell/(:num)', 'Equipment::sellAction/$1');
+        $routes->get('achievements', 'Achievements::show');
+        $routes->post('achievements/claim/(:num)', 'Achievements::claimAction/$1');
+        $routes->post('achievements/claim-all', 'Achievements::claimAllAction');
         $routes->post('account/delete', 'Account::delete');
     });
 });

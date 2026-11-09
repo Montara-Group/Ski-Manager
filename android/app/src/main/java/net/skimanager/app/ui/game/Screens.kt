@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.ConfirmationNumber
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Leaderboard
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Settings
@@ -365,6 +366,7 @@ private fun DeleteAccountDialog(app: AppState, onClose: () -> Unit) {
 private data class MoreItem(val route: String, val label: String, val icon: ImageVector, val subtitle: String)
 
 private val MORE_ITEMS = listOf(
+    MoreItem("achievements", "Achievements", Icons.Default.EmojiEvents, "Progress, rewards and unlocked features"),
     MoreItem("buildings", "Buildings", Icons.Default.Storefront, "Hotels, restaurants, rentals and patrol"),
     MoreItem("bank", "Bank & Loans", Icons.Default.AccountBalance, "Borrow capital and manage debt"),
     MoreItem("equipment", "Equipment", Icons.Default.Build, "Snowcats, snow guns and maintenance"),

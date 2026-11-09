@@ -13,6 +13,11 @@ class Achievements extends BaseController
     public function index()
     {
         if (!auth()->loggedIn()) return redirect()->to('/login');
+        return view('achievements/index', ['page' => $this->pageData()]);
+    }
+
+    public function pageData(): array
+    {
         $userId = auth()->id();
         Rules::sync($userId, false);
 
@@ -58,6 +63,7 @@ class Achievements extends BaseController
                     'id' => (int) $a['id'], 'name' => (string) $a['name'], 'description' => (string) $a['description'],
                     'icon' => preg_match('/^[a-z0-9 -]+$/i', (string) $a['icon']) ? (string) $a['icon'] : 'fa-solid fa-award',
                     'reward' => (int) $a['reward_amount'] ? currency((int) $a['reward_amount']) : null,
+                    'reward_amount' => (int) $a['reward_amount'],
                     'state' => $a['state'], 'pct' => $a['pct'],
                     'progress' => $fmt($a, $a['progress']) . ' / ' . $fmt($a, $a['target']),
                     'unlocks' => $a['unlocks'],
@@ -65,7 +71,7 @@ class Achievements extends BaseController
             ];
         }
 
-        return view('achievements/index', ['page' => [
+        return [
             'completed' => $completed,
             'total' => count($rows),
             'readyCount' => count($ready),
@@ -73,7 +79,8 @@ class Achievements extends BaseController
             'earned' => currency(array_sum(array_map(fn($a) => $a['claimed'] ? (int) $a['reward_amount'] : 0, $rows))),
             'lockedFeatures' => getDifficulty() === 'easy' ? [] : $lockedFeatures,
             'groups' => $list,
-        ]]);
+        ];
+    }
     }
 
     public function claim(int $id)
