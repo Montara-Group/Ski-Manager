@@ -33,7 +33,7 @@ Based on what this version of the app does. Check them against the current code 
 
 The server also logs IP addresses for rate limits and security, and the website has its own analytics. Check whether your privacy policy covers both.
 
-**Account deletion URL** for the form: `https://ski-manager.net/settings`. It requires signing in.
+**Account deletion URL** for the form: `https://ski-manager.net/privacy` (Publicly accessible without sign-in, as required by Google Play policy; section 4 details erasure and in-app deletion via Settings > Delete account).
 
 **Privacy policy URL:** `https://ski-manager.net/privacy`
 
