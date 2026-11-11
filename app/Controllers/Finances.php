@@ -77,8 +77,8 @@ class Finances extends BaseController
         $rentals = $db->table('buildings')->where('user_id', $userId)->where('building_type', 'rental')->where('status', 'open')->get()->getResultArray();
         foreach ($rentals as $r) { $rentalIncome += (int) ($r['revenue_per_day'] ?? 0); }
 
-        // Economy v2: last tick's real ticket revenue, and buildings earn by how full they were
-        $lastTick = featureEnabled('economy_v2') ? json_decode((string) ($visitors['last_tick'] ?? ''), true) : null;
+        // Last tick's real ticket revenue, and buildings earn by how full they were
+        $lastTick = json_decode((string) ($visitors['last_tick'] ?? ''), true) ?: null;
         if ($lastTick) {
             $ticketIncome = (int) ($lastTick['tickets'] ?? 0);
             $occ = $lastTick['occupancy'] ?? [];
@@ -95,8 +95,8 @@ class Finances extends BaseController
         $equip = $db->table('equipment')->where('user_id', $userId)->where('status', 'active')->get()->getResultArray();
         foreach ($equip as $e) { $equipmentCost += (int) ($e['fuel_cost'] ?? $e['daily_cost'] ?? 0); }
 
-        // Totals as the old view worked them out: the rows above are estimates; with economy v2 the
-        // last tick's real totals win and what the rows don't cover shows as "other"
+        // Totals as the old view worked them out: the rows above are estimates; once there's been a
+        // tick, its real totals win and what the rows don't cover shows as "other"
         $totalIncome = $ticketIncome + $hotelIncome + $restaurantIncome + $rentalIncome;
         $totalExpenses = $totalDailyExpenses + $equipmentCost + $loanPayments;
         $otherIncome = $liftSlopeRunning = $otherCosts = null;
