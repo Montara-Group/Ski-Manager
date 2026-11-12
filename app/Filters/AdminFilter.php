@@ -14,6 +14,12 @@ class AdminFilter implements FilterInterface
             return redirect()->to('/login')->with('error', 'Please log in to access the administration sector.');
         }
 
+        // An admin impersonating a player is signed in as that player; let them back out.
+        // admin_original_id is only ever set by Admin::impersonate(), which requires an admin.
+        if (trim($request->getUri()->getPath(), '/') === 'admin/stop-impersonate' && session()->has('admin_original_id')) {
+            return;
+        }
+
         $user = auth()->user();
         $isAdmin = auth()->id() === 1 || ($user && $user->inGroup('admin', 'superadmin'));
 

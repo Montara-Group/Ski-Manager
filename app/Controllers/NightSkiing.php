@@ -113,23 +113,13 @@ class NightSkiing extends BaseController
         $cost = (int) $t['cost'];
         $db = db_connect();
 
-        $finance = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
-        if ((int) ($finance['cash'] ?? 0) < $cost) {
-            return redirect()->back()->with('error', 'Not enough cash to install ' . $t['name'] . ' (' . currency($cost) . ' required).');
-        }
-
         $count = $this->lightModel->where('user_id', $userId)->countAllResults();
 
         $db->transStart();
-        if ($cost > 0) {
-            $db->table('player_finances')->where('user_id', $userId)->set('cash', "cash - {$cost}", false)->update();
-            $startDate = getSeasonStartDate();
-            $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
-            $db->table('financial_transactions')->insert([
-                'user_id' => $userId, 'game_day' => $gameDay,
-                'category' => 'Night Skiing', 'description' => 'Installed ' . $t['name'],
-                'amount' => $cost, 'type' => 'expense', 'created_at' => date('Y-m-d H:i:s'),
-            ]);
+        // One atomic debit (only if the cash is there), so two quick clicks can't both spend it
+        if (!\App\Libraries\Ledger::charge((int) $userId, $cost, 'Night Skiing', 'Installed ' . $t['name'])) {
+            $db->transComplete();
+            return redirect()->back()->with('error', 'Not enough cash to install ' . $t['name'] . ' (' . currency($cost) . ' required).');
         }
 
         $this->lightModel->insert([
@@ -175,19 +165,13 @@ class NightSkiing extends BaseController
 
         $cost = 2000;
         $db = db_connect();
-        $finance = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
-        if ((int)($finance['cash'] ?? 0) < $cost) return redirect()->back()->with('error', 'Not enough cash for repair.');
 
         $db->transStart();
-        $db->table('player_finances')->where('user_id', $userId)->set('cash', 'cash - ' . $cost, false)->update();
+        if (!\App\Libraries\Ledger::charge((int) $userId, $cost, 'Night Skiing', 'Repaired ' . $light['light_name'])) {
+            $db->transComplete();
+            return redirect()->back()->with('error', 'Not enough cash for repair.');
+        }
         $this->lightModel->update($id, ['condition_pct' => 100, 'status' => 'off']);
-        $startDate = getSeasonStartDate();
-        $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
-        $db->table('financial_transactions')->insert([
-            'user_id' => $userId, 'game_day' => $gameDay,
-            'category' => 'Night Skiing', 'description' => 'Repaired ' . $light['light_name'],
-            'amount' => $cost, 'type' => 'expense', 'created_at' => date('Y-m-d H:i:s'),
-        ]);
         $db->transComplete();
 
         log_activity($userId, 'Night Skiing', 'Repaired ' . $light['light_name'] . ' for ' . currency($cost), 'fa-solid fa-wrench');
@@ -213,17 +197,13 @@ class NightSkiing extends BaseController
         $db = db_connect();
 
         $db->transStart();
-        $this->lightModel->delete($id);
-        if ($refund > 0) {
-            $db->table('player_finances')->where('user_id', $userId)->set('cash', "cash + {$refund}", false)->update();
-            $startDate = getSeasonStartDate();
-            $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
-            $db->table('financial_transactions')->insert([
-                'user_id' => $userId, 'game_day' => $gameDay,
-                'category' => 'Night Skiing', 'description' => 'Removed ' . $light['light_name'] . ' (Salvage Refund)',
-                'amount' => $refund, 'type' => 'income', 'created_at' => date('Y-m-d H:i:s'),
-            ]);
+        // Refund only if this request removed the light, so a double click can't pay twice
+        $db->table('night_skiing')->where('id', $id)->where('user_id', $userId)->delete();
+        if ($db->affectedRows() !== 1) {
+            $db->transComplete();
+            return redirect()->back()->with('error', 'Light not found.');
         }
+        \App\Libraries\Ledger::credit((int) $userId, $refund, 'Night Skiing', 'Removed ' . $light['light_name'] . ' (Salvage Refund)');
         $db->transComplete();
 
         log_activity($userId, 'Night Skiing', 'Removed ' . $light['light_name'] . ' for ' . currency($refund) . ' salvage', 'fa-solid fa-trash');

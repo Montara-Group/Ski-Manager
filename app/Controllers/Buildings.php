@@ -302,23 +302,13 @@ class Buildings extends BaseController
         $cost = (int) ($lvl['cost'] ?? 0);
         $db = db_connect();
 
-        $fin = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
-        if ((int) ($fin['cash'] ?? 0) < $cost) {
-            return redirect()->back()->with('error', 'Not enough cash to construct ' . $lvl['name'] . ' (' . currency($cost) . ' required).');
-        }
-
         $count = $this->model->where('user_id', $userId)->where('building_type', $type)->countAllResults();
 
         $db->transStart();
-        if ($cost > 0) {
-            $db->table('player_finances')->where('user_id', $userId)->set('cash', "cash - {$cost}", false)->update();
-            $startDate = getSeasonStartDate();
-            $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
-            $db->table('financial_transactions')->insert([
-                'user_id' => $userId, 'game_day' => $gameDay,
-                'category' => 'Buildings', 'description' => 'Constructed ' . $lvl['name'],
-                'amount' => $cost, 'type' => 'expense', 'created_at' => date('Y-m-d H:i:s'),
-            ]);
+        // One atomic debit (only if the cash is there), so two quick clicks can't both spend it
+        if (!\App\Libraries\Ledger::charge((int) $userId, $cost, 'Buildings', 'Constructed ' . $lvl['name'])) {
+            $db->transComplete();
+            return redirect()->back()->with('error', 'Not enough cash to construct ' . $lvl['name'] . ' (' . currency($cost) . ' required).');
         }
 
         $this->model->insert([
@@ -373,29 +363,26 @@ class Buildings extends BaseController
         $cost = (int) ($next['cost'] ?? 0);
         $db = db_connect();
 
-        $fin = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
-        if ((int) ($fin['cash'] ?? 0) < $cost) {
+        // Keep the building's own number: "Ski Lodge #3" becomes "Boutique Hotel #3"
+        $num = preg_match('/#(\d+)\s*$/', (string) $building['name'], $m) ? $m[1] : '1';
+
+        $db->transBegin();
+        if (!\App\Libraries\Ledger::charge((int) $userId, $cost, 'Buildings', 'Upgraded ' . $building['name'] . ' to Lv.' . $nextLevel)) {
+            $db->transRollback();
             return redirect()->back()->with('error', 'Not enough cash to upgrade ' . $building['name'] . ' (' . currency($cost) . ' required).');
         }
-
-        $db->transStart();
-        if ($cost > 0) {
-            $db->table('player_finances')->where('user_id', $userId)->set('cash', "cash - {$cost}", false)->update();
-            $startDate = getSeasonStartDate();
-            $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
-            $db->table('financial_transactions')->insert([
-                'user_id' => $userId, 'game_day' => $gameDay,
-                'category' => 'Buildings', 'description' => 'Upgraded ' . $building['name'] . ' to Lv.' . $nextLevel,
-                'amount' => $cost, 'type' => 'expense', 'created_at' => date('Y-m-d H:i:s'),
-            ]);
-        }
-
-        $this->model->update($id, [
+        // Only from the level we read: a second request for the same upgrade changes nothing and is refunded by the rollback
+        $db->table('buildings')->where('id', $id)->where('user_id', $userId)->where('level', (int) $building['level'])->update([
             'level' => $nextLevel, 'capacity' => $next['capacity'],
             'revenue_per_day' => $next['revenue'], 'upkeep_per_day' => $next['upkeep'],
-            'name' => $next['name'] . ' #' . substr($building['name'], -2),
+            'name' => $next['name'] . ' #' . $num,
+            'updated_at' => date('Y-m-d H:i:s'),
         ]);
-        $db->transComplete();
+        if ($db->affectedRows() !== 1) {
+            $db->transRollback();
+            return redirect()->back()->with('error', $building['name'] . ' was already upgraded.');
+        }
+        $db->transCommit();
         clearResortRatingCache($userId);
 
         log_activity($userId, 'Building', 'Upgraded ' . $building['name'] . ' to Lv.' . $nextLevel . ' for ' . currency($cost), 'fa-solid fa-arrow-up');
@@ -419,17 +406,13 @@ class Buildings extends BaseController
         $db = db_connect();
 
         $db->transStart();
-        $this->model->delete($id);
-        if ($refund > 0) {
-            $db->table('player_finances')->where('user_id', $userId)->set('cash', "cash + {$refund}", false)->update();
-            $startDate = getSeasonStartDate();
-            $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
-            $db->table('financial_transactions')->insert([
-                'user_id' => $userId, 'game_day' => $gameDay,
-                'category' => 'Buildings', 'description' => 'Demolished ' . $building['name'] . ' (Salvage Refund)',
-                'amount' => $refund, 'type' => 'income', 'created_at' => date('Y-m-d H:i:s'),
-            ]);
+        // Refund only if this request removed the building, so a double click can't pay twice
+        $db->table('buildings')->where('id', $id)->where('user_id', $userId)->delete();
+        if ($db->affectedRows() !== 1) {
+            $db->transComplete();
+            return redirect()->back()->with('error', 'Building not found.');
         }
+        \App\Libraries\Ledger::credit((int) $userId, $refund, 'Buildings', 'Demolished ' . $building['name'] . ' (Salvage Refund)');
         $db->transComplete();
         clearResortRatingCache($userId);
 

@@ -660,12 +660,18 @@ class Alliances extends BaseController
             return redirect()->to('/alliances')->with('error', 'Insufficient alliance treasury funds. Upgrade costs ' . currency($tierConfig['cost']) . '.');
         }
 
-        $this->allianceModel->where('id', $alliance['id'])
+        // Debit only if the treasury still has it and the tier hasn't moved, so two quick requests can't both pay
+        $db = db_connect();
+        $db->table('alliances')->where('id', $alliance['id'])
+            ->where('treasury_cash >=', (int) $tierConfig['cost'])
+            ->where('pass_tier', (int) ($alliance['pass_tier'] ?? 1))
             ->set('treasury_cash', "treasury_cash - {$tierConfig['cost']}", false)
             ->set('pass_tier', $nextTier)
             ->update();
+        if ($db->affectedRows() !== 1) {
+            return redirect()->to('/alliances')->with('error', 'The Multi-Pass was already upgraded, or the treasury no longer has ' . currency($tierConfig['cost']) . '.');
+        }
 
-        $db = db_connect();
         $db->table('alliance_activity_log')->insert([
             'alliance_id' => $alliance['id'],
             'user_id'     => $userId,
@@ -718,10 +724,14 @@ class Alliances extends BaseController
             return redirect()->to('/alliances')->with('error', 'Insufficient treasury funds. Upgrade costs ' . currency($lvlConfig['cost']) . '.');
         }
 
-        // Deduct treasury
-        $this->allianceModel->where('id', $alliance['id'])
+        // Deduct treasury, only if it still has the money (one statement, so concurrent unlocks can't overdraw it)
+        db_connect()->table('alliances')->where('id', $alliance['id'])
+            ->where('treasury_cash >=', (int) $lvlConfig['cost'])
             ->set('treasury_cash', "treasury_cash - {$lvlConfig['cost']}", false)
             ->update();
+        if (db_connect()->affectedRows() !== 1) {
+            return redirect()->to('/alliances')->with('error', 'Insufficient treasury funds. Upgrade costs ' . currency($lvlConfig['cost']) . '.');
+        }
 
         if ($existing) {
             $db->table('alliance_unlocked_perks')->where('id', $existing['id'])->update([
@@ -853,10 +863,11 @@ class Alliances extends BaseController
         $application = $db->table('alliance_applications')
             ->where('id', $appId)
             ->where('alliance_id', $myMembership['alliance_id'])
+            ->where('status', 'pending')
             ->get()->getRowArray();
 
         if (!$application) {
-            return redirect()->to('/alliances')->with('error', 'Application not found.');
+            return redirect()->to('/alliances')->with('error', 'Application not found, or it was already answered.');
         }
 
         if ($action === 'accept') {
@@ -864,6 +875,17 @@ class Alliances extends BaseController
             $currentCount = $this->memberModel->where('alliance_id', $alliance['id'])->countAllResults();
             if ($currentCount >= (int) $alliance['max_members']) {
                 return redirect()->to('/alliances')->with('error', 'Alliance has reached maximum member capacity.');
+            }
+
+            // A player belongs to one alliance; they may have joined another since applying
+            if ($this->memberModel->where('user_id', $application['user_id'])->countAllResults() > 0) {
+                $db->table('alliance_applications')->where('id', $appId)->update(['status' => 'rejected']);
+                return redirect()->to('/alliances')->with('error', 'That player has already joined an alliance.');
+            }
+            // Claim the application first, so accepting it twice can't enrol the player twice
+            $db->table('alliance_applications')->where('id', $appId)->where('status', 'pending')->update(['status' => 'accepted']);
+            if ($db->affectedRows() !== 1) {
+                return redirect()->to('/alliances')->with('error', 'That application was already answered.');
             }
 
             // Enroll
@@ -877,7 +899,6 @@ class Alliances extends BaseController
                 'updated_at'    => date('Y-m-d H:i:s'),
             ]);
 
-            $db->table('alliance_applications')->where('id', $appId)->update(['status' => 'accepted']);
 
             $applicant = $db->table('users')->where('id', $application['user_id'])->get()->getRowArray();
             $appName = $applicant['username'] ?? 'Director';
@@ -890,7 +911,7 @@ class Alliances extends BaseController
 
             return redirect()->to('/alliances')->with('success', "Accepted {$appName} into the alliance!");
         } else {
-            $db->table('alliance_applications')->where('id', $appId)->update(['status' => 'rejected']);
+            $db->table('alliance_applications')->where('id', $appId)->where('status', 'pending')->update(['status' => 'rejected']);
             return redirect()->to('/alliances')->with('info', 'Application declined.');
         }
     }

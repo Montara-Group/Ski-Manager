@@ -132,7 +132,6 @@ class TerrainParks extends BaseController
     {
         $userId = auth()->id();
         $parkModel = new TerrainParkModel();
-        $financeModel = model('FinanceModel');
 
         $parkType = $this->request->getPost('park_type');
         $size = $this->request->getPost('size');
@@ -149,12 +148,15 @@ class TerrainParks extends BaseController
             return redirect()->to('/terrain-parks')->with('error', 'Invalid size.');
         }
 
-        $finances = $financeModel->where('user_id', $userId)->first();
-        if (($finances['cash'] ?? 0) < $config['cost']) {
-            return redirect()->to('/terrain-parks')->with('error', 'Not enough cash to build this park feature.');
+        // A park can only sit on one of the player's own slopes
+        $slopeId = (int) $slopeId;
+        if ($slopeId > 0 && !db_connect()->table('player_items')->where('id', $slopeId)->where('user_id', $userId)->where('item_type', 'slope')->countAllResults()) {
+            return redirect()->to('/terrain-parks')->with('error', 'Pick one of your own slopes for this park feature.');
         }
 
-        $financeModel->where('user_id', $userId)->set('cash', "cash - {$config['cost']}", false)->update();
+        if (!\App\Libraries\Ledger::charge((int) $userId, (int) $config['cost'], 'Terrain Parks', 'Built ' . TerrainParkModel::getLabel($parkType))) {
+            return redirect()->to('/terrain-parks')->with('error', 'Not enough cash to build this park feature.');
+        }
 
         $parkModel->insert([
             'user_id' => $userId,
@@ -164,7 +166,7 @@ class TerrainParks extends BaseController
             'condition_pct' => 100,
             'status' => 'under_construction',
             'build_days_left' => $config['build_days'],
-            'slope_id' => $slopeId ?: null,
+            'slope_id' => $slopeId > 0 ? $slopeId : null,
         ]);
 
         log_activity($userId, 'terrain_park_build', "Started building " . TerrainParkModel::getLabel($parkType) . " ({$size}) for " . currency($config['cost']));
@@ -189,16 +191,17 @@ class TerrainParks extends BaseController
     {
         $userId = auth()->id();
         $parkModel = new TerrainParkModel();
-        $financeModel = model('FinanceModel');
         $park = $parkModel->where('id', $id)->where('user_id', $userId)->first();
         if (!$park) return redirect()->to('/terrain-parks')->with('error', 'Park feature not found.');
+        // Repair must not finish a build early, and there's nothing to repair at full condition
+        if ($park['status'] === 'under_construction') return redirect()->to('/terrain-parks')->with('error', $park['name'] . ' is still being built.');
+        if ((float) $park['condition_pct'] >= 100) return redirect()->to('/terrain-parks')->with('error', $park['name'] . " doesn't need repairs.");
 
         $config = TerrainParkModel::getConfig($park['park_type'], $park['size']);
-        $repairCost = round($config['cost'] * 0.15 * (1 - $park['condition_pct'] / 100));
-        $finances = $financeModel->where('user_id', $userId)->first();
-        if (($finances['cash'] ?? 0) < $repairCost) return redirect()->to('/terrain-parks')->with('error', 'Not enough cash for repairs.');
-
-        $financeModel->where('user_id', $userId)->set('cash', "cash - {$repairCost}", false)->update();
+        $repairCost = (int) round($config['cost'] * 0.15 * (1 - $park['condition_pct'] / 100));
+        if (!\App\Libraries\Ledger::charge((int) $userId, $repairCost, 'Terrain Parks', 'Repaired ' . $park['name'])) {
+            return redirect()->to('/terrain-parks')->with('error', 'Not enough cash for repairs.');
+        }
         $parkModel->update($id, ['condition_pct' => 100.00, 'status' => 'open']);
         log_activity($userId, 'terrain_park_repair', "Repaired " . $park['name'] . " for " . currency($repairCost));
         return redirect()->to('/terrain-parks')->with('success', $park['name'] . ' has been fully repaired!');
@@ -212,10 +215,12 @@ class TerrainParks extends BaseController
         if (!$park) return redirect()->to('/terrain-parks')->with('error', 'Park feature not found.');
 
         $config = TerrainParkModel::getConfig($park['park_type'], $park['size']);
-        $refund = round($config['cost'] * 0.25);
-        $financeModel = model('FinanceModel');
-        $financeModel->where('user_id', $userId)->set('cash', "cash + {$refund}", false)->update();
-        $parkModel->delete($id);
+        $refund = (int) round($config['cost'] * 0.25);
+        // Refund only if this request actually removed it, so a double click can't pay twice
+        $db = db_connect();
+        $db->table('terrain_parks')->where('id', $id)->where('user_id', $userId)->delete();
+        if ($db->affectedRows() !== 1) return redirect()->to('/terrain-parks')->with('error', 'Park feature not found.');
+        \App\Libraries\Ledger::credit((int) $userId, $refund, 'Terrain Parks', 'Demolished ' . $park['name'] . ' (salvage)');
         log_activity($userId, 'terrain_park_demolish', "Demolished " . $park['name'] . ", refunded " . currency($refund));
         return redirect()->to('/terrain-parks')->with('success', $park['name'] . ' demolished. ' . currency($refund) . ' refunded.');
     }
@@ -224,13 +229,12 @@ class TerrainParks extends BaseController
     {
         $userId = auth()->id();
         $staffModel = new StaffModel();
-        $financeModel = model('FinanceModel');
         $hireCost = 2000;
-        $finances = $financeModel->where('user_id', $userId)->first();
-        if (($finances['cash'] ?? 0) < $hireCost) return redirect()->to('/terrain-parks')->with('error', 'Not enough cash to hire park crew.');
+        if (!\App\Libraries\Ledger::charge((int) $userId, $hireCost, 'Staff', 'Hired park crew')) {
+            return redirect()->to('/terrain-parks')->with('error', 'Not enough cash to hire park crew.');
+        }
 
         $names = ['Jake', 'Tyler', 'Kai', 'Mika', 'Sasha', 'Riley', 'Quinn', 'Devon', 'Avery', 'Jordan'];
-        $financeModel->where('user_id', $userId)->set('cash', "cash - {$hireCost}", false)->update();
         $staffModel->insert([
             'user_id' => $userId,
             'name' => $names[array_rand($names)] . ' ' . chr(rand(65, 90)) . '.',

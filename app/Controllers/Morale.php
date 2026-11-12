@@ -106,6 +106,11 @@ class Morale extends BaseController
 
         $act = $actions[$action];
 
+        // Pay first: the boost only happens if the resort can afford it (Ledger::charge is one atomic debit)
+        if ($act['cost'] > 0 && !\App\Libraries\Ledger::charge((int) $userId, $act['cost'], 'Staff', $names[$action])) {
+            return redirect()->to('/morale')->with('error', 'Not enough cash: ' . $names[$action] . ' costs ' . currency($act['cost']) . '.');
+        }
+
         if ($action === 'individual_bonus') {
             usort($staff, fn($a, $b) => (int) $a['morale'] - (int) $b['morale']);
             $lowest = $staff[0];
@@ -129,8 +134,14 @@ class Morale extends BaseController
             $newMorale = min(100, (int) $s['morale'] + $act['morale']);
             $staffModel->update($s['id'], ['morale' => $newMorale]);
         }
+        // Skills Training also gives everyone a point of experience, as its description says
+        if ($action === 'training') {
+            db_connect()->table('staff')->where('user_id', $userId)->where('status !=', 'fired')
+                ->set('experience', 'LEAST(100, experience + 1)', false)->update();
+        }
 
-        log_activity($userId, 'Staff', $names[$action] . ': all staff morale +' . $act['morale'], 'fa-solid fa-face-smile');
+        $costNote = $act['cost'] > 0 ? ' (-' . currency($act['cost']) . ')' : '';
+        log_activity($userId, 'Staff', $names[$action] . ': all staff morale +' . $act['morale'] . $costNote, 'fa-solid fa-face-smile');
 
         return redirect()->to('/morale')->with('success', $names[$action] . ' done! All staff morale +' . $act['morale'] . '.');
     }

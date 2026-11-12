@@ -89,6 +89,15 @@ class Marketing extends BaseController
         if (!isset($types[$type])) return redirect()->back()->with('error', 'Invalid campaign type.');
 
         $t = $types[$type];
+        // One campaign of each kind at a time; boosts don't stack by running the same one twice
+        if ($this->model->where('user_id', $userId)->where('campaign_type', $type)->where('status', 'active')->countAllResults() > 0) {
+            return redirect()->back()->with('error', $t['name'] . ' is already running.');
+        }
+        // The nightly tick charges the daily cost; the resort has to be able to pay at least the first day
+        $cash = (int) (db_connect()->table('player_finances')->select('cash')->where('user_id', $userId)->get()->getRow('cash') ?? 0);
+        if ($cash < (int) $t['cost']) {
+            return redirect()->back()->with('error', 'Not enough cash: ' . $t['name'] . ' costs ' . currency((int) $t['cost']) . ' a day.');
+        }
         $this->model->insert([
             'user_id' => $userId, 'campaign_type' => $type, 'name' => $t['name'],
             'daily_cost' => $t['cost'], 'visitor_boost' => $t['visitors'],

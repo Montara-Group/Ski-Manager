@@ -508,9 +508,16 @@ class Admin extends BaseController
     public function grantAchievement()
     {
         if (!$this->checkAdmin()) return redirect()->to('/dashboard');
-        $achRow = db_connect()->table('achievement_defs')->where('id', $achievementId)->get()->getRowArray() ?: db_connect()->table('achievements')->where('id', $achievementId)->get()->getRowArray();
+        $userId = (int) $this->request->getPost('user_id');
+        $achievementId = (int) $this->request->getPost('achievement_id');
+        if ($userId <= 0 || $achievementId <= 0) return redirect()->back()->with('error', 'Enter a player ID and an achievement ID.');
+        $db = db_connect();
+        $achRow = $db->table('achievement_defs')->where('id', $achievementId)->get()->getRowArray() ?: $db->table('achievements')->where('id', $achievementId)->get()->getRowArray();
+        if (!$achRow) return redirect()->back()->with('error', 'Achievement #' . $achievementId . ' not found.');
         $target = $achRow['target'] ?? 100;
-        db_connect()->table('achievements')->where('id', $achievementId)->where('user_id', $userId)->update(['completed' => 1, 'progress' => $target]);
+        $db->table('achievements')->where('id', $achievementId)->where('user_id', $userId)->update(['completed' => 1, 'progress' => $target]);
+        if ($db->affectedRows() < 1) return redirect()->back()->with('error', "Player #{$userId} has no achievement #{$achievementId}.");
+        $this->auditLog('grant_achievement', $userId, 'Achievement #' . $achievementId);
         log_activity($userId, 'admin_achievement', 'Achievement granted by admin');
         return redirect()->to('/admin/user/' . $userId)->with('success', 'Achievement granted.');
     }
@@ -521,7 +528,8 @@ class Admin extends BaseController
         $amount = (int) $this->request->getPost('amount');
         if ($amount <= 0 || $amount > 10000000) return redirect()->to('/admin')->with('error', 'Invalid amount.');
         $db = db_connect();
-        $db->table('player_finances')->set('cash', "cash + {$amount}", false)->update();
+        // CodeIgniter refuses an UPDATE without a WHERE; this one is meant for every resort
+        $db->table('player_finances')->where('user_id >', 0)->set('cash', "cash + {$amount}", false)->update();
         $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime(getSeasonStartDate())) / 86400) + 1);
         $users = $db->table('users')->get()->getResultArray();
         foreach ($users as $u) {
@@ -540,7 +548,8 @@ class Admin extends BaseController
         $amount = (int) $this->request->getPost("amount");
         if ($amount <= 0 || $amount > 100000) return redirect()->to("/admin")->with("error", "Invalid amount.");
         $db = db_connect();
-        $db->table("genepis")->set("balance", "balance + {$amount}", false)->set("total_earned", "total_earned + {$amount}", false)->update();
+        // CodeIgniter refuses an UPDATE without a WHERE; this one is meant for every player
+        $db->table("genepis")->where("user_id >", 0)->set("balance", "balance + {$amount}", false)->set("total_earned", "total_earned + {$amount}", false)->update();
         $this->auditLog("genepis_all", null, "+" . $amount . " to all players");
         return redirect()->to("/admin")->with("success", number_format($amount) . " Genepis added to all players.");
     }
@@ -1220,7 +1229,7 @@ class Admin extends BaseController
                 return redirect()->to('/admin/seasons')->with('success', "Season #{$targetSeason['season_number']} activated, leaderboard archived, and Sector 2 unlocked.");
             }
         }
-        $db->table('seasons')->update(['active' => 0]);
+        $db->table('seasons')->where('active', 1)->update(['active' => 0]);
         $db->table('seasons')->where('id', $id)->update(['active' => 1, 'maintenance' => 0, 'maintenance_until' => null]);
         $this->auditLog('activate_season', null, 'Season #' . $id);
         return redirect()->to('/admin/seasons')->with('success', 'Season activated.');

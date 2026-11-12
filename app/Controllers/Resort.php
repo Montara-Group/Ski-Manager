@@ -137,6 +137,8 @@ class Resort extends BaseController
                 'is_open' => $this->request->getPost('is_open') ? true : false,
             ];
             session()->set('resort', $resort);
+            // Open/closed lives in player_finances (the tick, dashboard and toggle read it there), not only the session
+            db_connect()->table('player_finances')->where('user_id', auth()->id())->update(['resort_open' => $resort['is_open'] ? 1 : 0]);
             log_activity(auth()->id(), 'Resort', 'Updated resort settings', 'fa-solid fa-pen-to-square');
             return redirect()->to('/resort')->with('success', 'Resort updated successfully.');
         }

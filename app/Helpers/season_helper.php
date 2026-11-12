@@ -360,7 +360,8 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
         }
 
         // 4. Deactivate Season 1, Activate Season 2, Clear maintenance
-        $db->table('seasons')->update(['active' => 0]);
+        // A WHERE is required: CodeIgniter refuses (or in production silently skips) an UPDATE without one
+        $db->table('seasons')->where('active', 1)->update(['active' => 0]);
         $db->table('seasons')->where('id', (int) $nextSeason['id'])->update([
             'active'            => 1,
             'maintenance'       => 0,

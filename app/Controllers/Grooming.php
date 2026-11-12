@@ -206,7 +206,27 @@ class Grooming extends BaseController
         return $this->extraRuns(null);
     }
 
+    /**
+     * Runs left and cash are read and then spent, so two quick requests could both use the same runs or
+     * money. Locking the player's finance row first makes a second request wait for the first, then
+     * read the updated runs and cash.
+     */
     private function extraRuns(?array $slopeIds)
+    {
+        $db = db_connect();
+        $db->transBegin();
+        $db->query('SELECT cash FROM player_finances WHERE user_id = ? FOR UPDATE', [(int) auth()->id()]);
+        try {
+            $response = $this->extraRunsLocked($slopeIds);
+            $db->transCommit();
+            return $response;
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            throw $e;
+        }
+    }
+
+    private function extraRunsLocked(?array $slopeIds)
     {
         $userId = auth()->id();
         $state = $this->state($userId);

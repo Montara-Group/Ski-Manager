@@ -64,7 +64,12 @@ class Fleet
         $db = db_connect();
         $refund = self::resaleValue($eq);
         $db->transStart();
-        $db->table('equipment')->where('id', $eq['id'])->delete();
+        // Pay out only if this call removed the machine, so a double click can't sell it twice
+        $db->table('equipment')->where('id', $eq['id'])->where('user_id', $userId)->delete();
+        if ($db->affectedRows() !== 1) {
+            $db->transComplete();
+            return 0;
+        }
         $db->table('staff')->where('user_id', $userId)->where('role', $eq['equipment_type'])->where('assigned_to', $eq['name'])->update(['assigned_to' => null]);
         if ($refund > 0) {
             $db->table('player_finances')->where('user_id', $userId)->set('cash', 'cash + ' . $refund, false)->set('total_income', 'total_income + ' . $refund, false)->update();

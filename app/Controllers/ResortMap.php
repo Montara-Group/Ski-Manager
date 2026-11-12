@@ -368,6 +368,12 @@ class ResortMap extends BaseController
             if (!$sec) {
                 return $this->response->setStatusCode(403)->setJSON(['error' => 'This sector is currently unavailable.', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
             }
+            // Same rule as the map page (isSegmentReleased): once any sector of this map is released,
+            // only released sectors can be built in
+            $anyReleased = $db->table('resort_sectors')->where('resort_map', $currentMap)->where('visible', 1)->where('released', 1)->countAllResults() > 0;
+            if ($anyReleased && empty($sec['released'])) {
+                return $this->response->setStatusCode(403)->setJSON(['error' => 'This part of the mountain isn\'t open for building yet.', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
+            }
         }
 
         $liftType = $data['lift_type'] ?? 'chair_fixed';
@@ -524,6 +530,11 @@ class ResortMap extends BaseController
 
         $db->transStart();
         $db->table('player_items')->where('id', $item['id'])->where('user_id', $userId)->delete();
+        // Refund only if this request removed it, so a double click can't pay twice
+        if ($db->affectedRows() !== 1) {
+            $db->transComplete();
+            return $fail(404, 'That lift or slope was not found.');
+        }
         // Detach things that pointed at it rather than deleting them
         $db->table('equipment')->where('user_id', $userId)->where('assigned_to', 'slope_' . $item['id'])->update(['assigned_to' => null]);
         $db->table('terrain_parks')->where('user_id', $userId)->where('slope_id', $item['id'])->update(['slope_id' => null]);

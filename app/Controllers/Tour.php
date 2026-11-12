@@ -133,15 +133,22 @@ class Tour extends BaseController
         $db = db_connect();
         $existing = $db->table('resort_likes')->where('user_id', $currentUser->id)->where('resort_user_id', $userId)->countAllResults();
 
+        // Reputation follows the like itself: +1 when a like is added, -1 when it's removed, and
+        // nothing when a repeated request changed no row (so like/unlike can't be farmed)
         if ($existing) {
             $db->table('resort_likes')->where('user_id', $currentUser->id)->where('resort_user_id', $userId)->delete();
+            if ($db->affectedRows() === 1) {
+                $db->table('player_finances')->where('user_id', $userId)->set('reputation', 'GREATEST(0, reputation - 1)', false)->update();
+            }
         } else {
-            $db->table('resort_likes')->insert([
+            $db->table('resort_likes')->ignore(true)->insert([
                 'user_id' => $currentUser->id,
                 'resort_user_id' => $userId,
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
-            $db->table('player_finances')->where('user_id', $userId)->set('reputation', 'reputation + 1', false)->update();
+            if ($db->affectedRows() === 1) {
+                $db->table('player_finances')->where('user_id', $userId)->set('reputation', 'LEAST(100, reputation + 1)', false)->update();
+            }
         }
 
         return redirect()->to('/tour/' . $userId);

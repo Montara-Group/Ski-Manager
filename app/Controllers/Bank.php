@@ -158,14 +158,19 @@ class Bank extends BaseController
 
         $db = db_connect();
         $maxLoans = $this->maxLoans($userId);
-        if ($db->table('loans')->where('user_id', $userId)->where('status', 'active')->countAllResults() >= $maxLoans) {
-            return redirect()->back()->with('error', "You already have {$maxLoans} active loans. Repay one to borrow again.");
-        }
-        if (!$db->table('player_finances')->where('user_id', $userId)->countAllResults()) return redirect()->back()->with('error', 'No resort finances found.');
-
         $p = self::terms(self::PRODUCTS[$type]);
         $now = date('Y-m-d H:i:s');
+
+        // Lock the player's finance row before counting loans, so two quick requests can't both pass the cap
         $db->transStart();
+        if (!$db->query('SELECT user_id FROM player_finances WHERE user_id = ? FOR UPDATE', [(int) $userId])->getRowArray()) {
+            $db->transComplete();
+            return redirect()->back()->with('error', 'No resort finances found.');
+        }
+        if ($db->table('loans')->where('user_id', $userId)->where('status', 'active')->countAllResults() >= $maxLoans) {
+            $db->transComplete();
+            return redirect()->back()->with('error', "You already have {$maxLoans} active loans. Repay one to borrow again.");
+        }
         $db->table('loans')->insert([
             'user_id' => $userId, 'loan_type' => $type, 'principal' => $p['amount'], 'interest_rate' => $p['rate'],
             'remaining' => $p['total_repay'], 'daily_payment' => $p['daily_payment'], 'days_total' => $p['days'],

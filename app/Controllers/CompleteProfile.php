@@ -79,8 +79,12 @@ class CompleteProfile extends BaseController
         $cash = match($difficulty) { 'easy' => 1000000, 'hard' => 200000, default => 500000 };
 
         $finance = $db->table('player_finances')->where('user_id', $userId)->get()->getRowArray();
+        // Only a new resort picks its start: posting this again must not reset cash or difficulty
+        if ($finance && (int) ($finance['profile_completed'] ?? 0) === 1) {
+            return redirect()->to('/dashboard');
+        }
         if ($finance) {
-            $db->table('player_finances')->where('user_id', $userId)->update([
+            $db->table('player_finances')->where('user_id', $userId)->where('profile_completed', 0)->update([
                 'difficulty' => $difficulty,
                 'resort_map' => $resortMap,
                 'cash' => $cash,
