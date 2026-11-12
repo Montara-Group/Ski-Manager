@@ -73,9 +73,10 @@ class ApiResultTest {
         assertEquals(422, failed.status)
         assertEquals("Validation failed", failed.message)
         assertEquals("invalid_parameters", failed.code)
-        // Ensure "code" and "email" are excluded from fields map
+        // "code" is not a field; "email" is kept (sign-up's email error, and the account email on activation_required)
         assertEquals(
             mapOf(
+                "email" to "user@ski.net",
                 "username" to "Username already taken",
                 "price" to "Price must be positive",
             ),

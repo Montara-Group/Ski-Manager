@@ -24,6 +24,9 @@ class AppState(context: Context) {
 
     val api = Api(tokens = { token }, onSignedOut = {
         if (signedIn) forget("Your session has ended. Sign in again.")
+    }, onProfileIncomplete = {
+        // Only the token is stored, so after a restart mid-choice the app starts in the game; route back
+        if (signedIn) needsStart = true
     })
 
     /** data: { token, user, profileComplete } from sign-in or the email code */

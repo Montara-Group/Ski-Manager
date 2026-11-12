@@ -229,7 +229,7 @@ class Snowmaking extends BaseController
         $userId = auth()->id();
         $eq = $this->gun($id);
         if (!$eq) return redirect()->back()->with('error', 'Snow gun not found.');
-        if ((int) $eq['condition_pct'] <= 0) return redirect()->back()->with('error', $eq['name'] . ' is broken: repair it first.');
+        if ((int) $eq['condition_pct'] <= 0 || $eq['status'] === 'broken') return redirect()->back()->with('error', $eq['name'] . ' is broken: repair it first.');
 
         $newStatus = $eq['status'] === 'active' ? 'off' : 'active';
         db_connect()->table('equipment')->where('id', $id)->update(['status' => $newStatus, 'updated_at' => date('Y-m-d H:i:s')]);

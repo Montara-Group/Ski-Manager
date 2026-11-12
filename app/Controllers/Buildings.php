@@ -14,7 +14,7 @@ class Buildings extends BaseController
         $this->model = new BuildingModel();
     }
 
-    private function getBuildingDefs(): array
+    protected function getBuildingDefs(): array
     {
         $db = db_connect();
         $types = $db->table('building_types')->orderBy('sort_order')->get()->getResultArray();

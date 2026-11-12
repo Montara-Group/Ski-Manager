@@ -29,7 +29,12 @@ sealed interface ApiResult {
 const val SERVER_ERROR = "Something went wrong. Try again."
 
 /** /api/v1/app. onSignedOut runs when the server no longer accepts the token */
-class Api(private val tokens: () -> String?, private val onSignedOut: () -> Unit) {
+class Api(
+    private val tokens: () -> String?,
+    private val onSignedOut: () -> Unit,
+    /** The server says this account hasn't chosen its start yet (e.g. the app restarted mid-choice) */
+    private val onProfileIncomplete: () -> Unit = {},
+) {
     private val client = OkHttpClient.Builder().connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).build()
     private val base = BuildConfig.BASE_URL + "/api/v1/app/"
 
@@ -64,6 +69,7 @@ class Api(private val tokens: () -> String?, private val onSignedOut: () -> Unit
             client.newCall(builder.build()).execute().use { response ->
                 val result = parseBody(response.code, response.body?.string())
                 if (result is ApiResult.Failed && result.code == "unauthenticated") withContext(Dispatchers.Main) { onSignedOut() }
+                if (result is ApiResult.Failed && result.code == "profile_incomplete") withContext(Dispatchers.Main) { onProfileIncomplete() }
                 result
             }
         } catch (e: IOException) {
@@ -78,7 +84,7 @@ class Api(private val tokens: () -> String?, private val onSignedOut: () -> Unit
             }
             val errors = root?.get("errors")?.takeIf { it.isJsonObject }?.asJsonObject
             val fields = errors?.entrySet().orEmpty()
-                .filter { it.key != "code" && it.key != "email" && it.value.isJsonPrimitive }
+                .filter { it.key != "code" && it.value.isJsonPrimitive }
                 .associate { it.key to it.value.asString }
             return ApiResult.Failed(status, root?.strOrNull("message") ?: SERVER_ERROR, errors?.strOrNull("code"), fields)
         }

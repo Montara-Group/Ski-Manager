@@ -319,7 +319,7 @@ private fun SnowGunCard(
                     if (isRunning) "Turn off" else "Turn on",
                     onToggle,
                     Modifier.weight(1f),
-                    enabled = condition > 0,
+                    enabled = gun.str("state") != "broken" && condition > 0,
                 )
                 if (condition < 100) {
                     SecondaryButton(

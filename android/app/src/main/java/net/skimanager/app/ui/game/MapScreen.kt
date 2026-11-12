@@ -148,6 +148,13 @@ fun MapScreen(app: AppState) {
             }
         }
         val builtItems = remember(data) { builtBySegment(data) }
+        val releasedSectors = remember(data) {
+            data.getAsJsonArray("releasedSectorIds")?.mapNotNull { runCatching { it.asInt }.getOrNull() }?.toSet().orEmpty()
+        }
+        fun buildable(s: Segment): Boolean {
+            val sector = runCatching { s.data.get("sector")?.asInt }.getOrNull() ?: 0
+            return releasedSectors.isEmpty() || sector == 0 || sector in releasedSectors
+        }
         val image by produceState<ImageBitmap?>(null, config.str("image")) {
             value = app.api.bytes(config.str("image"))?.let { withContext(Dispatchers.Default) { decodeMap(it) } }
         }
@@ -255,7 +262,9 @@ fun MapScreen(app: AppState) {
                         StatusBadge(kind, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary.copy(alpha = 0.12f))
                         Text(length, color = colors.muted, style = MaterialTheme.typography.bodyMedium)
                     }
-                    if (built == null) {
+                    if (built == null && !buildable(selected)) {
+                        Text("This part of the mountain isn't open for building yet.", color = colors.muted, style = MaterialTheme.typography.bodyMedium)
+                    } else if (built == null) {
                         PrimaryButton("Build for ${selected.data.str("costText")}", {
                             busy = true
                             scope.launch {

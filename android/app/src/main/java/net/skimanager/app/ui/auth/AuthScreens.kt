@@ -52,7 +52,7 @@ fun AuthFlow(app: AppState) {
     var notice by rememberSaveable { mutableStateOf<String?>(null) }
 
     when (step) {
-        Step.SignIn -> SignIn(app, email, onEmail = { email = it }, onSignUp = { step = Step.SignUp }, onNeedsCode = { step = Step.Code; notice = null })
+        Step.SignIn -> SignIn(app, email, onEmail = { email = it }, onSignUp = { step = Step.SignUp }, onNeedsCode = { accountEmail -> accountEmail?.takeIf { it.isNotBlank() }?.let { email = it }; step = Step.Code; notice = null })
         Step.SignUp -> SignUp(app, onBack = { step = Step.SignIn }, onCreated = { created, mailNote -> email = created; notice = mailNote; step = Step.Code })
         Step.Code -> EmailCode(app, email, notice, onBack = { step = Step.SignIn })
     }
@@ -96,7 +96,7 @@ private fun Field(
 }
 
 @Composable
-private fun SignIn(app: AppState, email: String, onEmail: (String) -> Unit, onSignUp: () -> Unit, onNeedsCode: () -> Unit) {
+private fun SignIn(app: AppState, email: String, onEmail: (String) -> Unit, onSignUp: () -> Unit, onNeedsCode: (String?) -> Unit) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var password by remember { mutableStateOf("") }
@@ -117,7 +117,7 @@ private fun SignIn(app: AppState, email: String, onEmail: (String) -> Unit, onSi
                 busy = false
                 when {
                     result is ApiResult.Ok -> app.signIn(result.data!!.asJsonObject)
-                    result is ApiResult.Failed && result.code == "activation_required" -> onNeedsCode()
+                    result is ApiResult.Failed && result.code == "activation_required" -> onNeedsCode(result.fields["email"])
                     else -> error = messageOf(result)
                 }
             }

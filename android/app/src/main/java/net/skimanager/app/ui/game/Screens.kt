@@ -268,7 +268,14 @@ fun SettingsScreen(app: AppState) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var deleting by remember { mutableStateOf(false) }
-    Loaded("settings", { app.api.get("settings") }) { data, reload ->
+    val signOut: () -> Unit = {
+        scope.launch {
+            app.api.post("auth/logout")
+            app.forget()
+        }
+    }
+    // Sign out stays reachable even when Settings can't load, so a player is never stuck in the app
+    Loaded("settings", { app.api.get("settings") }, failedAction = { SecondaryButton("Sign out", signOut, Modifier.fillMaxWidth()) }) { data, reload ->
         val user = data.obj("user")
         val imperial = data.str("units") == "imperial"
         ScreenColumn {
@@ -299,12 +306,7 @@ fun SettingsScreen(app: AppState) {
                     }
                 }
             }
-            SecondaryButton("Sign out", {
-                scope.launch {
-                    app.api.post("auth/logout")
-                    app.forget()
-                }
-            }, Modifier.fillMaxWidth())
+            SecondaryButton("Sign out", signOut, Modifier.fillMaxWidth())
             TextButton({ deleting = true }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                 Text("Delete account", color = LocalSkiColors.current.danger, fontWeight = FontWeight.SemiBold)
             }

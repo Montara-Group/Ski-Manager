@@ -88,7 +88,13 @@ fun MessageState(text: String, onRetry: (() -> Unit)? = null) {
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun Loaded(key: Any?, load: suspend () -> ApiResult, content: @Composable (JsonObject, reload: () -> Unit) -> Unit) {
+fun Loaded(
+    key: Any?,
+    load: suspend () -> ApiResult,
+    /** Shown under the error when loading fails, for actions that must always be reachable (Sign out) */
+    failedAction: (@Composable () -> Unit)? = null,
+    content: @Composable (JsonObject, reload: () -> Unit) -> Unit,
+) {
     var attempt by remember { mutableIntStateOf(0) }
     var result by remember(key) { mutableStateOf<ApiResult?>(null) }
     LaunchedEffect(key, attempt) { result = load() }
@@ -102,8 +108,11 @@ fun Loaded(key: Any?, load: suspend () -> ApiResult, content: @Composable (JsonO
             LoadingIndicator()
             Text("Loading…", style = MaterialTheme.typography.bodyMedium, color = LocalSkiColors.current.muted)
         }
-        is ApiResult.Offline -> MessageState(OFFLINE_TEXT) { result = null; attempt++ }
-        is ApiResult.Failed -> MessageState(if (r.code == null) SERVER_ERROR else r.message) { result = null; attempt++ }
+        is ApiResult.Offline, is ApiResult.Failed -> Box(Modifier.fillMaxSize()) {
+            val text = if (r is ApiResult.Failed && r.code != null) r.message else if (r is ApiResult.Failed) SERVER_ERROR else OFFLINE_TEXT
+            MessageState(text) { result = null; attempt++ }
+            failedAction?.let { Box(Modifier.align(Alignment.BottomCenter).padding(16.dp)) { it() } }
+        }
         is ApiResult.Ok -> content(r.data?.takeIf { it.isJsonObject }?.asJsonObject ?: JsonObject()) { attempt++ }
     }
 }

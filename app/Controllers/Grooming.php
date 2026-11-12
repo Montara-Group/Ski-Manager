@@ -127,6 +127,9 @@ class Grooming extends BaseController
                 'id' => (int) $o['id'],
                 'name' => (string) $o['name'],
                 'level' => (int) $o['level'],
+                // The app shows "Skill n · salary / day"; the salary is what the tick charges (difficulty cost multiplier)
+                'skill' => (int) $o['level'],
+                'salaryText' => currency((int) round((int) ($o['salary'] ?? 0) * getDifficultyMultiplier('cost_multiplier'))),
             ];
         }
 
