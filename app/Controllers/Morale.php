@@ -6,6 +6,18 @@ use App\Models\StaffModel;
 
 class Morale extends BaseController
 {
+    /** Rest Day can be given once a week; the cooldown is a player_boosts row, like the timed Génépis boosts */
+    private const REST_DAY_COOLDOWN = 'rest_day_cooldown';
+    private const REST_DAY_DAYS = 7;
+
+    /** When the next Rest Day can be given, or null if it can be given now */
+    private function restDayAvailableAt(int $userId): ?string
+    {
+        return db_connect()->table('player_boosts')->select('expires_at')->where('user_id', $userId)
+            ->where('boost_type', self::REST_DAY_COOLDOWN)->where('expires_at >', date('Y-m-d H:i:s'))
+            ->orderBy('expires_at', 'DESC')->get()->getRow('expires_at');
+    }
+
     public function index(): string
     {
         $userId = auth()->id();
@@ -19,13 +31,18 @@ class Morale extends BaseController
         $boosts = [
             'bonus_pay' => ['name' => 'Bonus Pay', 'desc' => 'Give all staff a one-time cash bonus. +15 morale.', 'icon' => 'fa-money-bill-wave', 'morale' => 15, 'cost' => 5000],
             'team_lunch' => ['name' => 'Team Lunch', 'desc' => 'Treat everyone to a mountain restaurant meal. +10 morale.', 'icon' => 'fa-utensils', 'morale' => 10, 'cost' => 2000],
-            'day_off' => ['name' => 'Rest Day', 'desc' => 'Give all staff a day off to recover. +20 morale, but no operations for 1 day.', 'icon' => 'fa-bed', 'morale' => 20, 'cost' => 0],
+            'day_off' => ['name' => 'Rest Day', 'desc' => 'Give all staff a day off to recover. +20 morale, once a week.', 'icon' => 'fa-bed', 'morale' => 20, 'cost' => 0],
             'training' => ['name' => 'Skills Training', 'desc' => 'Send staff to training workshops. +5 morale, +1 experience.', 'icon' => 'fa-graduation-cap', 'morale' => 5, 'cost' => 3000],
             'new_uniforms' => ['name' => 'New Uniforms', 'desc' => 'Fresh uniforms for the whole team. +8 morale.', 'icon' => 'fa-shirt', 'morale' => 8, 'cost' => 1500],
             'party' => ['name' => 'Staff Party', 'desc' => 'End-of-week celebration. +25 morale for everyone.', 'icon' => 'fa-champagne-glasses', 'morale' => 25, 'cost' => 8000],
             'raise' => ['name' => 'Salary Raise', 'desc' => 'Increase all salaries by 10%. Permanent +12 morale.', 'icon' => 'fa-arrow-trend-up', 'morale' => 12, 'cost' => 0, 'salary_increase' => true],
             'individual_bonus' => ['name' => 'Individual Bonus', 'desc' => 'Reward your lowest morale staff member. +30 morale for them.', 'icon' => 'fa-user-check', 'morale' => 30, 'cost' => 1000, 'individual' => true],
         ];
+
+        $restAt = $this->restDayAvailableAt((int) $userId);
+        if ($restAt) {
+            $boosts['day_off']['desc'] .= ' Next one from ' . date('j M, H:i', strtotime($restAt)) . '.';
+        }
 
         // Sort staff by morale ascending
         usort($staff, fn($a, $b) => (int) $a['morale'] - (int) $b['morale']);
@@ -106,6 +123,10 @@ class Morale extends BaseController
 
         $act = $actions[$action];
 
+        if ($action === 'day_off' && ($restAt = $this->restDayAvailableAt((int) $userId))) {
+            return redirect()->to('/morale')->with('error', 'Your staff had a Rest Day recently. The next one is available from ' . date('j M, H:i', strtotime($restAt)) . '.');
+        }
+
         // Pay first: the boost only happens if the resort can afford it (Ledger::charge is one atomic debit)
         if ($act['cost'] > 0 && !\App\Libraries\Ledger::charge((int) $userId, $act['cost'], 'Staff', $names[$action])) {
             return redirect()->to('/morale')->with('error', 'Not enough cash: ' . $names[$action] . ' costs ' . currency($act['cost']) . '.');
@@ -133,6 +154,12 @@ class Morale extends BaseController
         foreach ($staff as $s) {
             $newMorale = min(100, (int) $s['morale'] + $act['morale']);
             $staffModel->update($s['id'], ['morale' => $newMorale]);
+        }
+        if ($action === 'day_off') {
+            db_connect()->table('player_boosts')->insert([
+                'user_id' => $userId, 'boost_type' => self::REST_DAY_COOLDOWN,
+                'expires_at' => date('Y-m-d H:i:s', strtotime('+' . self::REST_DAY_DAYS . ' days')),
+            ]);
         }
         // Skills Training also gives everyone a point of experience, as its description says
         if ($action === 'training') {
