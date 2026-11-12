@@ -217,20 +217,23 @@ export default function SettingsPage({
                 {codeFor === 'password' ? 'Set New Password' : 'Change Password'}
               </Button>
 
-              <form action="/account/send-code" method="post" className="inline-block">
-                <CsrfInput />
-                <input type="hidden" name="purpose" value="password" />
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="sm"
-                  className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-primary underline min-h-11 sm:min-h-8"
-                >
-                  <Icon name="fa-envelope" />
-                  {codeFor === 'password' ? 'Resend verification code' : 'No password? Email me a code'}
-                </Button>
-              </form>
+              <Button
+                type="submit"
+                form="send-code-password"
+                formNoValidate
+                variant="ghost"
+                size="sm"
+                className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-primary underline min-h-11 sm:min-h-8"
+              >
+                <Icon name="fa-envelope" />
+                {codeFor === 'password' ? 'Resend verification code' : 'No password? Email me a code'}
+              </Button>
             </div>
+          </form>
+          {/* Its own form: a form can't sit inside another, and the button above submits it with form="..." */}
+          <form id="send-code-password" action="/account/send-code" method="post" hidden>
+            <CsrfInput />
+            <input type="hidden" name="purpose" value="password" />
           </form>
         </Panel>
 
@@ -508,20 +511,23 @@ export default function SettingsPage({
                 Permanently Delete Account
               </Button>
 
-              <form action="/account/send-code" method="post" className="inline-block">
-                <CsrfInput />
-                <input type="hidden" name="purpose" value="delete" />
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="sm"
-                  className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-danger underline min-h-11 sm:min-h-8"
-                >
-                  <Icon name="fa-envelope" />
-                  {codeFor === 'delete' ? 'Resend deletion code' : 'No password? Email me a code'}
-                </Button>
-              </form>
+              <Button
+                type="submit"
+                form="send-code-delete"
+                formNoValidate
+                variant="ghost"
+                size="sm"
+                className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-danger underline min-h-11 sm:min-h-8"
+              >
+                <Icon name="fa-envelope" />
+                {codeFor === 'delete' ? 'Resend deletion code' : 'No password? Email me a code'}
+              </Button>
             </div>
+          </form>
+          {/* Its own form: a form can't sit inside another, and the button above submits it with form="..." */}
+          <form id="send-code-delete" action="/account/send-code" method="post" hidden>
+            <CsrfInput />
+            <input type="hidden" name="purpose" value="delete" />
           </form>
         </Panel>
       </div>

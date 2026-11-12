@@ -115,6 +115,8 @@ $routes->post('/real-estate/repair/(:num)', 'RealEstate::repair/$1');
 $routes->get('/rentals', 'Buildings::show/rental');
 $routes->get('/resort', 'Resort::index');
 $routes->get('/restaurants', 'Buildings::show/restaurant');
+// /buildings has no page of its own; dashboard links and old bookmarks land on the first building category
+$routes->addRedirect('buildings', 'hotels');
 $routes->get('/retail', 'Buildings::show/retail');
 $routes->get('/scenic-lifts', 'ScenicLifts::index');
 $routes->get('/settings', 'Settings::index');

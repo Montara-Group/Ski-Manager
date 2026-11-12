@@ -19,7 +19,7 @@ $page = [
     'magicLinkUrl' => site_url('login/magic-link'),
     'allowDiscord' => (string) env('DISCORD_CLIENT_ID', '') !== '',
     'error' => session('error'),
-    'errors' => session('errors') ? (array) session('errors') : null,
+    'errors' => session('errors') ? array_values((array) session('errors')) : null, // a list: the page reads errors.length
     'message' => session('message'),
     'season' => $season,
     'seasonDay' => $seasonDay,

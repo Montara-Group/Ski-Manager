@@ -794,7 +794,14 @@ export default function AdminIndexPage({
           >
             <div className="space-y-4">
               {/* Cash to All */}
-              <form action="/admin/add-cash-all" method="post" className="space-y-1.5">
+              <form
+                action="/admin/add-cash-all"
+                method="post"
+                className="space-y-1.5"
+                onSubmit={(e) => {
+                  if (!window.confirm(`Give ${bulkCash.toLocaleString()} € to ALL players?`)) e.preventDefault();
+                }}
+              >
                 <CsrfInput />
                 <label className="text-[11px] font-semibold text-muted block">
                   Give cash to all players
@@ -815,11 +822,6 @@ export default function AdminIndexPage({
                     size="sm"
                     variant="secondary"
                     className="shrink-0"
-                    onPress={(e) => {
-                      if (!window.confirm(`Give $${bulkCash.toLocaleString()} to ALL players?`)) {
-                        e.continuePropagation();
-                      }
-                    }}
                   >
                     Give Cash
                   </Button>
@@ -827,7 +829,14 @@ export default function AdminIndexPage({
               </form>
 
               {/* Genepis to All */}
-              <form action="/admin/add-genepis-all" method="post" className="space-y-1.5 pt-3 border-t border-edge">
+              <form
+                action="/admin/add-genepis-all"
+                method="post"
+                className="space-y-1.5 pt-3 border-t border-edge"
+                onSubmit={(e) => {
+                  if (!window.confirm(`Give ${bulkGenepis.toLocaleString()} Genepis to ALL players?`)) e.preventDefault();
+                }}
+              >
                 <CsrfInput />
                 <label className="text-[11px] font-semibold text-muted block">
                   Give Genepis to all players
@@ -847,11 +856,6 @@ export default function AdminIndexPage({
                     size="sm"
                     variant="secondary"
                     className="shrink-0"
-                    onPress={(e) => {
-                      if (!window.confirm(`Give ${bulkGenepis.toLocaleString()} Genepis to ALL players?`)) {
-                        e.continuePropagation();
-                      }
-                    }}
                   >
                     Give Genepis
                   </Button>
