@@ -35,6 +35,10 @@ class OwnPaceBankScoreRelease extends Migration
             $this->db->query('ALTER TABLE player_clocks ADD INDEX season_score (season_number, score)');
         }
 
+        // Every resort gets a score now, not after its next day
+        helper(['rating']);
+        \App\Libraries\ResortScore::rescoreAll();
+
         if (!$this->db->fieldExists('release_season', 'resort_sectors')) {
             $this->forge->addColumn('resort_sectors', [
                 'release_season' => ['type' => 'INT', 'unsigned' => true, 'null' => true, 'after' => 'released'],

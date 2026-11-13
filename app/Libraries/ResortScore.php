@@ -39,6 +39,26 @@ class ResortScore
         return ['score' => array_sum($parts), 'parts' => $parts, 'profitPerDay' => $profitPerDay, 'visitorsPerDay' => $visitorsPerDay];
     }
 
+    /**
+     * Score every resort from its current state, for resorts that haven't had a day since scoring began.
+     * The season's visitors are estimated from the last day's visitors times days played.
+     */
+    public static function rescoreAll(): int
+    {
+        $db = db_connect();
+        $rows = $db->query('SELECT pc.user_id, pc.game_day, pf.daily_visitors FROM player_clocks pc JOIN player_finances pf ON pf.user_id = pc.user_id')->getResultArray();
+        foreach ($rows as $r) {
+            $visitors = (int) $r['daily_visitors'] * max(1, (int) $r['game_day']);
+            $result = self::compute((int) $r['user_id'], (int) $r['game_day'], $visitors);
+            $db->table('player_clocks')->where('user_id', (int) $r['user_id'])->update([
+                'season_visitors' => $visitors,
+                'score' => $result['score'],
+                'score_parts' => json_encode($result['parts'] + ['profitPerDay' => $result['profitPerDay'], 'visitorsPerDay' => $result['visitorsPerDay']]),
+            ]);
+        }
+        return count($rows);
+    }
+
     /** Add the day's visitors to the season total and store the new score */
     public static function store(int $userId, int $visitorsToday): array
     {
