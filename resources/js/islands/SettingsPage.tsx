@@ -4,9 +4,11 @@ import { Icon } from '@/components/Icon';
 import { CsrfInput, Page, Panel, PostButton } from '@/components/Page';
 import { SeasonChoiceFields } from '@/components/SeasonChoiceFields';
 import { Select } from '@/components/Select';
+import { Switch } from '@/components/Switch';
 import { ApiError } from '@/lib/api';
 import { BetaMembership } from '@/components/BetaMembership';
 import type { BetaState } from '@/lib/beta';
+import { sendAutopilot, type ClockState } from '@/lib/clock';
 import { SEASON_OPTIONS, sendVote, type SeasonChoice, type SeasonVoteResults, type SeasonVoteState } from '@/lib/seasonVote';
 
 export type UserMeta = {
@@ -37,6 +39,7 @@ export type SettingsPageProps = {
   activityCount: number;
   seasonVote?: SeasonVoteState & { closed: boolean; myComment: string; results: SeasonVoteResults | null };
   beta?: BetaState;
+  clock?: ClockState;
 };
 
 export default function SettingsPage({
@@ -51,6 +54,7 @@ export default function SettingsPage({
   activityCount = 0,
   seasonVote,
   beta,
+  clock,
 }: SettingsPageProps) {
   const [betaState, setBetaState] = useState<BetaState | undefined>(beta);
   const [usernameVal, setUsernameVal] = useState(user?.username ?? '');
@@ -421,6 +425,8 @@ export default function SettingsPage({
           </div>
         </Panel>
 
+        {clock?.enabled && <SeasonClockSection clock={clock} />}
+
         {seasonVote && (seasonVote.open || (seasonVote.closed && seasonVote.results)) && <SeasonVoteSection vote={seasonVote} />}
 
         {betaState && (
@@ -526,6 +532,49 @@ export default function SettingsPage({
         </Panel>
       </div>
     </Page>
+  );
+}
+
+/** Own-pace seasons: the autopilot switch and today's Next day allowance */
+function SeasonClockSection({ clock }: { clock: Extract<ClockState, { enabled: true }> }) {
+  const [on, setOn] = useState(clock.autopilot);
+  const [busy, setBusy] = useState(false);
+
+  const change = async (value: boolean) => {
+    setBusy(true);
+    setOn(value);
+    try {
+      await sendAutopilot(value);
+      toast.success(value ? 'Autopilot is on.' : 'Autopilot is off.');
+    } catch (e) {
+      setOn(!value);
+      toast.danger(e instanceof ApiError ? e.message : "The setting didn't save. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Panel
+      title={
+        <span className="flex items-center gap-2">
+          <Icon name="fa-forward-step" className="text-accent" />
+          Season clock
+        </span>
+      }
+    >
+      <div className="flex flex-col gap-3 text-sm">
+        <p>
+          Your resort is on day {clock.day} of {clock.length} in season {clock.seasonNumber}. Next day moves it forward, up to {clock.cap} days per real day. You have {clock.left} left today.
+        </p>
+        <Switch isSelected={on} onChange={change} isDisabled={busy} placement="end">
+          Autopilot
+        </Switch>
+        <p className="text-muted">
+          Autopilot moves your resort forward one day each night at 00:05 Eastern time if you didn't press Next day the day before. It stops after 48 hours without a visit, and your resort waits on its day until you come back.
+        </p>
+      </div>
+    </Panel>
   );
 }
 

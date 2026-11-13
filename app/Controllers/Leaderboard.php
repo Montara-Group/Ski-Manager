@@ -10,6 +10,8 @@ namespace App\Controllers;
 class Leaderboard extends BaseController
 {
     public const SHOWN = 50;
+    /** Own pace: days a resort must have played this season before it is ranked by profit per day */
+    public const MIN_DAYS = 10;
 
     public function index(): string
     {
@@ -33,28 +35,35 @@ class Leaderboard extends BaseController
             }
         }
 
+        // Own pace: resorts are on different days, so they are compared by profit per day within the viewer's season
+        $ownPace = $v2 && $userId && \App\Libraries\Clock::enabledFor($userId);
         $where = "u.id NOT IN (1, 3) AND u.active = 1 AND (u.status IS NULL OR u.status != 'demo')";
         $binds = [];
+        if ($ownPace) { $where .= ' AND COALESCE(pc.season_number, ?) = ?'; $binds[] = (int) getGlobalSeason()['season_number']; $binds[] = getSeasonNumber(); }
         if ($v2 && $difficulty !== 'all') { $where .= ' AND pf.difficulty = ?'; $binds[] = $difficulty; }
         $rows = $db->query("
             SELECT u.id, u.username, u.created_at, pf.cash, pf.difficulty, pf.daily_visitors, pf.resort_name,
                    CAST(pf.total_income AS SIGNED) - CAST(pf.total_expenses AS SIGNED) AS net_profit,
                    CAST(pf.cash AS SIGNED) + CAST(pf.total_income AS SIGNED) AS score,
+                   COALESCE(pc.game_day, 0) AS clock_day,
+                   ROUND((CAST(pf.total_income AS SIGNED) - CAST(pf.total_expenses AS SIGNED)) / GREATEST(COALESCE(pc.game_day, 1), 1)) AS per_day,
                    COALESCE(it.slopes, 0) AS slope_count, COALESCE(it.lifts, 0) AS lift_count,
                    COALESCE(b.n, 0) AS building_count, COALESCE(st.n, 0) AS staff_count
             FROM users u
             JOIN player_finances pf ON pf.user_id = u.id
+            LEFT JOIN player_clocks pc ON pc.user_id = u.id
             LEFT JOIN (SELECT user_id, SUM(item_type = 'slope') slopes, SUM(item_type = 'lift') lifts FROM player_items GROUP BY user_id) it ON it.user_id = u.id
             LEFT JOIN (SELECT user_id, COUNT(*) n FROM buildings GROUP BY user_id) b ON b.user_id = u.id
             LEFT JOIN (SELECT user_id, COUNT(*) n FROM staff WHERE status != 'fired' GROUP BY user_id) st ON st.user_id = u.id
             WHERE {$where}
-            ORDER BY " . ($v2 ? 'net_profit DESC, pf.cash DESC' : 'score DESC') . ', u.id ASC', $binds)->getResultArray();
+            ORDER BY " . ($ownPace ? 'per_day DESC, net_profit DESC' : ($v2 ? 'net_profit DESC, pf.cash DESC' : 'score DESC')) . ', u.id ASC', $binds)->getResultArray();
 
         // Only resorts that exist this season are ranked; a fresh account with nothing built isn't
         $ranked = []; $unranked = 0; $rank = 0; $prev = null;
         foreach ($rows as $i => $r) {
             if ((int) $r['slope_count'] + (int) $r['lift_count'] + (int) $r['building_count'] === 0) { $unranked++; continue; }
-            $value = $v2 ? (int) $r['net_profit'] : (int) $r['score'];
+            if ($ownPace && (int) $r['clock_day'] < self::MIN_DAYS) { $unranked++; continue; }
+            $value = $ownPace ? (int) $r['per_day'] : ($v2 ? (int) $r['net_profit'] : (int) $r['score']);
             if ($value !== $prev) { $rank = count($ranked) + 1; $prev = $value; }
             $r['rank'] = $rank;
             $ranked[] = $r;
@@ -66,11 +75,12 @@ class Leaderboard extends BaseController
 
         $players = array_slice($ranked, 0, self::SHOWN);
         $past = $this->pastSeasons();
-        $metric = fn(array $p) => $v2 ? (int) $p['net_profit'] : (int) $p['score'];
+        $metric = fn(array $p) => $ownPace ? (int) $p['per_day'] : ($v2 ? (int) $p['net_profit'] : (int) $p['score']);
         $signed = fn(int $v) => ($v > 0 ? '+' : '') . currency($v);
         $row = fn(array $p) => [
             'id' => (int) $p['id'], 'rank' => (int) $p['rank'], 'username' => (string) $p['username'], 'resortName' => (string) ($p['resort_name'] ?? ''),
-            'profit' => $signed((int) $p['net_profit']), 'profitPositive' => (int) $p['net_profit'] >= 0,
+            'profit' => $ownPace ? $signed((int) $p['per_day']) . '/day' : $signed((int) $p['net_profit']), 'profitPositive' => (int) $p['net_profit'] >= 0,
+            'day' => $ownPace ? (int) $p['clock_day'] : null,
             'skiers' => number_format((int) $p['daily_visitors']), 'cash' => currency((int) $p['cash']),
             'score' => $v2 ? null : number_format((int) $p['score']),
             'slopes' => (int) $p['slope_count'], 'lifts' => (int) $p['lift_count'], 'buildings' => (int) $p['building_count'],
@@ -79,7 +89,9 @@ class Leaderboard extends BaseController
 
         return [
             'v2' => $v2,
-            'subtitle' => getSeasonName() . ' · day ' . getSeasonDay() . ' · ' . ($v2 ? 'ranked by profit this season' : 'ranked by score'),
+            'ownPace' => $ownPace,
+            'minDays' => self::MIN_DAYS,
+            'subtitle' => getSeasonName() . ' · day ' . getSeasonDay() . ' · ' . ($ownPace ? 'ranked by average profit per day' : ($v2 ? 'ranked by profit this season' : 'ranked by score')),
             'difficulty' => $difficulty,
             'me' => $me ? $row($me) + [
                 'behind' => ($me['rank'] > 1 && isset($players[0])) ? currency(max(0, $metric($players[0]) - $metric($me))) : null,

@@ -117,7 +117,7 @@ class Admin extends BaseController
         $season = $db->table('seasons')->where('active', 1)->get()->getRowArray() ?? [];
         $unreadSupport = $db->table('support_messages')->where('sender', 'player')->where('is_read', 0)->countAllResults();
         // The tick writes tomorrow's weather row, so the newest row tells us when it last ran
-        $lastTick = $db->table('weather')->select('game_day, created_at')->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
+        $lastTick = $db->table('weather')->select('game_day, created_at')->where('season_number', (int) getGlobalSeason()['season_number'])->orderBy('id', 'DESC')->limit(1)->get()->getRowArray();
 
         $diskTotal = @disk_total_space('/') ?: 0;
         $diskFree = @disk_free_space('/') ?: 0;
@@ -605,7 +605,7 @@ class Admin extends BaseController
         if (!isset($visMap[$condition])) return redirect()->to('/admin/settings')->with('error', 'Unknown weather condition.');
         \App\Libraries\Weather::ensure($gameDay + 1);
 
-        $db->table('weather')->where('game_day', $gameDay)->update([
+        $db->table('weather')->where('season_number', getSeasonNumber())->where('game_day', $gameDay)->update([
             'condition_name' => $condition, 'temp' => $temp,
             'wind' => $wind, 'snow_base' => $snowBase, 'snowfall' => $snowfall,
             'visibility' => $visMap[$condition] ?? 'Good',
@@ -661,7 +661,7 @@ class Admin extends BaseController
     {
         if (!$this->checkAdmin()) return redirect()->to('/dashboard');
         $db = db_connect();
-        $weatherRaw = $db->table('weather')->orderBy('game_day', 'DESC')->limit(7)->get()->getResultArray();
+        $weatherRaw = $db->table('weather')->where('season_number', getSeasonNumber())->orderBy('game_day', 'DESC')->limit(7)->get()->getResultArray();
         $weather = array_map(function($w) {
             return [
                 'game_day' => (int) $w['game_day'],

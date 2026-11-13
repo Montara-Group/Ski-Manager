@@ -25,6 +25,8 @@ class Me extends BaseController
                 'seasonDay' => getSeasonDay(),
                 'seasonLength' => getSeasonLength(),
             ],
+            // Own-pace seasons: { enabled: false } while the resort follows the shared calendar
+            'clock' => \App\Libraries\Clock::state((int) $user->id),
             'unread' => unreadNotificationCount((int) $user->id),
         ]);
     }

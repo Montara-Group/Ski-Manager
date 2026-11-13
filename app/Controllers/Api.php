@@ -112,7 +112,7 @@ class Api extends BaseController
 
         // 6. Current Weather
         $gameDay = function_exists('getGameDay') ? getGameDay() : 42;
-        $weatherRow = $db->table('weather')->where('game_day', $gameDay)->get()->getRowArray();
+        $weatherRow = $db->table('weather')->where('season_number', getSeasonNumber())->where('game_day', $gameDay)->get()->getRowArray();
         if (!$weatherRow) {
             $weatherRow = [
                 'game_day'       => $gameDay,

@@ -1,4 +1,5 @@
 // Props the PHP layout passes to the shell islands (App\Libraries\Shell::props)
+import type { ClockState } from './clock';
 import type { SeasonVoteState } from './seasonVote';
 
 export type NavItem = {
@@ -28,6 +29,8 @@ export type Stats = {
   /** Server Unix time in seconds, and the zone the resort clock runs in */
   now: number;
   timezone: string;
+  /** Own-pace seasons: { enabled: false } while the resort follows the shared calendar */
+  clock?: ClockState;
   genepis: number;
   stars: number;
 };

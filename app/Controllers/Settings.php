@@ -55,6 +55,8 @@ class Settings extends BaseController
                 'results' => \App\Libraries\SeasonVote::isClosed() ? \App\Libraries\SeasonVote::results() : null,
             ],
             'beta' => \App\Libraries\Beta::state((int) $userId),
+            // Own-pace seasons: the autopilot switch
+            'clock' => \App\Libraries\Clock::state((int) $userId),
         ];
 
         return $page;

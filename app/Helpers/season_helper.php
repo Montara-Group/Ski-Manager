@@ -133,7 +133,8 @@ function checkAutoSeasonRollover(): void
     }
 }
 
-function getCurrentSeason(): array
+/** The shared calendar's season: the newest active row. Logged-out pages and shared-calendar players use it */
+function getGlobalSeason(): array
 {
     static $season = null;
     if ($season !== null) return $season;
@@ -156,11 +157,28 @@ function getCurrentSeason(): array
     return $season;
 }
 
+function getSeasonByNumber(int $number): ?array
+{
+    static $seasons = [];
+    if (!array_key_exists($number, $seasons)) {
+        $seasons[$number] = db_connect()->table('seasons')->where('season_number', $number)->get()->getRowArray() ?: null;
+    }
+    return $seasons[$number];
+}
+
+/** The season the current player is in: their own with own-pace seasons (App\Libraries\Clock), else the shared one */
+function getCurrentSeason(): array
+{
+    $clock = \App\Libraries\Clock::current();
+    if ($clock) {
+        $season = getSeasonByNumber((int) $clock['season_number']);
+        if ($season) return $season;
+    }
+    return getGlobalSeason();
+}
+
 function getNextSeason(): ?array
 {
-    static $nextSeason = null;
-    if ($nextSeason !== null) return $nextSeason;
-
     $db = db_connect();
     if (!$db->tableExists('seasons')) return null;
 
@@ -175,6 +193,10 @@ function getNextSeason(): ?array
 
 function getDaysUntilNextSeason(): int
 {
+    // Own pace: the next season starts when this player's season ends
+    if (\App\Libraries\Clock::current()) {
+        return max(0, getSeasonLength() - getSeasonDay());
+    }
     $next = getNextSeason();
     if ($next && !empty($next['start_date'])) {
         $diff = (int) ceil((strtotime($next['start_date']) - strtotime(date('Y-m-d'))) / 86400);
@@ -212,26 +234,12 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
         return false;
     }
 
-    // Weather rows are keyed only by game_day, which restarts at 1 each season. Without this,
-    // the new season would read last season's rows and the tick would skip days that "exist".
-    // DDL commits implicitly in MySQL, so the archive table is created before the transaction.
-    $weatherArchive = 'weather_season_' . $currSeasonNumber;
-    if ($db->tableExists('weather')) {
-        $db->query("CREATE TABLE IF NOT EXISTS `{$weatherArchive}` LIKE `weather`");
-    }
-
     $economyV2 = function_exists('featureLevel') && featureLevel('economy_v2') === 2;
 
     try {
         $db->transStart();
 
-        // 0. Archive last season's weather; the new season's is generated from day 1 (App\Libraries\Weather)
-        if ($db->tableExists('weather')) {
-            if ($db->table($weatherArchive)->countAllResults() === 0) {
-                $db->query("INSERT INTO `{$weatherArchive}` SELECT * FROM `weather`");
-            }
-            $db->table('weather')->emptyTable();
-        }
+        // 0. Weather rows carry their season number (App\\Libraries\\Weather): the new season's are generated from day 1
 
         // 1. Snapshot current leaderboard standings into archives
         if ($db->tableExists('season_leaderboard_archives')) {
@@ -382,10 +390,23 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
     }
 }
 
+/** Day of the shared calendar, counted from the active season's start date */
+function getGlobalGameDay(): int
+{
+    $season = getGlobalSeason();
+    return max(1, (int)((strtotime(date('Y-m-d')) - strtotime($season['start_date'])) / 86400) + 1);
+}
+
 function getGameDay(): int
 {
-    $season = getCurrentSeason();
-    return max(1, (int)((strtotime(date('Y-m-d')) - strtotime($season['start_date'])) / 86400) + 1);
+    $clock = \App\Libraries\Clock::current();
+    return $clock ? (int) $clock['game_day'] : getGlobalGameDay();
+}
+
+/** Game day of any player, for code that writes rows for someone other than the signed-in player */
+function getGameDayFor(int $userId): int
+{
+    return \App\Libraries\Clock::as($userId, 'getGameDay');
 }
 
 function getSeasonDay(): int
@@ -395,9 +416,27 @@ function getSeasonDay(): int
     return (($gameDay = getGameDay()) - 1) % $duration + 1;
 }
 
+/**
+ * The date day 1 would have been for the current player. Many pages compute the day as
+ * (today - start) + 1, so with own pace this is today minus the player's day: the same formula
+ * then gives their own day.
+ */
 function getSeasonStartDate(): string
 {
-    return getCurrentSeason()['start_date'] ?? '2026-06-06';
+    if (\App\Libraries\Clock::current()) {
+        return date('Y-m-d', strtotime('-' . (getGameDay() - 1) . ' days', strtotime(date('Y-m-d'))));
+    }
+    return getGlobalSeason()['start_date'] ?? '2026-06-06';
+}
+
+/** Earliest created_at of this season's rows (financial_transactions, ticket_sales) for the current player */
+function getSeasonRecordsSince(): string
+{
+    $clock = \App\Libraries\Clock::current();
+    if ($clock && !empty($clock['season_started_at'])) {
+        return date('Y-m-d', strtotime($clock['season_started_at']));
+    }
+    return getGlobalSeason()['start_date'] ?? '2026-06-06';
 }
 
 function getSeasonLength(): int

@@ -19,10 +19,11 @@ class SeasonReset
         'scenic_lifts', 'lift_tickets', 'ticket_sales', 'avalanche_zones', 'staff_candidates',
     ];
 
-    /** Net worth, starting cash and legacy bonus for every player, richest first */
-    public static function plan(): array
+    /** Net worth, starting cash and legacy bonus for every player (or one, with $userId), richest first */
+    public static function plan(?int $userId = null): array
     {
         $db = db_connect();
+        $only = fn($builder) => $userId ? $builder->where('user_id', $userId) : $builder;
         $startCash = [];
         foreach ($db->table('difficulty_config')->where('config_key', 'starting_cash')->get()->getResultArray() as $r) {
             $startCash[$r['difficulty']] = (int) $r['config_value'];
@@ -34,23 +35,23 @@ class SeasonReset
             $levelCost[$l['type_key']][(int) $l['level']] = ($levelCost[$l['type_key']][(int) $l['level'] - 1] ?? 0) + (int) $l['cost'];
         }
         $assets = [];
-        foreach ($db->table('buildings')->select('user_id, building_type, level')->get()->getResultArray() as $b) {
+        foreach ($only($db->table('buildings')->select('user_id, building_type, level'))->get()->getResultArray() as $b) {
             $assets[(int) $b['user_id']] = ($assets[(int) $b['user_id']] ?? 0) + ($levelCost[$b['building_type']][(int) $b['level']] ?? 0);
         }
-        foreach ($db->table('player_items')->get()->getResultArray() as $i) {
+        foreach ($only($db->table('player_items'))->get()->getResultArray() as $i) {
             $assets[(int) $i['user_id']] = ($assets[(int) $i['user_id']] ?? 0) + ResortMap::buildCost($i);
         }
         if ($db->tableExists('equipment_catalog')) {
             // Looked up in PHP: the two tables' model_key columns have different collations, so SQL can't join them
             $catalog = array_column($db->table('equipment_catalog')->select('model_key, cost')->get()->getResultArray(), 'cost', 'model_key');
-            foreach ($db->table('equipment')->select('user_id, model_key')->get()->getResultArray() as $e) {
+            foreach ($only($db->table('equipment')->select('user_id, model_key'))->get()->getResultArray() as $e) {
                 $assets[(int) $e['user_id']] = ($assets[(int) $e['user_id']] ?? 0) + (int) ($catalog[$e['model_key']] ?? 0);
             }
         }
-        $debt = array_column($db->query("SELECT user_id, SUM(remaining) d FROM loans WHERE status = 'active' GROUP BY user_id")->getResultArray(), 'd', 'user_id');
+        $debt = array_column($db->query("SELECT user_id, SUM(remaining) d FROM loans WHERE status = 'active'" . ($userId ? ' AND user_id = ' . (int) $userId : '') . ' GROUP BY user_id')->getResultArray(), 'd', 'user_id');
 
         $plan = [];
-        foreach ($db->table('player_finances')->select('user_id, cash, difficulty')->get()->getResultArray() as $f) {
+        foreach ($only($db->table('player_finances')->select('user_id, cash, difficulty'))->get()->getResultArray() as $f) {
             $uid = (int) $f['user_id'];
             // Assets count at half what they cost: that's roughly what they'd sell for
             $netWorth = (int) $f['cash'] + (int) round(($assets[$uid] ?? 0) * 0.5) - (int) ($debt[$uid] ?? 0);
@@ -106,6 +107,40 @@ class SeasonReset
         return $plan;
     }
 
+    /**
+     * Own-pace seasons: start one resort over for $seasonNumber when its player finishes the season
+     * before. Same rules as apply(), for that player only. Runs inside the caller's transaction.
+     */
+    public static function applyFor(int $userId, int $seasonNumber, string $seasonName): array
+    {
+        $db = db_connect();
+        $plan = self::plan($userId)[0] ?? null;
+        if (!$plan) return [];
+        $now = date('Y-m-d H:i:s');
+
+        if (!$db->table('season_legacy')->where('season_number', $seasonNumber)->where('user_id', $userId)->countAllResults()) {
+            $db->table('season_legacy')->insert([
+                'season_number' => $seasonNumber, 'user_id' => $userId, 'net_worth' => $plan['net_worth'],
+                'legacy_bonus' => $plan['legacy_bonus'], 'starting_cash' => $plan['starting_cash'], 'created_at' => $now,
+            ]);
+        }
+        foreach (self::RESET_TABLES as $table) {
+            if ($db->tableExists($table)) $db->table($table)->where('user_id', $userId)->delete();
+        }
+        if ($db->tableExists('tournaments')) {
+            $db->table('tournaments')->where('host_id', $userId)->where('status !=', 'ended')->update(['status' => 'ended']);
+        }
+        $db->table('player_finances')->where('user_id', $userId)->update([
+            'cash' => $plan['starting_cash'] + $plan['legacy_bonus'], 'total_income' => 0, 'total_expenses' => 0,
+            'daily_visitors' => 0, 'reputation' => 0, 'resort_open' => 1, 'last_tick' => null, 'updated_at' => $now,
+        ]);
+        $bonus = $plan['legacy_bonus'] > 0 ? ' Your legacy bonus from last season: ' . currency($plan['legacy_bonus']) . '.' : '';
+        notify($userId, 'season', $seasonName . ' starts fresh',
+            'Your resort starts over with ' . currency($plan['starting_cash'] + $plan['legacy_bonus']) . '.' . $bonus,
+            'fa-solid fa-mountain-sun', '/map');
+        return $plan;
+    }
+
     /** Start the active season over on day 1 (its weather is regenerated from day 1 by App\Libraries\Weather) */
     public static function restartActiveSeason(): array
     {
@@ -113,7 +148,7 @@ class SeasonReset
         $season = $db->table('seasons')->where('active', 1)->orderBy('season_number', 'DESC')->get()->getRowArray();
         if (!$season) throw new \RuntimeException('No active season');
 
-        $db->table('weather')->emptyTable();
+        $db->table('weather')->where('season_number', (int) $season['season_number'])->delete();
         $db->table('seasons')->where('id', (int) $season['id'])->update(['start_date' => date('Y-m-d')]);
         return $season;
     }

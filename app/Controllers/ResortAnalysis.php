@@ -103,7 +103,7 @@ class ResortAnalysis extends BaseController
     private function todayReport(int $userId): ?array
     {
         return db_connect()->table('resort_reports')->where('user_id', $userId)->where('game_day', getGameDay())
-            ->where('created_at >=', getSeasonStartDate() . ' 00:00:00')->get()->getRowArray();
+            ->where('created_at >=', getSeasonRecordsSince() . ' 00:00:00')->get()->getRowArray();
     }
 
     public function order()

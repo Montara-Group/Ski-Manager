@@ -79,15 +79,16 @@ function getCurrentWeather(): array
 
     // Generates today's (and tomorrow's) row if the tick hasn't, e.g. right after a season starts
     \App\Libraries\Weather::ensure($gameDay + 1);
-    $row = $db->table('weather')->where('game_day', $gameDay)->get()->getRowArray();
+    $season = function_exists('getSeasonNumber') ? getSeasonNumber() : 1;
+    $row = $db->table('weather')->where('season_number', $season)->where('game_day', $gameDay)->get()->getRowArray();
 
     if (!$row) {
         // Fallback: lookup latest game_day <= today
-        $row = $db->table('weather')->where('game_day <=', $gameDay)->orderBy('game_day', 'DESC')->limit(1)->get()->getRowArray();
+        $row = $db->table('weather')->where('season_number', $season)->where('game_day <=', $gameDay)->orderBy('game_day', 'DESC')->limit(1)->get()->getRowArray();
 
         // If none, take any latest
         if (!$row) {
-            $row = $db->table('weather')->orderBy('game_day', 'DESC')->limit(1)->get()->getRowArray();
+            $row = $db->table('weather')->where('season_number', $season)->orderBy('game_day', 'DESC')->limit(1)->get()->getRowArray();
         }
     }
 

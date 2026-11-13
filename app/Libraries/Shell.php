@@ -175,11 +175,13 @@ class Shell
                 'tempIcon' => $weather['temp'] <= -5 ? 'fa-snowflake' : ($weather['temp'] <= 0 ? 'fa-cloud' : 'fa-sun'),
                 'weather' => (string) ($weather['condition_name'] ?? ''),
                 'snow' => snow((int) $weather['snow_base']),
-                'gameDay' => (int) $weather['game_day'],
+                'gameDay' => getSeasonDay(),
                 'seasonLength' => getSeasonLength(),
                 // Resort clock: server time, so the browser's own clock is never trusted
                 'now' => time(),
                 'timezone' => 'America/New_York',
+                // Own-pace seasons (App\Libraries\Clock): Next day button and autopilot
+                'clock' => \App\Libraries\Clock::state($userId),
                 'genepis' => (int) ($genepis['balance'] ?? 0),
                 'stars' => (int) ($rating['stars'] ?? 0),
             ] : null,

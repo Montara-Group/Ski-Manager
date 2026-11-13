@@ -12,8 +12,7 @@ class GameLogger
         $finalUserId = $userId ?? auth()->id() ?? null;
 
         if ($day === null) {
-            $startDate = function_exists('getSeasonStartDate') ? getSeasonStartDate() : date('Y-m-d');
-            $day = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
+            $day = $finalUserId ? getGameDayFor((int) $finalUserId) : getGameDay();
         }
 
         if ($finalUserId) {

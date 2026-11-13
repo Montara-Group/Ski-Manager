@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Button, toast } from '@heroui/react';
 import { Icon } from '@/components/Icon';
+import { ApiError } from '@/lib/api';
+import { sendNextDay, type ClockState } from '@/lib/clock';
 import type { Stats } from '@/lib/shell';
 
 type ZoneParts = { year: number; month: number; day: number; hour: number; minute: number };
@@ -108,17 +111,21 @@ export default function StatsBar(stats: Stats) {
             Day <b className="font-semibold">{stats.gameDay}</b>/{stats.seasonLength}
           </span>
         </Stat>
-        <li aria-label={clockLabel}>
-          <span
-            title={clockLabel}
-            aria-hidden="true"
-            className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 whitespace-nowrap pointer-coarse:min-h-11 text-muted"
-          >
-            <Icon name="fa-clock" className="text-muted" />
-            <span className="font-semibold tabular-nums">{time}</span>
-            <span className="hidden text-xs sm:inline">Next day in {next.short}</span>
-          </span>
-        </li>
+        {stats.clock?.enabled ? (
+          <NextDay clock={stats.clock} time={time} autopilotIn={next} />
+        ) : (
+          <li aria-label={clockLabel}>
+            <span
+              title={clockLabel}
+              aria-hidden="true"
+              className="flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2 whitespace-nowrap pointer-coarse:min-h-11 text-muted"
+            >
+              <Icon name="fa-clock" className="text-muted" />
+              <span className="font-semibold tabular-nums">{time}</span>
+              <span className="hidden text-xs sm:inline">Next day in {next.short}</span>
+            </span>
+          </li>
+        )}
         <Stat href="/genepis" label={`${stats.genepis.toLocaleString('en-US')} Génépis. Open the Génépis shop`} icon="fa-seedling" tone="text-success">
           <span className="font-semibold tabular-nums">{stats.genepis.toLocaleString('en-US')}</span>
         </Stat>
@@ -127,6 +134,53 @@ export default function StatsBar(stats: Stats) {
         </Stat>
       </ul>
     </div>
+  );
+}
+
+/** Own-pace seasons: the Next day button, today's remaining presses and what autopilot does tonight */
+function NextDay({ clock, time, autopilotIn }: { clock: Extract<ClockState, { enabled: true }>; time: string; autopilotIn: { short: string; long: string } }) {
+  const [busy, setBusy] = useState(false);
+  const blocked = clock.seasonComplete ? 'Season complete' : clock.left === 0 ? 'No days left today' : null;
+  const auto = !clock.autopilot ? 'Autopilot off' : clock.autopilotTonight ? `Autopilot in ${autopilotIn.short}` : 'Autopilot skips tonight';
+  const autoLong = !clock.autopilot
+    ? 'Autopilot is off'
+    : clock.autopilotTonight
+      ? `Autopilot adds a day in ${autopilotIn.long}`
+      : 'You pressed Next day today, so autopilot skips tonight';
+  const label = blocked
+    ? `${blocked}. Resort time ${time}. ${autoLong}`
+    : `Next day, ${clock.left} of ${clock.cap} left today. Resort time ${time}. ${autoLong}`;
+
+  const press = async () => {
+    setBusy(true);
+    try {
+      await sendNextDay();
+      // Every page figure depends on the day: reload to show the new one
+      window.location.reload();
+    } catch (e) {
+      toast.danger(e instanceof ApiError ? e.message : "The day didn't run. Try again.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="flex shrink-0 items-center gap-2 px-1">
+      <Button
+        size="sm"
+        variant="primary"
+        className="min-h-9 pointer-coarse:min-h-11"
+        onPress={press}
+        isDisabled={blocked !== null || busy}
+        isPending={busy}
+        aria-label={label}
+      >
+        <Icon name="fa-forward-step" />
+        {blocked ?? <>Next day <span className="tabular-nums">({clock.left} left)</span></>}
+      </Button>
+      <span aria-hidden="true" title={label} className="hidden whitespace-nowrap text-xs text-muted sm:inline">
+        {time} · {auto}
+      </span>
+    </li>
   );
 }
 

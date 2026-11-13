@@ -113,14 +113,18 @@ class Weather
         return max(0, (int) round($prevBase + $w['snowfall'] - $melt - $settle));
     }
 
-    /** Make sure every day of the current season up to $upTo has a weather row */
-    public static function ensure(int $upTo): void
+    /**
+     * Make sure every day of a season up to $upTo has a weather row. $season defaults to the current
+     * player's season; rows are shared by everyone on the same season and day.
+     */
+    public static function ensure(int $upTo, ?int $season = null): void
     {
         $db = db_connect();
-        $season = function_exists('getSeasonNumber') ? (int) getSeasonNumber() : 1;
-        $winterDays = getWinterDays();
-        $upTo = max(1, min($upTo, getSeasonLength() + 1));
-        $rows = array_column($db->table('weather')->select('game_day, snow_base')->where('game_day <=', $upTo)->get()->getResultArray(), 'snow_base', 'game_day');
+        $season ??= function_exists('getSeasonNumber') ? (int) getSeasonNumber() : 1;
+        $def = function_exists('getSeasonByNumber') ? (getSeasonByNumber($season) ?? getCurrentSeason()) : getCurrentSeason();
+        $winterDays = (int) $def['winter_days'];
+        $upTo = max(1, min($upTo, max(1, (int) $def['duration_days']) + 1));
+        $rows = array_column($db->table('weather')->select('game_day, snow_base')->where('season_number', $season)->where('game_day <=', $upTo)->get()->getResultArray(), 'snow_base', 'game_day');
         if (count($rows) >= $upTo) return;
 
         $base = self::START_BASE;
@@ -128,7 +132,9 @@ class Weather
             if (isset($rows[$d])) { $base = (int) $rows[$d]; continue; }
             $w = self::day($season, $d, $winterDays);
             $base = $d === 1 ? self::START_BASE + $w['snowfall'] : self::nextBase($base, $w, self::phase($d, $winterDays) === 'summer');
-            $db->table('weather')->insert([
+            // IGNORE: two requests generating the same day at once must not fail on the (season, day) key
+            $db->table('weather')->ignore(true)->insert([
+                'season_number' => $season,
                 'game_day' => $d, 'temp' => $w['temp'], 'condition_name' => $w['condition'], 'wind' => $w['wind'],
                 'snowfall' => $w['snowfall'], 'visibility' => $w['visibility'], 'humidity' => $w['humidity'],
                 'snow_base' => $base, 'forecast' => json_encode(self::forecast($season, $d, $winterDays)), 'created_at' => date('Y-m-d H:i:s'),

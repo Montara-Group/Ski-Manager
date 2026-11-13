@@ -5,9 +5,14 @@ import { Page, Panel } from '@/components/Page';
 type Row = {
   id: number; rank: number; username: string; resortName: string; profit: string; profitPositive: boolean;
   skiers: string; cash: string; score: string | null; slopes: number; lifts: number; buildings: number; isMe: boolean;
+  /** Own-pace seasons: the resort's own game day */
+  day?: number | null;
 };
 type Props = {
   v2: boolean;
+  /** Own-pace seasons: ranked by average profit per day within the viewer's season */
+  ownPace?: boolean;
+  minDays?: number;
   subtitle: string;
   difficulty: string;
   me: (Row & { behind: string | null }) | null;
@@ -51,7 +56,7 @@ export default function LeaderboardPage(p: Props) {
       {p.me ? (
         <section aria-label="Your position" className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl border border-accent bg-accent-soft p-4 text-sm">
           <span>Your position: <b className="text-lg"><Medal rank={p.me.rank} /> #{p.me.rank}</b> of {p.rankedCount}</span>
-          <span>Season profit: <b className={p.me.profitPositive ? 'text-success' : 'text-danger'}>{p.me.profit}</b></span>
+          <span>{p.ownPace ? 'Profit per day' : 'Season profit'}: <b className={p.me.profitPositive ? 'text-success' : 'text-danger'}>{p.me.profit}</b></span>
           {p.me.behind && <span className="text-muted">{p.me.behind} behind the leader</span>}
         </section>
       ) : p.meUnranked && (
@@ -80,7 +85,7 @@ export default function LeaderboardPage(p: Props) {
               <tr className="border-b border-border">
                 <th scope="col" className="p-3 font-medium">Rank</th>
                 <th scope="col" className="p-3 font-medium">Resort manager</th>
-                <th scope="col" className="p-3 font-medium">{p.v2 ? 'Season profit' : 'Net profit'}</th>
+                <th scope="col" className="p-3 font-medium">{p.ownPace ? 'Profit per day' : p.v2 ? 'Season profit' : 'Net profit'}</th>
                 <th scope="col" className="hidden p-3 font-medium sm:table-cell">Skiers today</th>
                 <th scope="col" className="hidden p-3 font-medium md:table-cell">Resort</th>
                 <th scope="col" className="hidden p-3 font-medium lg:table-cell">Cash</th>
@@ -104,8 +109,12 @@ export default function LeaderboardPage(p: Props) {
       </Panel>
       <p className="text-sm text-muted">
         Showing the top {p.shown} of {p.rankedCount} ranked resort{p.rankedCount === 1 ? '' : 's'}.{' '}
-        {p.unranked > 0 && <>{p.unranked} manager{p.unranked === 1 ? " hasn't" : "s haven't"} built anything yet this season. </>}
-        Profit is income minus running costs since the season started; tied resorts share a rank.
+        {p.unranked > 0 && (p.ownPace
+          ? <>{p.unranked} resort{p.unranked === 1 ? " isn't" : "s aren't"} ranked yet: nothing built, or fewer than {p.minDays} days played. </>
+          : <>{p.unranked} manager{p.unranked === 1 ? " hasn't" : "s haven't"} built anything yet this season. </>)}
+        {p.ownPace
+          ? <>Every resort is on its own day, so the board compares season profit divided by days played. A resort is ranked after {p.minDays} days; tied resorts share a rank.</>
+          : <>Profit is income minus running costs since the season started; tied resorts share a rank.</>}
       </p>
 
       {p.pastSeasons.length > 0 && (
@@ -172,6 +181,7 @@ function PlayerRow({ row: r, v2 }: { row: Row; v2: boolean }) {
               )}
             </div>
             {r.resortName && <div className="truncate text-muted">{r.resortName}</div>}
+            {r.day != null && <div className="text-muted">Day {r.day}</div>}
           </div>
         </div>
       </td>

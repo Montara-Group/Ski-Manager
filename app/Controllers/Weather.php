@@ -27,7 +27,7 @@ class Weather extends BaseController
         $winterDays = getWinterDays();
 
         $history = db_connect()->table('weather')->select('game_day, snow_base, snowfall, temp, condition_name')
-            ->where('game_day <=', $gameDay)->where('game_day >', $gameDay - 21)->orderBy('game_day')->get()->getResultArray();
+            ->where('season_number', getSeasonNumber())->where('game_day <=', $gameDay)->where('game_day >', $gameDay - 21)->orderBy('game_day')->get()->getResultArray();
 
         $warm = $baseTemp > 0 || in_array($condition, ['Rain', 'Freezing Rain'], true);
         $quality = match (true) {

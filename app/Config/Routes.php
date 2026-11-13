@@ -151,6 +151,9 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1', 'filter' => '
     $routes->get('me', 'Me::index');
     $routes->post('season-vote', 'SeasonVote::vote');
     $routes->post('season-vote/snooze', 'SeasonVote::snooze');
+    // Own-pace seasons (App\Libraries\Clock): Next day and the autopilot switch
+    $routes->post('day/next', 'Day::next');
+    $routes->post('day/autopilot', 'Day::autopilot');
     // Beta program (App\Libraries\Beta): join, leave, per-feature switch, feedback
     $routes->post('beta/join', 'Beta::join');
     $routes->post('beta/leave', 'Beta::leave');
@@ -166,6 +169,9 @@ $routes->group('api/v1/app', ['namespace' => 'App\Controllers\Api\V1\App'], stat
     $routes->group('', ['filter' => 'apptoken'], static function ($routes) {
         $routes->post('auth/logout', 'Auth::logout');
         $routes->get('me', 'Me::show');
+        $routes->get('day', 'Day::show');
+        $routes->post('day/next', 'Day::next');
+        $routes->post('day/autopilot', 'Day::autopilot');
         $routes->post('profile', 'Profile::submit');
         $routes->get('dashboard', 'Dashboard::show');
         $routes->get('finances', 'Finances::show');

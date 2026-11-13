@@ -3,8 +3,8 @@
 function log_activity(int $userId, string $category, string $message, string $icon = 'fa-solid fa-circle-info'): void
 {
     $db = db_connect();
-    $startDate = getSeasonStartDate();
-    $gameDay = max(1, (int)((strtotime(date('Y-m-d')) - strtotime($startDate)) / 86400) + 1);
+    // The player's own day (own-pace seasons), even when the row is written for someone else
+    $gameDay = $userId > 0 ? getGameDayFor($userId) : getGameDay();
 
     // Resolve username dynamically for the master admin log layout
     $username = 'System';

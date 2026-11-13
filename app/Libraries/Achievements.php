@@ -140,7 +140,7 @@ class Achievements
         $summerProfit = $inSummer ? (int) $db->query(
             "SELECT COUNT(*) n FROM (SELECT game_day, SUM(IF(type = 'income', amount, -amount)) net FROM financial_transactions
              WHERE user_id = ? AND game_day > ? AND created_at >= ? AND category IN ('Daily Income', 'Daily Expenses') GROUP BY game_day) d WHERE d.net > 0",
-            [$userId, $winterDays, getSeasonStartDate() . ' 00:00:00']
+            [$userId, $winterDays, getSeasonRecordsSince() . ' 00:00:00']
         )->getRow('n') : 0;
 
         $joined = $db->table('users')->select('created_at')->where('id', $userId)->get()->getRow('created_at');

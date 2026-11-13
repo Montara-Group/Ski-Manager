@@ -1,0 +1,1 @@
+import{n as e}from"./api-DhQwUZyH.js";function t(){return e(`day/next`,{method:`POST`,body:{}})}function n(t){return e(`day/autopilot`,{method:`POST`,body:{on:t}})}export{t as n,n as t};
