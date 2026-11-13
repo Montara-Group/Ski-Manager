@@ -1,3 +1,11 @@
+## Release 2026-11-13 19:18
+
+* Merge pull request #95 from Montara-Group/feat/notifications-revamp (0337d4ef)
+* feat(notifications): categories, per-item read, paging and a better bell (aa08e09f)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (24596647)
+* Merge pull request #94 from Montara-Group/main (9ab8901b)
+* chore(changelog): update CHANGELOG.md and updates view [skip ci] (dd89ce57)
+
 ## Release 2026-11-13 04:18
 
 * Merge pull request #94 from Montara-Group/main (9ab8901b)
