@@ -164,7 +164,8 @@ function NextDay({ clock, time, autopilotIn }: { clock: Extract<ClockState, { en
   };
 
   return (
-    <li className="flex shrink-0 items-center gap-2 px-1">
+    // First on phones, where the bar scrolls sideways and later items start out of view
+    <li className="order-first flex shrink-0 items-center gap-2 px-1 sm:order-none">
       <Button
         size="sm"
         variant="primary"
