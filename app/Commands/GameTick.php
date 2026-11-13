@@ -63,8 +63,8 @@ class GameTick extends BaseCommand
                     $db->resetTransStatus();
                     $db->transBegin();
 
-                    Clock::as($userId, fn() => DayTick::run($userId));
-                    Clock::syncShared($userId);
+                    $report = Clock::as($userId, fn() => DayTick::run($userId));
+                    Clock::syncShared($userId, (int) $report['visitors']);
 
                     if ($db->transStatus() === false) {
                         $db->transRollback();

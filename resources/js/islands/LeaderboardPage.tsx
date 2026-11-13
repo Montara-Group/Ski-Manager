@@ -5,8 +5,9 @@ import { Page, Panel } from '@/components/Page';
 type Row = {
   id: number; rank: number; username: string; resortName: string; profit: string; profitPositive: boolean;
   skiers: string; cash: string; score: string | null; slopes: number; lifts: number; buildings: number; isMe: boolean;
-  /** Own-pace seasons: the resort's own game day */
+  /** Own-pace seasons: the resort's own game day and its score parts (0 to 250 each) */
   day?: number | null;
+  scoreParts?: { profit: number; rating: number; reputation: number; visitors: number } | null;
 };
 type Props = {
   v2: boolean;
@@ -22,7 +23,7 @@ type Props = {
   shown: number;
   rankedCount: number;
   unranked: number;
-  pastSeasons: { number: number; name: string; rows: { rank: number; username: string; resortName: string; cash: string; slopes: number; lifts: number }[] }[];
+  pastSeasons: { number: number; name: string; rows: { rank: number; username: string; resortName: string; cash: string; slopes: number; lifts: number; score?: string | null }[] }[];
 };
 
 const BOARDS = [['easy', 'Easy'], ['standard', 'Standard'], ['hard', 'Hard'], ['all', 'All']] as const;
@@ -56,7 +57,11 @@ export default function LeaderboardPage(p: Props) {
       {p.me ? (
         <section aria-label="Your position" className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-xl border border-accent bg-accent-soft p-4 text-sm">
           <span>Your position: <b className="text-lg"><Medal rank={p.me.rank} /> #{p.me.rank}</b> of {p.rankedCount}</span>
-          <span>{p.ownPace ? 'Profit per day' : 'Season profit'}: <b className={p.me.profitPositive ? 'text-success' : 'text-danger'}>{p.me.profit}</b></span>
+          {p.ownPace ? (
+            <span>Resort score: <b>{p.me.score}</b> <span className="text-muted">({p.me.profit})</span></span>
+          ) : (
+            <span>Season profit: <b className={p.me.profitPositive ? 'text-success' : 'text-danger'}>{p.me.profit}</b></span>
+          )}
           {p.me.behind && <span className="text-muted">{p.me.behind} behind the leader</span>}
         </section>
       ) : p.meUnranked && (
@@ -71,7 +76,7 @@ export default function LeaderboardPage(p: Props) {
             <li key={r.id} className={`rounded-xl border bg-surface p-3 text-center sm:p-4 ${r.rank === 1 ? 'border-warning sm:py-6' : 'border-border'}`}>
               <div className="text-3xl"><Medal rank={r.rank} /><span className="sr-only">Rank {r.rank}</span></div>
               <div className="truncate font-semibold">{r.username}</div>
-              <div className="text-sm font-semibold text-success sm:text-lg">{p.v2 ? r.profit : r.score}</div>
+              <div className="text-sm font-semibold text-success sm:text-lg">{p.ownPace ? r.score : p.v2 ? r.profit : r.score}</div>
               <div className="text-sm text-muted">{r.slopes} slopes · {r.lifts} lifts</div>
             </li>
           ))}
@@ -85,7 +90,7 @@ export default function LeaderboardPage(p: Props) {
               <tr className="border-b border-border">
                 <th scope="col" className="p-3 font-medium">Rank</th>
                 <th scope="col" className="p-3 font-medium">Resort manager</th>
-                <th scope="col" className="p-3 font-medium">{p.ownPace ? 'Profit per day' : p.v2 ? 'Season profit' : 'Net profit'}</th>
+                <th scope="col" className="p-3 font-medium">{p.ownPace ? 'Resort score' : p.v2 ? 'Season profit' : 'Net profit'}</th>
                 <th scope="col" className="hidden p-3 font-medium sm:table-cell">Skiers today</th>
                 <th scope="col" className="hidden p-3 font-medium md:table-cell">Resort</th>
                 <th scope="col" className="hidden p-3 font-medium lg:table-cell">Cash</th>
@@ -93,11 +98,11 @@ export default function LeaderboardPage(p: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {p.players.map((r) => <PlayerRow key={r.id} row={r} v2={p.v2} />)}
+              {p.players.map((r) => <PlayerRow key={r.id} row={r} v2={p.v2} ownPace={!!p.ownPace} />)}
               {p.meOutsideTop && p.me && (
                 <>
                   <tr aria-hidden="true"><td colSpan={7} className="py-1 text-center text-muted">…</td></tr>
-                  <PlayerRow row={p.me} v2={p.v2} />
+                  <PlayerRow row={p.me} v2={p.v2} ownPace={!!p.ownPace} />
                 </>
               )}
               {p.players.length === 0 && (
@@ -113,7 +118,7 @@ export default function LeaderboardPage(p: Props) {
           ? <>{p.unranked} resort{p.unranked === 1 ? " isn't" : "s aren't"} ranked yet: nothing built, or fewer than {p.minDays} days played. </>
           : <>{p.unranked} manager{p.unranked === 1 ? " hasn't" : "s haven't"} built anything yet this season. </>)}
         {p.ownPace
-          ? <>Every resort is on its own day, so the board compares season profit divided by days played. A resort is ranked after {p.minDays} days; tied resorts share a rank.</>
+          ? <>Every resort is on its own day, so the board ranks a resort score out of 1,000: up to 250 points each for profit per day, star rating, reputation and visitors per day. A resort is ranked after {p.minDays} days and moves to the season's final board on its last day; tied resorts share a rank.</>
           : <>Profit is income minus running costs since the season started; tied resorts share a rank.</>}
       </p>
 
@@ -132,14 +137,14 @@ export default function LeaderboardPage(p: Props) {
                 <div className="overflow-x-auto px-2 pb-3">
                   <table className="w-full text-sm">
                     <thead className="text-left text-muted">
-                      <tr><th scope="col" className="p-2 font-medium">Rank</th><th scope="col" className="p-2 font-medium">Manager</th><th scope="col" className="p-2 font-medium">Final cash</th><th scope="col" className="hidden p-2 font-medium sm:table-cell">Resort</th></tr>
+                      <tr><th scope="col" className="p-2 font-medium">Rank</th><th scope="col" className="p-2 font-medium">Manager</th><th scope="col" className="p-2 font-medium">{season.rows.some((r) => r.score) ? 'Final score' : 'Final cash'}</th><th scope="col" className="hidden p-2 font-medium sm:table-cell">Resort</th></tr>
                     </thead>
                     <tbody className="divide-y divide-border">
                       {season.rows.map((r) => (
                         <tr key={r.rank + r.username}>
                           <td className="whitespace-nowrap p-2 font-semibold"><Medal rank={r.rank} /> {r.rank}</td>
                           <td className="p-2"><div className="font-semibold">{r.username}</div>{r.resortName && <div className="text-muted">{r.resortName}</div>}</td>
-                          <td className="p-2 tabular-nums">{r.cash}</td>
+                          <td className="p-2 tabular-nums">{r.score ?? r.cash}</td>
                           <td className="hidden p-2 sm:table-cell">{r.slopes} slopes · {r.lifts} lifts</td>
                         </tr>
                       ))}
@@ -164,7 +169,7 @@ export default function LeaderboardPage(p: Props) {
   );
 }
 
-function PlayerRow({ row: r, v2 }: { row: Row; v2: boolean }) {
+function PlayerRow({ row: r, v2, ownPace }: { row: Row; v2: boolean; ownPace: boolean }) {
   return (
     <tr className={r.isMe ? 'bg-accent-soft' : ''}>
       <td className="whitespace-nowrap p-3 font-semibold"><Medal rank={r.rank} /> {r.rank}</td>
@@ -185,7 +190,19 @@ function PlayerRow({ row: r, v2 }: { row: Row; v2: boolean }) {
           </div>
         </div>
       </td>
-      <td className={`whitespace-nowrap p-3 font-semibold tabular-nums ${r.profitPositive ? 'text-success' : 'text-danger'}`}>{r.profit}</td>
+      {ownPace ? (
+        <td className="whitespace-nowrap p-3 tabular-nums">
+          <div className="font-semibold">{r.score}</div>
+          <div className={`text-sm ${r.profitPositive ? 'text-success' : 'text-danger'}`}>{r.profit}</div>
+          {r.scoreParts && (
+            <div className="text-xs text-muted">
+              Profit {r.scoreParts.profit} · Stars {r.scoreParts.rating} · Rep. {r.scoreParts.reputation} · Visitors {r.scoreParts.visitors}
+            </div>
+          )}
+        </td>
+      ) : (
+        <td className={`whitespace-nowrap p-3 font-semibold tabular-nums ${r.profitPositive ? 'text-success' : 'text-danger'}`}>{r.profit}</td>
+      )}
       <td className="hidden whitespace-nowrap p-3 tabular-nums sm:table-cell">{r.skiers}</td>
       <td className="hidden whitespace-nowrap p-3 md:table-cell">{r.slopes} slopes · {r.lifts} lifts · {r.buildings} buildings</td>
       <td className="hidden whitespace-nowrap p-3 tabular-nums lg:table-cell">{r.cash}</td>

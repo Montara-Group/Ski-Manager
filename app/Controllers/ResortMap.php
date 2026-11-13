@@ -140,7 +140,8 @@ class ResortMap extends BaseController
             $userCash = (int) ($finRow['cash'] ?? 0);
         }
 
-        $releasedSectorIds = array_column(array_filter($sectors, fn($s) => $s['released']), 'id');
+        // Released for this player: by their own season with own-pace seasons (App\Libraries\Sectors)
+        $releasedSectorIds = \App\Libraries\Sectors::openIds($sectors, $userId ? (int) $userId : null);
         $lifts = $slopes = 0;
         foreach ($segments as $s) {
             $s['type'] === 'lift' ? $lifts++ : $slopes++;
@@ -381,6 +382,11 @@ class ResortMap extends BaseController
                 ->get()->getRowArray();
             if (!$sec) {
                 return $this->response->setStatusCode(403)->setJSON(['error' => 'This sector is currently unavailable.', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
+            }
+            // Own-pace seasons: a sector opens in the season it is released in
+            $uid = (int) auth()->id();
+            if (\App\Libraries\Clock::enabledFor($uid) && !\App\Libraries\Sectors::isOpen($sec, $uid)) {
+                return $this->response->setStatusCode(403)->setJSON(['error' => 'This sector opens in a later season.', 'csrf_token' => csrf_token(), 'csrf_hash' => csrf_hash()]);
             }
         }
 

@@ -106,13 +106,19 @@ export default function StatsBar(stats: Stats) {
         <Stat href="/snowmaking" label={`Snow base ${stats.snow}. Open Snowmaking`} icon="fa-layer-group" tone="text-link">
           <span className="tabular-nums">{stats.snow}</span>
         </Stat>
-        <Stat label={`Season day ${stats.gameDay} of ${stats.seasonLength}`} icon="fa-calendar-day" tone="text-muted">
-          <span className="tabular-nums">
-            Day <b className="font-semibold">{stats.gameDay}</b>/{stats.seasonLength}
-          </span>
-        </Stat>
+        {stats.clock?.enabled && stats.clock.freePlay ? (
+          <Stat label={`Season complete. Free play, season day ${stats.gameDay}`} icon="fa-flag-checkered" tone="text-success">
+            <span>Free play</span>
+          </Stat>
+        ) : (
+          <Stat label={`Season day ${stats.gameDay} of ${stats.seasonLength}`} icon="fa-calendar-day" tone="text-muted">
+            <span className="tabular-nums">
+              Day <b className="font-semibold">{stats.gameDay}</b>/{stats.seasonLength}
+            </span>
+          </Stat>
+        )}
         {stats.clock?.enabled ? (
-          <NextDay clock={stats.clock} time={time} autopilotIn={next} />
+          <NextDay clock={stats.clock} time={time} autopilotIn={next} now={now} />
         ) : (
           <li aria-label={clockLabel}>
             <span
@@ -137,19 +143,22 @@ export default function StatsBar(stats: Stats) {
   );
 }
 
-/** Own-pace seasons: the Next day button, today's remaining presses and what autopilot does tonight */
-function NextDay({ clock, time, autopilotIn }: { clock: Extract<ClockState, { enabled: true }>; time: string; autopilotIn: { short: string; long: string } }) {
+/** Own-pace seasons: the Next day button, saved days and what autopilot does tonight */
+function NextDay({ clock, time, autopilotIn, now }: { clock: Extract<ClockState, { enabled: true }>; time: string; autopilotIn: { short: string; long: string }; now: number }) {
   const [busy, setBusy] = useState(false);
-  const blocked = clock.seasonComplete ? 'Season complete' : clock.left === 0 ? 'No days left today' : null;
+  const refill = clock.nextBankAt ? countdown(clock.nextBankAt * 1000 - now) : null;
+  const empty = clock.bank < 1;
   const auto = !clock.autopilot ? 'Autopilot off' : clock.autopilotTonight ? `Autopilot in ${autopilotIn.short}` : 'Autopilot skips tonight';
   const autoLong = !clock.autopilot
     ? 'Autopilot is off'
     : clock.autopilotTonight
       ? `Autopilot adds a day in ${autopilotIn.long}`
       : 'You pressed Next day today, so autopilot skips tonight';
-  const label = blocked
-    ? `${blocked}. Resort time ${time}. ${autoLong}`
-    : `Next day, ${clock.left} of ${clock.cap} left today. Resort time ${time}. ${autoLong}`;
+  const action = clock.nextSeasonReady ? `Start ${clock.nextSeasonName ?? 'the next season'}` : 'Next day';
+  const saved = `${clock.bank} of ${clock.bankMax} days saved`;
+  const label = empty && refill
+    ? `No saved days. The next one is ready in ${refill.long}. Resort time ${time}. ${autoLong}`
+    : `${action}, ${saved}${refill ? `, next one in ${refill.long}` : ''}. Resort time ${time}. ${autoLong}`;
 
   const press = async () => {
     setBusy(true);
@@ -171,12 +180,12 @@ function NextDay({ clock, time, autopilotIn }: { clock: Extract<ClockState, { en
         variant="primary"
         className="min-h-9 pointer-coarse:min-h-11"
         onPress={press}
-        isDisabled={blocked !== null || busy}
+        isDisabled={empty || busy}
         isPending={busy}
         aria-label={label}
       >
         <Icon name="fa-forward-step" />
-        {blocked ?? <>Next day <span className="tabular-nums">({clock.left} left)</span></>}
+        {empty && refill ? <>Next day in <span className="tabular-nums">{refill.short}</span></> : <>{action} <span className="tabular-nums">({clock.bank} saved)</span></>}
       </Button>
       <span aria-hidden="true" title={label} className="hidden whitespace-nowrap text-xs text-muted sm:inline">
         {time} · {auto}

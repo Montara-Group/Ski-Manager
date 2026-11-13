@@ -1283,13 +1283,58 @@ class Admin extends BaseController
 
         $resortMaps = \App\Controllers\ResortMap::getResortMapNames();
 
+        // Sectors each season opens (App\Libraries\Sectors), with how many runs and lifts each holds
+        $counts = [];
+        foreach ($db->query("SELECT sector, SUM(type = 'lift') lifts, SUM(type <> 'lift') runs FROM map_segments WHERE active = 1 GROUP BY sector")->getResultArray() as $c) {
+            $counts[(int) $c['sector']] = ['lifts' => (int) $c['lifts'], 'runs' => (int) $c['runs']];
+        }
+        $sectors = array_map(fn($s) => [
+            'id' => (int) $s['id'],
+            'name' => (string) $s['name'],
+            'resort_map' => (string) $s['resort_map'],
+            'visible' => (bool) $s['visible'],
+            'release_season' => $s['release_season'] !== null ? (int) $s['release_season'] : null,
+            'runs' => $counts[(int) $s['id']]['runs'] ?? 0,
+            'lifts' => $counts[(int) $s['id']]['lifts'] ?? 0,
+        ], $db->table('resort_sectors')->orderBy('resort_map')->orderBy('sort_order')->orderBy('id')->get()->getResultArray());
+
         $page = [
             'seasons' => $seasons,
             'resortMaps' => $resortMaps,
             'nextSeasonNumber' => count($seasons) + 1,
+            'sectors' => $sectors,
+            'ownPace' => featureLevel('own_pace') > 0,
         ];
 
         return view('admin/seasons', ['page' => $page]);
+    }
+
+    /** POST /admin/seasons/content/{id}: the season's trail map and the sectors it opens */
+    public function saveSeasonContent(int $id)
+    {
+        if (!$this->checkAdmin()) return redirect()->to('/admin/seasons')->with('error', 'Unauthorized access.');
+        $db = db_connect();
+        $season = $db->table('seasons')->where('id', $id)->get()->getRowArray();
+        if (!$season) return redirect()->to('/admin/seasons')->with('error', 'That season no longer exists.');
+
+        $map = (string) $this->request->getPost('resort_map');
+        if (!array_key_exists($map, \App\Controllers\ResortMap::getResortMapNames())) {
+            return redirect()->to('/admin/seasons')->with('error', 'Pick a trail map from the list.');
+        }
+        $number = (int) $season['season_number'];
+        $chosen = array_map('intval', (array) ($this->request->getPost('sectors') ?? []));
+
+        $db->transStart();
+        $db->table('seasons')->where('id', $id)->update(['resort_map' => $map]);
+        // A sector opens in one season: unticked ones that opened here go back to unassigned
+        $db->table('resort_sectors')->where('release_season', $number)->update(['release_season' => null]);
+        if ($chosen) {
+            $db->table('resort_sectors')->where('resort_map', $map)->whereIn('id', $chosen)->update(['release_season' => $number]);
+        }
+        $db->transComplete();
+
+        $this->auditLog('season_content', null, "Season #{$number}: map {$map}, sectors " . ($chosen ? implode(',', $chosen) : 'none'));
+        return redirect()->to('/admin/seasons')->with('success', "Season #{$number} now opens " . count($chosen) . ' sector' . (count($chosen) === 1 ? '' : 's') . '.');
     }
 
     public function activateSeason(int $id)

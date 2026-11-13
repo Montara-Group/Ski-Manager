@@ -75,7 +75,7 @@ class Api extends BaseController
                 'name'            => $sec['name'],
                 'color'           => $sec['color'] ?? '#3b82f6',
                 'boundary_points' => is_array($bPts) ? $bPts : [],
-                'released'        => (bool) ($sec['released'] ?? false),
+                'released'        => \App\Libraries\Sectors::isOpen($sec, $userId ?: null),
                 'visible'         => (bool) ($sec['visible'] ?? true),
             ];
         }

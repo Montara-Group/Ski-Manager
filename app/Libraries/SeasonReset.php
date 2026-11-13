@@ -78,19 +78,28 @@ class SeasonReset
         if (self::alreadyApplied($seasonNumber)) {
             throw new \RuntimeException("Season {$seasonNumber} resorts were already reset");
         }
-        $plan = self::plan();
+        // Own-pace resorts start their next season when they finish the last one (SeasonEnd::rollover)
+        $all = self::plan();
+        $plan = array_values(array_filter($all, fn($p) => !Clock::enabledFor((int) $p['user_id'])));
+        $skipped = count($all) - count($plan);
         $now = date('Y-m-d H:i:s');
+        if (!$plan) return [];
 
         $db->table('season_legacy')->insertBatch(array_map(fn($p) => [
             'season_number' => $seasonNumber, 'user_id' => $p['user_id'], 'net_worth' => $p['net_worth'],
             'legacy_bonus' => $p['legacy_bonus'], 'starting_cash' => $p['starting_cash'], 'created_at' => $now,
         ], $plan));
 
+        $ids = array_column($plan, 'user_id');
         foreach (self::RESET_TABLES as $table) {
-            if ($db->tableExists($table)) $db->table($table)->emptyTable();
+            if (!$db->tableExists($table)) continue;
+            if ($skipped === 0) $db->table($table)->emptyTable();
+            else $db->table($table)->whereIn('user_id', $ids)->delete();
         }
         if ($db->tableExists('tournaments')) {
-            $db->table('tournaments')->where('status !=', 'ended')->update(['status' => 'ended']);
+            $t = $db->table('tournaments')->where('status !=', 'ended');
+            if ($skipped > 0) $t->whereIn('host_id', $ids);
+            $t->update(['status' => 'ended']);
         }
 
         foreach ($plan as $p) {

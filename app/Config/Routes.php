@@ -30,6 +30,7 @@ $routes->post("/admin/suspicious/(:num)/review", "Admin::reviewSuspect/$1");
 $routes->get("/admin/seasons", "Admin::seasonPlanner");
 $routes->post("/admin/seasons/create", "Admin::createSeason");
 $routes->post("/admin/seasons/activate/(:num)", "Admin::activateSeason/$1");
+$routes->post("/admin/seasons/content/(:num)", "Admin::saveSeasonContent/$1");
 $routes->get("/admin/economy", "Admin::economy");
 $routes->get("/admin/season-vote", "Admin::seasonVote");
 $routes->post("/admin/season-vote/settings", "Admin::saveSeasonVote");

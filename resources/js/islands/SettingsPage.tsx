@@ -565,7 +565,10 @@ function SeasonClockSection({ clock }: { clock: Extract<ClockState, { enabled: t
     >
       <div className="flex flex-col gap-3 text-sm">
         <p>
-          Your resort is on day {clock.day} of {clock.length} in season {clock.seasonNumber}. Next day moves it forward, up to {clock.cap} days per real day. You have {clock.left} left today.
+          {clock.freePlay
+            ? <>Season {clock.seasonNumber} is complete and your resort is in free play until the next season opens.</>
+            : <>Your resort is on day {clock.day} of {clock.length} in season {clock.seasonNumber}.</>}{' '}
+          Next day spends a saved day. You get one every {clock.bankHours} hours and can keep up to {clock.bankMax}; you have {clock.bank} now.
         </p>
         <Switch isSelected={on} onChange={change} isDisabled={busy} placement="end">
           Autopilot

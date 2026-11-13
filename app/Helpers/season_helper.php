@@ -266,6 +266,8 @@ function triggerSeasonRollover(?int $targetSeasonNumber = null, bool $force = fa
                 $rank = 1;
                 foreach ($leaders as $l) {
                     $uId = (int) $l['user_id'];
+                    // Own-pace resorts join the final board when they finish their own season (App\Libraries\SeasonEnd)
+                    if (\App\Libraries\Clock::enabledFor($uId)) continue;
                     $slopesCount = $db->table('player_items')->where('user_id', $uId)->where('item_type', 'slope')->countAllResults();
                     $liftsCount = $db->table('player_items')->where('user_id', $uId)->where('item_type', 'lift')->countAllResults();
 

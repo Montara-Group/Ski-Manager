@@ -15,16 +15,31 @@ export type AdminSeasonRecord = {
   active: boolean;
 };
 
+export type AdminSector = {
+  id: number;
+  name: string;
+  resort_map: string;
+  visible: boolean;
+  /** Season the sector opens in, or null: the old global Released switch decides */
+  release_season: number | null;
+  runs: number;
+  lifts: number;
+};
+
 export type AdminSeasonsPageProps = {
   seasons: AdminSeasonRecord[];
   resortMaps: Record<string, string>;
   nextSeasonNumber: number;
+  sectors?: AdminSector[];
+  ownPace?: boolean;
 };
 
 export default function AdminSeasonsPage({
   seasons,
   resortMaps,
   nextSeasonNumber,
+  sectors = [],
+  ownPace = false,
 }: AdminSeasonsPageProps) {
   const [newSeason, setNewSeason] = useState({
     season_number: nextSeasonNumber,
@@ -114,6 +129,25 @@ export default function AdminSeasonsPage({
                 ))}
               </tbody>
             </table>
+          </div>
+        </Panel>
+
+        <Panel
+          title={
+            <div className="flex items-center gap-2">
+              <Icon name="fa-map" className="text-accent" />
+              <span>What each season opens</span>
+            </div>
+          }
+        >
+          <p className="mb-4 text-sm text-muted">
+            Each season uses one trail map and opens the sectors ticked here. Players on their own pace build in every sector opened by their season or an earlier one, so a sector opens for each player when they reach that season. Runs and lifts belong to a sector: move them between sectors in Map Studio.
+            {!ownPace && ' Own-pace seasons are off, so for now the Released switch in Map Studio still decides for everyone.'}
+          </p>
+          <div className="space-y-4">
+            {seasons.map((s) => (
+              <SeasonContent key={s.id} season={s} resortMaps={resortMaps} sectors={sectors} />
+            ))}
           </div>
         </Panel>
 
@@ -220,5 +254,63 @@ export default function AdminSeasonsPage({
         </Panel>
       </div>
     </Page>
+  );
+}
+
+/** One season's trail map and the sectors it opens (POST /admin/seasons/content/{id}) */
+function SeasonContent({ season, resortMaps, sectors }: { season: AdminSeasonRecord; resortMaps: Record<string, string>; sectors: AdminSector[] }) {
+  const [map, setMap] = useState(season.resort_map || 'ParkCity');
+  const onMap = sectors.filter((x) => x.resort_map === map);
+
+  return (
+    <form action={`/admin/seasons/content/${season.id}`} method="post" className="rounded-xl border border-border p-4">
+      <CsrfInput />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h3 className="font-semibold">
+          Season {season.season_number}: {season.name}
+        </h3>
+        <div className="w-full sm:w-64">
+          <Select
+            name="resort_map"
+            value={map}
+            onChange={(val) => setMap(String(val))}
+            aria-label={`Trail map for season ${season.season_number}`}
+            options={Object.entries(resortMaps).map(([key, name]) => ({ id: key, label: name }))}
+          />
+        </div>
+      </div>
+      {onMap.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">This map has no sectors yet. Draw them in Map Studio.</p>
+      ) : (
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+          {onMap.map((x) => {
+            const elsewhere = x.release_season !== null && x.release_season !== season.season_number;
+            return (
+              <li key={x.id}>
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-lg border border-border p-3 text-sm md:min-h-9">
+                  <input
+                    type="checkbox"
+                    name="sectors[]"
+                    value={x.id}
+                    defaultChecked={x.release_season === season.season_number}
+                    className="mt-0.5 size-5 accent-[var(--accent)]"
+                  />
+                  <span>
+                    <span className="font-semibold">{x.name}</span>
+                    <span className="block text-muted">
+                      {x.runs} runs, {x.lifts} lifts{!x.visible && ' · hidden in Map Studio'}
+                      {elsewhere && ` · opens in season ${x.release_season}; ticking moves it here`}
+                    </span>
+                  </span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <Button type="submit" variant="secondary" className="mt-3 min-h-11 md:min-h-9">
+        Save season {season.season_number}
+      </Button>
+    </form>
   );
 }

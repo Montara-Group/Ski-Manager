@@ -37,7 +37,8 @@ class DayTick
         $user = ['id' => $userId];
         $gameDay = getGameDay();
         $isWinter = isWinterDay();
-        $todayWeather = self::weather(getSeasonNumber(), $gameDay);
+        // Season day, not game day: in free play past the last day the season's weather repeats
+        $todayWeather = self::weather(getSeasonNumber(), getSeasonDay());
 
         if (self::$diffConfigs === null) {
             self::$diffConfigs = [];
