@@ -37,6 +37,7 @@ class Filters extends BaseFilters
         'featuregate' => \App\Filters\FeatureGate::class,
         'admin'         => \App\Filters\AdminFilter::class,
         'maintenance'   => \App\Filters\MaintenanceFilter::class,
+        'privatesite'   => \App\Filters\PrivateSite::class,
         'markdown'      => \App\Filters\MarkdownNegotiationFilter::class,
         'cors'          => Cors::class,
         'apiauth'       => \App\Filters\ApiAuth::class,
@@ -84,6 +85,7 @@ class Filters extends BaseFilters
      */
     public array $globals = [
         'before' => [
+            'privatesite', // staging only: admins only when PRIVATE_SITE = true
             'maintenance',
             // 'honeypot',
             'csrf' => ['except' => ['api/auth', 'api/sync', 'api/v1/app/*']],
@@ -91,6 +93,7 @@ class Filters extends BaseFilters
         ],
         'after' => [
             // 'honeypot',
+            'privatesite',
             'secureheaders',
             'markdown',
         ],
