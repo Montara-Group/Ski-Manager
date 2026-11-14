@@ -164,3 +164,36 @@
       image-set(var(--hero-webp) type("image/webp"), var(--hero-jpg) type("image/jpeg"));
   }
 }
+
+/*
+ * Home page snow report board (DESIGN.md, Identity): light paper and a dark header strip in both
+ * themes, like a real resort board. Ink on paper is 13:1, the muted ink 7:1.
+ */
+.snow-board {
+  --board-paper: oklch(97% 0.012 85);
+  --board-ink: oklch(24% 0.03 260);
+  --board-muted: oklch(42% 0.03 260);
+  --board-rule: oklch(86% 0.015 85);
+  background: var(--board-paper);
+  color: var(--board-ink);
+}
+.snow-board-strip {
+  background: var(--board-ink);
+  color: var(--board-paper);
+}
+.snow-board-cell {
+  border-bottom: 1px solid var(--board-rule);
+}
+.snow-board-cell:nth-child(odd) {
+  border-right: 1px solid var(--board-rule);
+}
+.snow-board-cell dt,
+.snow-board-cell dd + dd,
+.snow-board-note {
+  color: var(--board-muted);
+}
+
+/* Season progress track on the home page, one of the two gradients DESIGN.md allows */
+.season-track {
+  background: linear-gradient(90deg, var(--sign-blue), var(--accent));
+}

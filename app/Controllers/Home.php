@@ -14,180 +14,171 @@ class Home extends BaseController
             '</sitemap.xml>; rel="describedby"; type="text/xml"',
         ]));
 
-        $raw = $this->getHomepageStats();
-
-        $weather = $raw['weather'] ?? null;
-        $snowfall = $weather ? (int) ($weather['snowfall'] ?? 0) : 0;
-        $weatherFormatted = null;
-
-        if ($weather) {
-            $weatherFormatted = [
-                'condition' => $weather['condition'] ?? '',
-                'conditionName' => $weather['condition_name'] ?? ($weather['condition'] ?? 'Clear'),
-                'temp' => isset($weather['temp']) ? temp((int) $weather['temp']) : '–',
-                'snowBase' => isset($weather['snow_base']) ? snow((int) $weather['snow_base']) : '–',
-                'snowfallText' => $snowfall > 0 ? (snow($snowfall) . ' new snow') : 'No new snow',
-                'windText' => isset($weather['wind']) ? speed((int) $weather['wind']) : '–',
-            ];
-        }
-
-        $topPlayer = null;
-        if (!empty($raw['topPlayer'])) {
-            $topPlayer = [
-                'username' => $raw['topPlayer']['username'] ?? 'Player',
-                'cashText' => currency((int) ($raw['topPlayer']['cash'] ?? 0)),
-            ];
-        }
-
-        $standings = [];
-        if (!empty($raw['standings'])) {
-            foreach ($raw['standings'] as $idx => $s) {
-                $standings[] = [
-                    'rank' => $idx + 1,
-                    'username' => $s['username'] ?? '',
-                    'resortName' => $s['resort_name'] ?? '',
-                    'totalLifts' => (int) ($s['total_lifts'] ?? 0),
-                    'totalSlopes' => (int) ($s['total_slopes'] ?? 0),
-                    'cashText' => currency((int) ($s['cash'] ?? 0)),
-                ];
-            }
-        }
-
-        $recent = [];
-        if (!empty($raw['recent'])) {
-            foreach ($raw['recent'] as $r) {
-                $recent[] = [
-                    'username' => $r['username'] ?? '',
-                    'name' => $r['name'] ?? '',
-                    'itemType' => $r['item_type'] ?? 'slope',
-                    'difficulty' => $r['difficulty'] ?? 'blue',
-                    'timeAgoText' => function_exists('timeAgo') ? timeAgo($r['created_at']) : '',
-                ];
-            }
-        }
-
-        $page = [
-            'isLoggedIn' => (bool) (function_exists('auth') && auth()->loggedIn()),
-            'playerCount' => (int) $raw['playerCount'],
-            'playerCountFormatted' => number_format((int) $raw['playerCount']),
-            'totalSlopes' => (int) $raw['totalSlopes'],
-            'totalSlopesFormatted' => number_format((int) $raw['totalSlopes']),
-            'topPlayer' => $topPlayer,
-            'weather' => $weatherFormatted,
-            'season' => [
-                'current' => (int) $raw['currentSeasonNum'],
-                'day' => (int) $raw['seasonDay'],
-                'length' => (int) $raw['seasonLen'],
-                'daysRemaining' => (int) $raw['daysRemaining'],
-                'startDateFormatted' => date('F j, Y', $raw['seasonStart']),
-            ],
-            's2' => [
-                'live' => (bool) $raw['s2Live'],
-                'justOpened' => (bool) $raw['s2JustOpened'],
-                'runs' => (int) $raw['s2Runs'],
-                'lifts' => (int) $raw['s2Lifts'],
-                'steep' => (int) $raw['s2Steep'],
-            ],
-            'standings' => $standings,
-            'recent' => $recent,
-        ];
-
+        $page = $this->pageData();
         return view('home', ['page' => $page]);
     }
 
     /**
-     * Gathers public statistics and season metrics for the landing page.
+     * Everything the home page shows. All of it is live game data: no number on the page is written by hand.
      */
-    protected function getHomepageStats(): array
+    protected function pageData(): array
     {
         $db = db_connect();
+        $notDemo = "(u.status IS NULL OR u.status != 'demo')";
 
-        $playerCount = $db->table('users')->where('id !=', 1)->countAllResults(false);
-        $totalSlopes = $db->table('player_items')->where('item_type', 'slope')->countAllResults(false);
-        $topPlayer = $db->query(
-            "SELECT u.username, pf.cash FROM player_finances pf JOIN users u ON u.id = pf.user_id WHERE u.id != 1 ORDER BY pf.cash DESC LIMIT 1"
-        )->getRowArray();
-        $weather = getCurrentWeather();
+        $playerCount = (int) $db->query("SELECT COUNT(*) n FROM users u WHERE u.id != 1 AND {$notDemo}")->getRow()->n;
+        $runsBuilt = (int) $db->table('player_items')->where('item_type', 'slope')->countAllResults();
+        $buildersThisWeek = (int) $db->query(
+            "SELECT COUNT(DISTINCT pi.user_id) n FROM player_items pi JOIN users u ON u.id = pi.user_id
+             WHERE pi.created_at >= NOW() - INTERVAL 7 DAY AND u.id != 1 AND {$notDemo}"
+        )->getRow()->n;
 
-        $currentSeasonNum = (int) getSeasonNumber();
+        $seasonNumber = (int) getSeasonNumber();
         $seasonDay = (int) getSeasonDay();
-        $seasonLen = (int) getSeasonLength();
-        $daysRemaining = max(0, $seasonLen - $seasonDay);
-        $seasonStart = strtotime(getSeasonStartDate());
+        $seasonLength = max(1, (int) getSeasonLength());
+        $season = $db->table('seasons')->where('season_number', $seasonNumber)->get()->getRowArray();
+        $resortMap = (string) ($season['resort_map'] ?? 'ParkCity');
 
-        // Season 2 note: only once Sector 2 is actually released, with counts from the real map
-        $s2 = $db->table('resort_sectors')->where('resort_map', 'ParkCity')->where('name', 'Sector 2')->get()->getRowArray();
-        $s2Live = $currentSeasonNum >= 2 && $s2 && (int) $s2['released'] === 1;
-        $s2Runs = 0;
-        $s2Lifts = 0;
-        $s2Steep = 0;
-        $standings = [];
+        $w = getCurrentWeather();
+        $weather = $w ? [
+            'condition' => (string) ($w['condition_name'] ?? 'Clear'),
+            'temp'      => temp((int) $w['temp']),
+            'snowBase'  => snow((int) ($w['snow_base'] ?? 0)),
+            'newSnow'   => (int) ($w['snowfall'] ?? 0) > 0 ? snow((int) $w['snowfall']) : 'None',
+            'wind'      => speed((int) ($w['wind'] ?? 0)),
+            'snowGuns'  => !empty($w['can_make_snow']),
+        ] : null;
 
-        if ($s2Live) {
-            $segments = $db->table('map_segments')
-                ->select('type, difficulty, COUNT(*) AS n')
-                ->where('sector', $s2['id'])
-                ->where('active', 1)
-                ->groupBy('type, difficulty')
-                ->get()
-                ->getResultArray();
+        return [
+            'isLoggedIn' => (bool) (function_exists('auth') && auth()->loggedIn()),
+            'players'    => number_format($playerCount),
+            'runsBuilt'  => number_format($runsBuilt),
+            'buildersThisWeek' => number_format($buildersThisWeek),
+            'season'     => [
+                'number' => $seasonNumber,
+                'name'   => (string) ($season['name'] ?? "Season {$seasonNumber}"),
+                'day'    => $seasonDay,
+                'length' => $seasonLength,
+            ],
+            'weather'   => $weather,
+            'sectors'   => $this->sectors($resortMap),
+            'seasons'   => $this->seasons($seasonNumber),
+            'standings' => $this->standings(),
+            'recent'    => $this->recentBuilds(),
+        ];
+    }
 
-            foreach ($segments as $r) {
-                if ($r['type'] === 'lift') {
-                    $s2Lifts += (int) $r['n'];
-                    continue;
-                }
-                $s2Runs += (int) $r['n'];
-                if (in_array($r['difficulty'], ['black', 'double_black'], true)) {
-                    $s2Steep += (int) $r['n'];
-                }
-            }
+    /** Runs by difficulty and lifts in each sector players can build in, from the map itself */
+    protected function sectors(string $resortMap): array
+    {
+        $db = db_connect();
+        $rows = $db->query(
+            "SELECT s.id, s.name,
+                    SUM(m.type = 'lift') lifts,
+                    SUM(m.type = 'snowpark') parks,
+                    SUM(m.type = 'downhill' AND m.difficulty = 'green') green,
+                    SUM(m.type = 'downhill' AND m.difficulty = 'blue') blue,
+                    SUM(m.type = 'downhill' AND m.difficulty = 'black') black,
+                    SUM(m.type = 'downhill' AND m.difficulty = 'double_black') doubleBlack
+             FROM resort_sectors s
+             LEFT JOIN map_segments m ON m.sector = s.id AND m.active = 1
+             WHERE s.resort_map = ? AND s.visible = 1 AND s.released = 1
+             GROUP BY s.id, s.name ORDER BY s.sort_order, s.id",
+            [$resortMap]
+        )->getResultArray();
 
-            if ($db->tableExists('season_leaderboard_archives')) {
-                // Demo accounts were ranked by the Season 1 rollover; keep them off the public standings
-                $standings = $db->table('season_leaderboard_archives a')
-                    ->select('a.username, a.resort_name, a.cash, a.total_lifts, a.total_slopes')
-                    ->join('users u', 'u.id = a.user_id', 'left')
-                    ->where('a.season_number', 1)
-                    ->groupStart()->where('u.status IS NULL')->orWhere('u.status !=', 'demo')->groupEnd()
-                    ->orderBy('a.rank_position', 'ASC')
-                    ->limit(5)
-                    ->get()
-                    ->getResultArray();
-            }
+        return array_map(fn(array $r) => [
+            'name'        => (string) $r['name'],
+            'green'       => (int) $r['green'],
+            'blue'        => (int) $r['blue'],
+            'black'       => (int) $r['black'],
+            'doubleBlack' => (int) $r['doubleBlack'],
+            'lifts'       => (int) $r['lifts'],
+            'parks'       => (int) $r['parks'],
+        ], $rows);
+    }
+
+    /** Seasons that exist in the game, oldest first */
+    protected function seasons(int $current): array
+    {
+        $rows = db_connect()->table('seasons')->orderBy('season_number', 'ASC')->get()->getResultArray();
+        return array_map(function (array $s) use ($current) {
+            $n = (int) $s['season_number'];
+            return [
+                'number' => $n,
+                'name'   => (string) $s['name'],
+                'start'  => date('F j, Y', strtotime((string) $s['start_date'])),
+                'state'  => $n < $current ? 'done' : ($n === $current ? 'live' : 'next'),
+            ];
+        }, $rows);
+    }
+
+    /** This season's top resorts by profit, ranked the way /leaderboard ranks them (all difficulties) */
+    protected function standings(): array
+    {
+        $rows = db_connect()->query(
+            "SELECT u.username, pf.resort_name,
+                    CAST(pf.total_income AS SIGNED) - CAST(pf.total_expenses AS SIGNED) AS profit,
+                    COALESCE(it.slopes, 0) slopes, COALESCE(it.lifts, 0) lifts
+             FROM users u
+             JOIN player_finances pf ON pf.user_id = u.id
+             LEFT JOIN (SELECT user_id, SUM(item_type = 'slope') slopes, SUM(item_type = 'lift') lifts FROM player_items GROUP BY user_id) it ON it.user_id = u.id
+             WHERE u.id NOT IN (1, 3) AND u.active = 1 AND (u.status IS NULL OR u.status != 'demo')
+               AND COALESCE(it.slopes, 0) + COALESCE(it.lifts, 0) > 0
+             ORDER BY profit DESC, pf.cash DESC, u.id ASC
+             LIMIT 5"
+        )->getResultArray();
+
+        $out = [];
+        foreach ($rows as $i => $r) {
+            $profit = (int) $r['profit'];
+            $out[] = [
+                'rank'     => $i + 1,
+                'username' => (string) $r['username'],
+                'resort'   => (string) ($r['resort_name'] ?? ''),
+                'runs'     => (int) $r['slopes'],
+                'lifts'    => (int) $r['lifts'],
+                'profit'   => ($profit > 0 ? '+' : '') . currency($profit),
+                'positive' => $profit >= 0,
+            ];
         }
+        return $out;
+    }
 
-        $s2JustOpened = $s2Live && $currentSeasonNum === 2 && $seasonDay <= 14;
-
-        // What people built lately (real players only)
-        $recent = $db->table('player_items pi')
+    /**
+     * What players built lately: at most two per player, so one busy builder doesn't fill the list.
+     * Names the game gave by default ("Slope Path 97") are left out; the trail sign says what it is.
+     */
+    protected function recentBuilds(): array
+    {
+        $rows = db_connect()->table('player_items pi')
             ->select('pi.name, pi.item_type, pi.difficulty, pi.created_at, u.username')
             ->join('users u', 'u.id = pi.user_id')
             ->where('u.id !=', 1)
+            ->whereIn('pi.item_type', ['slope', 'lift'])
             ->groupStart()->where('u.status IS NULL')->orWhere('u.status !=', 'demo')->groupEnd()
             ->orderBy('pi.id', 'DESC')
-            ->limit(6)
+            ->limit(40)
             ->get()
             ->getResultArray();
 
-        return [
-            'playerCount'     => $playerCount,
-            'totalSlopes'     => $totalSlopes,
-            'topPlayer'       => $topPlayer,
-            'weather'         => $weather,
-            'currentSeasonNum'=> $currentSeasonNum,
-            'seasonDay'       => $seasonDay,
-            'seasonLen'       => $seasonLen,
-            'daysRemaining'   => $daysRemaining,
-            'seasonStart'     => $seasonStart,
-            's2Live'          => $s2Live,
-            's2Runs'          => $s2Runs,
-            's2Lifts'         => $s2Lifts,
-            's2Steep'         => $s2Steep,
-            's2JustOpened'    => $s2JustOpened,
-            'standings'       => $standings,
-            'recent'          => $recent,
-        ];
+        $perPlayer = [];
+        $out = [];
+        foreach ($rows as $r) {
+            $who = (string) $r['username'];
+            if (($perPlayer[$who] = ($perPlayer[$who] ?? 0) + 1) > 2) continue;
+            $name = trim((string) $r['name']);
+            $isDefault = $name === '' || preg_match('/^(Slope Path|Lift Line|Slope|Lift|Run)\s*#?\d+$/i', $name);
+            $out[] = [
+                'username'   => $who,
+                'kind'       => $r['item_type'] === 'lift' ? 'lift' : 'run',
+                'difficulty' => in_array($r['difficulty'], ['green', 'blue', 'black', 'double_black'], true) ? $r['difficulty'] : 'blue',
+                'name'       => $isDefault ? null : $name,
+                'ago'        => function_exists('timeAgo') ? timeAgo((string) $r['created_at']) : '',
+            ];
+            if (count($out) === 6) break;
+        }
+        return $out;
     }
 
     public function maintenance(): string
