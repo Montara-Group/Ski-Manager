@@ -167,7 +167,7 @@
 
 /*
  * Home page snow report board (DESIGN.md, Identity): light paper and a dark header strip in both
- * themes, like a real resort board. Ink on paper is 13:1, the muted ink 7:1.
+ * themes, like a real resort board. Ink on paper is 15.1:1, the muted ink 7.8:1 (measured).
  */
 .snow-board {
   --board-paper: oklch(97% 0.012 85);
