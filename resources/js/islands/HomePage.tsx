@@ -96,7 +96,7 @@ function Hero({ isLoggedIn, players, runsBuilt, buildersThisWeek, season, weathe
           <p className="flex items-center gap-2 text-sm text-white/85">
             <span className="size-2 rounded-full bg-[oklch(72%_0.18_155)]" aria-hidden="true" />
             <span>
-              {season.name}, day {season.day} of {season.length}
+              Season {season.number}, day {season.day} of {season.length}
             </span>
           </p>
 
@@ -149,14 +149,15 @@ function Hero({ isLoggedIn, players, runsBuilt, buildersThisWeek, season, weathe
 }
 
 function HeroImage() {
+  // Under the dark overlay the small map is enough on phones; wide screens get the sharp one
   const webp = parkCityHasWebp('low') && parkCityHasWebp('med');
   return (
     <picture>
-      {webp && <source type="image/webp" srcSet="/img/ParkCity_low.webp 800w, /img/ParkCity_med.webp 3150w" sizes="100vw" />}
+      {webp && <source type="image/webp" media="(min-width: 1024px)" srcSet="/img/ParkCity_med.webp" />}
+      <source media="(min-width: 1024px)" srcSet="/img/ParkCity_med.jpg" />
+      {webp && <source type="image/webp" srcSet="/img/ParkCity_low.webp" />}
       <img
         src="/img/ParkCity_low.jpg"
-        srcSet="/img/ParkCity_low.jpg 800w, /img/ParkCity_med.jpg 3150w"
-        sizes="100vw"
         alt=""
         width={800}
         height={533}
@@ -208,7 +209,9 @@ function SnowBoard({ weather, season }: { weather: HomeWeather | null; season: H
 }
 
 /* 2. The real trail map, and what players can build on it */
-function Mountain({ sectors, isLoggedIn }: { sectors: HomeSector[]; isLoggedIn: boolean }) {
+function Mountain({ sectors: all, isLoggedIn }: { sectors: HomeSector[]; isLoggedIn: boolean }) {
+  // A sector with nothing drawn on it yet has nothing to build
+  const sectors = all.filter((s) => s.green + s.blue + s.black + s.doubleBlack + s.lifts + s.parks > 0);
   const webp = parkCityHasWebp('low') && parkCityHasWebp('med');
   const total = sectors.reduce(
     (t, s) => ({ runs: t.runs + s.green + s.blue + s.black + s.doubleBlack, lifts: t.lifts + s.lifts, parks: t.parks + s.parks }),
@@ -248,7 +251,7 @@ function Mountain({ sectors, isLoggedIn }: { sectors: HomeSector[]; isLoggedIn: 
           </figcaption>
         </figure>
 
-        <div className="space-y-5 lg:col-span-5">
+        <div className="order-first space-y-5 lg:order-none lg:col-span-5">
           <div className="space-y-2">
             <h2 id="home-mountain" className="text-2xl font-bold text-foreground sm:text-3xl">
               The mountain is Park City
@@ -289,7 +292,7 @@ function Mountain({ sectors, isLoggedIn }: { sectors: HomeSector[]; isLoggedIn: 
                 </tbody>
               </table>
               <p className="text-xs text-muted">
-                {total.runs} runs and {total.lifts} lifts open to build{total.parks > 0 ? `, plus ${total.parks} terrain parks` : ''}.
+                {total.runs} runs and {total.lifts} lifts open to build{total.parks > 0 ? `, plus ${total.parks} terrain ${total.parks === 1 ? 'park' : 'parks'}` : ''}.
               </p>
             </div>
           ) : (
@@ -340,7 +343,7 @@ function GameDay() {
             <h3 className="text-base font-semibold text-foreground">You decide</h3>
             <ul className="divide-y divide-border border-y border-border">
               {decisions.map((d) => (
-                <li key={d.text} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3 text-sm">
+                <li key={d.text} className="grid grid-cols-[1fr_auto] items-baseline gap-4 py-3 text-sm">
                   <span className="text-foreground">{d.text}</span>
                   {d.guide && (
                     <a href={d.guide.href} className={`${textLink} inline-flex min-h-11 items-center text-xs sm:min-h-0`}>
@@ -392,7 +395,7 @@ function ThisSeason({
     <section className="border-b border-border bg-background py-14 sm:py-20" aria-labelledby="home-live">
       <div className="mx-auto max-w-6xl space-y-8 px-4 sm:px-6 lg:px-8">
         <h2 id="home-live" className="text-2xl font-bold text-foreground sm:text-3xl">
-          {season.name}, so far
+          Season {season.number} so far
         </h2>
 
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
@@ -564,7 +567,7 @@ function DemoStartButton({ className, children }: { className: string; children:
   return (
     <form action="/demo" method="post" className="contents">
       <input type="hidden" name={meta?.dataset.field || 'csrf_test_name'} value={meta?.content || ''} />
-      <Button type="submit" className={className}>
+      <Button type="submit" variant="ghost" className={className}>
         <span>{children}</span>
       </Button>
     </form>

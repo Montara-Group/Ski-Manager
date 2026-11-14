@@ -14,13 +14,13 @@ $primary = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg
 ob_start();
 ?>
 <section class="relative isolate overflow-hidden bg-[#0a0e14] text-white" aria-labelledby="home-title">
-    <img src="/img/ParkCity_low.jpg" srcset="/img/ParkCity_low.jpg 800w, /img/ParkCity_med.jpg 3150w" sizes="100vw" alt="" width="800" height="533" fetchpriority="high" decoding="async" class="absolute inset-0 -z-20 size-full object-cover">
+    <picture><source media="(min-width: 1024px)" srcset="/img/ParkCity_med.jpg"><img src="/img/ParkCity_low.jpg" alt="" width="800" height="533" fetchpriority="high" decoding="async" class="absolute inset-0 -z-20 size-full object-cover"></picture>
     <div class="absolute inset-0 -z-10 bg-[#0a0e14]/85 lg:bg-transparent lg:bg-gradient-to-r lg:from-[#0a0e14]/95 lg:via-[#0a0e14]/85 lg:to-[#0a0e14]/45"></div>
     <div class="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-12 lg:px-8 lg:py-20">
         <div class="space-y-6 lg:col-span-7">
             <p class="flex items-center gap-2 text-sm text-white/85">
                 <span class="size-2 rounded-full bg-[oklch(72%_0.18_155)]" aria-hidden="true"></span>
-                <span><?= esc($s['name']) ?>, day <?= (int) $s['day'] ?> of <?= (int) $s['length'] ?></span>
+                <span>Season <?= (int) $s['number'] ?>, day <?= (int) $s['day'] ?> of <?= (int) $s['length'] ?></span>
             </p>
             <h1 id="home-title" class="max-w-xl text-[clamp(2.125rem,5vw,3.25rem)] font-bold leading-[1.1] tracking-tight">
                 Run a ski resort on a <span class="text-[oklch(80%_0.11_245)]">real mountain.</span>
