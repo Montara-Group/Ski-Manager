@@ -55,7 +55,7 @@ class PrivateSite implements FilterInterface
         $html = '<!doctype html><html lang="en"><head><meta charset="utf-8">'
             . '<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow">'
             . '<title>Private site - Ski Manager</title>'
-            . '<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#11151c;color:#e3e8f0;font:16px/1.5 system-ui,sans-serif;padding:16px}'
+            . '<style ' . csp_style_nonce() . '>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#11151c;color:#e3e8f0;font:16px/1.5 system-ui,sans-serif;padding:16px}'
             . 'main{max-width:28rem}h1{font-size:1.5rem;margin:0 0 .5rem}p{color:#aab3c2;margin:0 0 1rem}a{color:#8cbcff}a:focus-visible{outline:2px solid #8cbcff;outline-offset:2px}</style>'
             . '</head><body><main><h1>This site is private</h1>'
             . '<p>This is the Ski Manager test server. The game is at <a href="https://ski-manager.net">ski-manager.net</a>.</p>'
