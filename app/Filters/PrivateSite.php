@@ -10,6 +10,9 @@ use CodeIgniter\HTTP\ResponseInterface;
  * Closes the whole site to everyone but admins, for staging.ski-manager.net. Off unless the server's
  * .env sets `PRIVATE_SITE = true`, so production never runs it.
  *
+ * Optional `PRIVATE_SITE_KEY`: opening any page with ?site_key=<key> sets a cookie that lets that
+ * browser in for 7 days, for a tester without an admin account. Leave it unset to allow admins only.
+ *
  * Signing in stays open (login, auth, logout), so an admin can get in. Everyone else gets a short
  * "this site is private" page, and API calls get a 403. Responses carry noindex so search engines
  * drop the staging copy. CLI (spark, the game tick) doesn't pass through filters.
@@ -38,6 +41,9 @@ class PrivateSite implements FilterInterface
         }
 
         if ($this->isAdmin($this->sessionUser()) || $this->isAdmin($this->tokenUser($request))) {
+            return;
+        }
+        if ($this->hasKey($request)) {
             return;
         }
 
@@ -72,6 +78,21 @@ class PrivateSite implements FilterInterface
         if (self::enabled()) {
             $response->setHeader('X-Robots-Tag', 'noindex, nofollow');
         }
+    }
+
+    /** A tester's browser carrying PRIVATE_SITE_KEY, from ?site_key= or the cookie it set */
+    private function hasKey(RequestInterface $request): bool
+    {
+        $key = (string) env('PRIVATE_SITE_KEY', '');
+        if (strlen($key) < 16) {
+            return false;
+        }
+        $given = (string) ($request->getGet('site_key') ?? '');
+        if ($given !== '' && hash_equals($key, $given)) {
+            service('response')->setCookie('private_site_key', hash('sha256', $key), 7 * 86400, '', '/', '', true, true, 'Lax');
+            return true;
+        }
+        return hash_equals(hash('sha256', $key), (string) ($request->getCookie('private_site_key') ?? ''));
     }
 
     private function sessionUser()
