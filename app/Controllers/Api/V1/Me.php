@@ -23,6 +23,8 @@ class Me extends ApiController
             'genepis' => (int) ($genepis['balance'] ?? 0),
             'gameDay' => getGameDay(),
             'seasonDay' => getSeasonDay(),
+            // Own-pace seasons: { enabled: false } on the shared calendar (App\Libraries\Clock::state)
+            'clock' => \App\Libraries\Clock::state((int) $user->id),
         ]);
     }
 }
