@@ -160,8 +160,18 @@ class Alliances extends BaseController
             ];
         }
 
-        $formattedMembers = array_map(function ($m) use ($userId) {
+        // Own-pace seasons: members can be on different days, so show where each one is
+        $clocks = [];
+        if ($members) {
+            foreach ($db->table('player_clocks')->select('user_id, season_number, game_day')->whereIn('user_id', array_column($members, 'user_id'))->get()->getResultArray() as $c) {
+                $clocks[(int) $c['user_id']] = $c;
+            }
+        }
+
+        $formattedMembers = array_map(function ($m) use ($userId, $clocks) {
+            $clock = \App\Libraries\Clock::enabledFor((int) $m['user_id']) ? ($clocks[(int) $m['user_id']] ?? null) : null;
             return [
+                'clockText' => $clock ? 'Season ' . (int) $clock['season_number'] . ', day ' . (int) $clock['game_day'] : null,
                 'membership_id' => (int) $m['membership_id'],
                 'user_id' => (int) $m['user_id'],
                 'username' => (string) $m['username'],

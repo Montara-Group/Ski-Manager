@@ -93,7 +93,7 @@ class GameTick extends BaseCommand
             if (!Clock::enabledFor($userId)) continue;
             CLI::write("Autopilot user {$userId}...", 'yellow');
             $result = Clock::advance($userId, 'autopilot');
-            CLI::write('  ' . $result['message'], $result['ok'] ? 'white' : 'red');
+            CLI::write('  ' . $result['message'] . (isset($result['ms']) ? " ({$result['ms']} ms)" : ''), $result['ok'] ? 'white' : 'red');
         }
 
         // Storage Maintenance: Prune old activity logs & financial records to keep storage bounded

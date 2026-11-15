@@ -75,8 +75,32 @@ private fun money(positive: Boolean) = if (positive) LocalSkiColors.current.succ
 
 @Composable
 fun DashboardScreen(app: AppState) {
-    Loaded("dashboard", { app.api.get("dashboard") }) { data, _ ->
+    var reloadCount by remember { mutableStateOf(0) }
+    var dayMessage by remember { mutableStateOf<String?>(null) }
+    var dayError by remember { mutableStateOf<String?>(null) }
+    var dayBusy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    // Own-pace seasons: POST day/next runs one day of this resort and answers with the day's report
+    fun nextDay() {
+        dayBusy = true
+        dayError = null
+        scope.launch {
+            when (val r = app.api.post("day/next")) {
+                is ApiResult.Ok -> {
+                    dayMessage = r.message
+                    reloadCount++
+                }
+                is ApiResult.Failed -> dayError = r.message
+                is ApiResult.Offline -> dayError = OFFLINE_TEXT
+            }
+            dayBusy = false
+        }
+    }
+
+    Loaded(reloadCount, { app.api.get("dashboard") }) { data, _ ->
         val hero = data.obj("hero")
+        val clock = data.obj("clock")
         val kpis = data.obj("kpis")
         val weather = kpis.obj("weather")
         val open = hero.bool("resortOpen")
@@ -105,6 +129,39 @@ fun DashboardScreen(app: AppState) {
                     "${hero.int("liftCount")} of ${hero.int("totalLifts")} lifts · ${hero.int("slopeCount")} of ${hero.int("totalSlopes")} slopes",
                     style = MaterialTheme.typography.bodyMedium,
                 )
+            }
+            if (clock.bool("enabled")) {
+                val bank = clock.int("bank")
+                val ready = clock.bool("nextSeasonReady")
+                Panel("Your season") {
+                    Text(
+                        if (clock.bool("freePlay")) "Season complete. Free play until the next season opens."
+                        else "Day ${clock.int("day")} of ${clock.int("length")} · ${bank} of ${clock.int("bankMax")} days saved",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        when {
+                            !clock.bool("autopilot") -> "Autopilot is off: your resort moves only when you press Next day."
+                            clock.bool("autopilotTonight") -> "Autopilot adds a day tonight if you don't press Next day."
+                            else -> "You pressed Next day today, so autopilot skips tonight."
+                        },
+                        color = LocalSkiColors.current.muted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    dayMessage?.let { Text(it, color = LocalSkiColors.current.success, style = MaterialTheme.typography.bodyMedium) }
+                    dayError?.let { Text(it, color = LocalSkiColors.current.danger, style = MaterialTheme.typography.bodyMedium) }
+                    PrimaryButton(
+                        text = when {
+                            dayBusy -> "Running the day…"
+                            bank < 1 -> "No saved days left"
+                            ready -> "Start ${clock.strOrNull("nextSeasonName") ?: "the next season"}"
+                            else -> "Next day"
+                        },
+                        onClick = { nextDay() },
+                        enabled = !dayBusy && bank > 0,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
             data.obj("estimate").takeIf { it.size() > 0 }?.let { e ->
                 Panel("Tonight's estimate") {

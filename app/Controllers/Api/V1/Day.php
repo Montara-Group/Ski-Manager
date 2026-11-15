@@ -11,7 +11,9 @@ class Day extends ApiController
     public function next(): ResponseInterface
     {
         [$status, $body] = self::advance((int) auth()->id());
-        return $status === 200 ? $this->ok($body['state'] ?? null, $body['message']) : $this->fail($body['message'], $status);
+        if ($status !== 200) return $this->fail($body['message'], $status);
+        // The page reloads after a day, so the top bar shows the report from here (StatsBar)
+        return $this->ok(($body['state'] ?? []) + ['report' => ['message' => $body['message']] + ($body['report'] ?? [])], $body['message']);
     }
 
     public function autopilot(): ResponseInterface

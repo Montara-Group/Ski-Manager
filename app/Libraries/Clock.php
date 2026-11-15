@@ -187,6 +187,7 @@ class Clock
         $today = date('Y-m-d');
         $now = date('Y-m-d H:i:s');
 
+        $started = hrtime(true);
         $db->resetTransStatus();
         $db->transBegin();
         try {
@@ -262,6 +263,12 @@ class Clock
             return ['ok' => false, 'message' => "The day didn't run. Nothing changed. Try again."];
         }
 
+        // A Next day runs inside a web request on a 1 vCPU server: log slow ones so a queue can replace it if needed
+        $ms = (int) round((hrtime(true) - $started) / 1e6);
+        if ($ms > self::cfg('slowTickMs')) {
+            log_message('warning', "Clock::advance user {$userId} ({$source}) took {$ms} ms");
+        }
+
         self::forget($userId);
         $state = self::state($userId);
         $message = match (true) {
@@ -269,7 +276,7 @@ class Clock
             $finished !== null => "Season complete. Final resort score {$finished['score']}: {$finished['badge']}, +{$finished['genepis']} Génépis.",
             default => 'Day ' . $state['day'] . ': +' . currency((int) $report['income']) . ' income, -' . currency((int) $report['expenses']) . ' costs, ' . number_format((int) $report['visitors']) . ' visitors.',
         };
-        return ['ok' => true, 'message' => $message, 'report' => $report, 'state' => $state];
+        return ['ok' => true, 'message' => $message, 'report' => $report, 'state' => $state, 'ms' => $ms];
     }
 
     private static function duration(int $seconds): string

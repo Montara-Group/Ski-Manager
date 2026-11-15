@@ -24,4 +24,7 @@ class OwnPace extends BaseConfig
 
     /** Days a resort must have played this season before the leaderboard ranks it */
     public int $minRankedDays = 10;
+
+    /** A day that takes longer than this is logged as a warning (see Clock::advance) */
+    public int $slowTickMs = 500;
 }

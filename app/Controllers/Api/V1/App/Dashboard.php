@@ -16,6 +16,8 @@ class Dashboard extends \App\Controllers\Dashboard
             'alerts' => $page['alerts'],
             'kpis' => $page['kpis'],
             'estimate' => $page['demoEstimate'] ?? null,
+            // Own-pace seasons: { enabled: false } on the shared calendar (App\Libraries\Clock::state)
+            'clock' => \App\Libraries\Clock::state((int) auth()->id()),
         ]);
     }
 }

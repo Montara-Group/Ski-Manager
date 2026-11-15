@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button, toast } from '@heroui/react';
 import { Icon } from '@/components/Icon';
 import { ApiError } from '@/lib/api';
-import { sendNextDay, type ClockState } from '@/lib/clock';
+import { keepDayReport, sendNextDay, takeDayReport, type ClockState } from '@/lib/clock';
 import type { Stats } from '@/lib/shell';
 
 type ZoneParts = { year: number; month: number; day: number; hour: number; minute: number };
@@ -146,6 +146,11 @@ export default function StatsBar(stats: Stats) {
 /** Own-pace seasons: the Next day button, saved days and what autopilot does tonight */
 function NextDay({ clock, time, autopilotIn, now }: { clock: Extract<ClockState, { enabled: true }>; time: string; autopilotIn: { short: string; long: string }; now: number }) {
   const [busy, setBusy] = useState(false);
+  // The report of the day that ran just before this reload
+  useEffect(() => {
+    const report = takeDayReport();
+    if (report) toast.success(report);
+  }, []);
   const refill = clock.nextBankAt ? countdown(clock.nextBankAt * 1000 - now) : null;
   const empty = clock.bank < 1;
   const auto = !clock.autopilot ? 'Autopilot off' : clock.autopilotTonight ? `Autopilot in ${autopilotIn.short}` : 'Autopilot skips tonight';
@@ -163,7 +168,8 @@ function NextDay({ clock, time, autopilotIn, now }: { clock: Extract<ClockState,
   const press = async () => {
     setBusy(true);
     try {
-      await sendNextDay();
+      const result = await sendNextDay();
+      if (result.report?.message) keepDayReport(result.report.message);
       // Every page figure depends on the day: reload to show the new one
       window.location.reload();
     } catch (e) {

@@ -79,6 +79,8 @@ export type AllianceMemberProps = {
   cashText: string;
   donated_cash: number;
   donatedText: string;
+  /** Own-pace seasons: "Season 2, day 40", or null on the shared calendar */
+  clockText?: string | null;
   isCurrentUser: boolean;
   canManage: boolean;
 };
@@ -386,6 +388,7 @@ export default function AllianceDashboardPage({
                     {m.resort_map} &middot;{' '}
                     <span className="font-mono text-foreground">{m.open_slopes} Slopes</span> &middot;{' '}
                     <span className="font-mono text-foreground">{m.open_lifts} Lifts</span>
+                    {m.clockText && <span className="block text-xs">{m.clockText}</span>}
                   </td>
                   <td className="py-2.5">
                     <Chip

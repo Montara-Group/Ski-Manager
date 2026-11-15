@@ -28,8 +28,38 @@ export type ClockState =
       score: number;
     };
 
+/** What the day that just ran earned and cost (App\\Libraries\\Clock::advance) */
+export interface DayReport {
+  message: string;
+  day?: number;
+  income?: number;
+  expenses?: number;
+  visitors?: number;
+}
+
 export function sendNextDay() {
-  return api<ClockState>('day/next', { method: 'POST', body: {} });
+  return api<ClockState & { report?: DayReport }>('day/next', { method: 'POST', body: {} });
+}
+
+/* The page reloads after Next day, so the report waits in sessionStorage for the top bar to show it */
+const REPORT_KEY = 'sm.dayReport';
+
+export function keepDayReport(message: string) {
+  try {
+    sessionStorage.setItem(REPORT_KEY, message);
+  } catch {
+    // storage blocked: the activity log still has the report
+  }
+}
+
+export function takeDayReport(): string | null {
+  try {
+    const message = sessionStorage.getItem(REPORT_KEY);
+    sessionStorage.removeItem(REPORT_KEY);
+    return message;
+  } catch {
+    return null;
+  }
 }
 
 export function sendAutopilot(on: boolean) {
