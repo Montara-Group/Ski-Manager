@@ -34,6 +34,10 @@ $routes->post("/admin/seasons/content/(:num)", "Admin::saveSeasonContent/$1");
 $routes->get("/admin/economy", "Admin::economy");
 $routes->get("/admin/season-vote", "Admin::seasonVote");
 $routes->post("/admin/season-vote/settings", "Admin::saveSeasonVote");
+$routes->get("/admin/resort-vote", "Admin::resortVote");
+$routes->post("/admin/resort-vote/(:num)/open", "Admin::resortVoteOpen/$1");
+$routes->post("/admin/resort-vote/(:num)/winner", "Admin::resortVoteWinner/$1");
+$routes->post("/admin/resort-vote/area/(:num)/in-game", "Admin::resortVoteInGame/$1");
 $routes->get("/tutorial/check", "Tutorial::checkStep");
 $routes->get("auth/google", "GoogleAuth::redirect");
 $routes->get("auth/google/callback", "GoogleAuth::callback");
@@ -46,6 +50,8 @@ $routes->get("notifications", "Notifications::index");
 $routes->get("notifications/read-all", "Notifications::readAllLegacy");
 $routes->post("notifications/read-all", "Notifications::readAll");
 $routes->get("notifications/open/(:num)", "Notifications::open/$1");
+$routes->get("notifications/feed", "Notifications::feed");
+$routes->post("notifications/(:num)/read", "Notifications::markRead/$1");
 $routes->post("notifications/delete-all", "Notifications::deleteAll");
 $routes->post("notifications/delete-read", "Notifications::deleteRead");
 $routes->get("parking", "Parking::index");
@@ -155,6 +161,10 @@ $routes->group('api/v1', ['namespace' => 'App\Controllers\Api\V1', 'filter' => '
     // Own-pace seasons (App\Libraries\Clock): Next day and the autopilot switch
     $routes->post('day/next', 'Day::next');
     $routes->post('day/autopilot', 'Day::autopilot');
+    // Monthly resort vote (App\Libraries\ResortVote)
+    $routes->get('resort-vote/search', 'ResortVote::search');
+    $routes->post('resort-vote', 'ResortVote::vote');
+    $routes->post('resort-vote/retract', 'ResortVote::retract');
     // Beta program (App\Libraries\Beta): join, leave, per-feature switch, feedback
     $routes->post('beta/join', 'Beta::join');
     $routes->post('beta/leave', 'Beta::leave');
@@ -180,6 +190,7 @@ $routes->group('api/v1/app', ['namespace' => 'App\Controllers\Api\V1\App'], stat
         $routes->get('leaderboard', 'Leaderboard::show');
         $routes->get('notifications', 'Notifications::show');
         $routes->post('notifications/read-all', 'Notifications::markAllRead');
+        $routes->post('notifications/(:num)/read', 'Notifications::markOneRead/$1');
         $routes->get('tickets', 'Tickets::show');
         $routes->post('tickets/(:num)', 'Tickets::update/$1');
         $routes->get('staff', 'Staff::show');
@@ -191,6 +202,7 @@ $routes->group('api/v1/app', ['namespace' => 'App\Controllers\Api\V1\App'], stat
         $routes->get('map', 'Map::show');
         $routes->post('map/build', 'Map::build');
         $routes->post('map/demolish/(:num)', 'Map::demolish/$1');
+        $routes->post('map/upgrade/(:num)', 'Map::upgrade/$1');
         $routes->get('settings', 'Settings::show');
         $routes->post('settings/units', 'Settings::units');
         $routes->get('buildings', 'Buildings::show');
@@ -216,6 +228,9 @@ $routes->group('api/v1/app', ['namespace' => 'App\Controllers\Api\V1\App'], stat
         $routes->post('snowmaking/(:num)/repair', 'Snowmaking::repairAction/$1');
         $routes->post('snowmaking/repair/(:num)', 'Snowmaking::repairAction/$1');
         $routes->post('snowmaking/assign', 'Snowmaking::assignAction');
+        $routes->post('snowmaking/(:num)/mode', 'Snowmaking::modeAction/$1');
+        $routes->post('snowmaking/(:num)/upgrade', 'Snowmaking::upgradeAction/$1');
+        $routes->post('snowmaking/target', 'Snowmaking::targetAction');
         $routes->post('snowmaking/(:num)/sell', 'Snowmaking::sellAction/$1');
         $routes->post('snowmaking/sell/(:num)', 'Snowmaking::sellAction/$1');
         $routes->get('equipment', 'Equipment::show');
@@ -255,6 +270,7 @@ $routes->post("/dashboard/reset-widgets", "Dashboard::resetWidgets");
 $routes->post("/dashboard/batch-update-widgets", "Dashboard::batchUpdateWidgets");
 $routes->post("/map/build", "ResortMap::buildItem");
 $routes->post("/map/demolish/(:num)", "ResortMap::demolishItem/$1");
+$routes->post("/map/upgrade/(:num)", "ResortMap::swapLift/$1");
 $routes->match(['get', 'head'], '/api/map-image/(:segment)', 'MapImage::serve/$1');
 $routes->post("/map/change-map", "ResortMap::changeMap");
 $routes->post("/map/sector/create", "ResortMap::createSector");
@@ -345,6 +361,9 @@ $routes->post('/snowmaking/sell/(:num)', 'Snowmaking::sell/$1');
 $routes->post('/snowmaking/toggle/(:num)', 'Snowmaking::toggle/$1');
 $routes->post("/snowmaking/toggle-all", "Snowmaking::toggleAll");
 $routes->post("/snowmaking/assign", "Snowmaking::assignCannon");
+$routes->post('/snowmaking/mode/(:num)', 'Snowmaking::mode/$1');
+$routes->post('/snowmaking/upgrade/(:num)', 'Snowmaking::upgrade/$1');
+$routes->post('/snowmaking/target', 'Snowmaking::target');
 $routes->post('/staff/fire/(:num)', 'Staff::fire/$1');
 $routes->post("/staff/train/(:num)", "Staff::train/$1");
 $routes->post('/staff/hire', 'Staff::doHire');

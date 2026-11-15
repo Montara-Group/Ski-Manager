@@ -114,7 +114,8 @@ class Shell
         return [
             'href' => $locked ? '/achievements' : $it['url'],
             'url' => $it['url'],
-            'label' => $it['label'],
+            // /vote is the monthly resort vote once its flag is on
+            'label' => $it['url'] === '/vote' && \App\Libraries\ResortVote::flagOn() ? 'Resort Vote' : $it['label'],
             'icon' => $it['icon'],
             'locked' => $locked,
             'flagOff' => $flagOff,
@@ -160,8 +161,6 @@ class Shell
         $fin = $userId ? $db->table('player_finances')->select('cash')->where('user_id', $userId)->get()->getRowArray() : null;
         $genepis = $userId ? $db->table('genepis')->select('balance')->where('user_id', $userId)->get()->getRowArray() : null;
         $rating = $userId ? resortRating($userId) : null;
-        $notifs = $userId ? $db->table('notifications')->select('id, title, message, icon, is_read')->where('user_id', $userId)
-            ->orderBy('created_at', 'DESC')->limit(5)->get()->getResultArray() : [];
 
         return [
             'path' => $currentPath,
@@ -187,11 +186,7 @@ class Shell
             ] : null,
             'notifications' => [
                 'unread' => $userId ? unreadNotificationCount($userId) : 0,
-                'latest' => array_map(fn($n) => [
-                    'id' => (int) $n['id'], 'title' => (string) $n['title'], 'message' => (string) $n['message'],
-                    'icon' => preg_match('/^[a-z0-9 -]+$/i', (string) $n['icon']) ? (string) $n['icon'] : 'fa-solid fa-bell',
-                    'isRead' => (bool) $n['is_read'],
-                ], $notifs),
+                'latest' => $userId ? NotificationFeed::latest((int) $userId) : [],
             ],
             'flash' => $flash,
             'demo' => $userId && session()->get('is_demo') ? \App\Controllers\Demo::barState((int) $userId) : null,
