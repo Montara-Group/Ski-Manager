@@ -115,6 +115,8 @@ fi
 # 6. Run Database Migrations Inside PHP Container
 echo "Executing database migrations..."
 if docker ps --format '{{.Names}}' | grep -q "${PHP_CONTAINER}"; then
+    # The cached file list can hide a new migration while migrate still prints "complete": clear it first
+    docker exec -w "${CONTAINER_PATH}" "${PHP_CONTAINER}" php spark cache:clear >/dev/null 2>&1 || true
     docker exec -w "${CONTAINER_PATH}" "${PHP_CONTAINER}" php spark migrate || {
         echo "WARNING: Migrations encountered an issue or no pending migrations."
     }
