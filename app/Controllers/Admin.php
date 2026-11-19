@@ -1458,6 +1458,45 @@ class Admin extends BaseController
     }
 
     /** GET /admin/resort-vote: this month's tally, past months, winner picks */
+    /** GET /admin/android-testing: the Android closed test's links and the invite (App\Libraries\AndroidTesting) */
+    public function androidTesting(): string|\CodeIgniter\HTTP\RedirectResponse
+    {
+        if (!$this->checkAdmin()) return redirect()->to('/dashboard')->with('error', 'Unauthorized access.');
+        $page = ['groupUrl' => \App\Libraries\AndroidTesting::groupUrl(), 'joinUrl' => \App\Libraries\AndroidTesting::joinUrl(), 'invite' => \App\Libraries\AndroidTesting::inviteStats(), 'rewards' => \App\Libraries\AndroidTesting::rewardStats()];
+        return view('admin/android_testing', ['page' => $page]);
+    }
+
+    /** POST /admin/android-testing/notify: the invite notification for every eligible account that hasn't had it */
+    public function androidTestingNotify(): \CodeIgniter\HTTP\RedirectResponse
+    {
+        if (!$this->checkAdmin()) return redirect()->to('/dashboard')->with('error', 'Unauthorized access.');
+        $n = \App\Libraries\AndroidTesting::notifyAll();
+        $this->auditLog('android_invite', null, $n . ' notified');
+        return redirect()->to('/admin/android-testing')->with('success', $n === 0
+            ? 'Everyone eligible already has the notification.'
+            : 'Sent the notification to ' . number_format($n) . ($n === 1 ? ' player.' : ' players.'));
+    }
+
+    /** POST /admin/android-testing/link: group_url (the testers Google Group) and join_url (the opt-in link) */
+    public function androidTestingLink(): \CodeIgniter\HTTP\RedirectResponse
+    {
+        if (!$this->checkAdmin()) return redirect()->to('/dashboard')->with('error', 'Unauthorized access.');
+        $back = redirect()->to('/admin/android-testing');
+        $links = ['group_url' => 'AndroidTesting.groupUrl', 'join_url' => 'AndroidTesting.joinUrl'];
+        foreach ($links as $field => $key) {
+            $url = trim((string) $this->request->getPost($field));
+            if ($url !== '' && (!filter_var($url, FILTER_VALIDATE_URL) || !str_starts_with($url, 'https://'))) {
+                return $back->with('error', 'Use full https:// links, copied from Google Groups and Play Console.');
+            }
+        }
+        foreach ($links as $field => $key) {
+            $url = trim((string) $this->request->getPost($field));
+            $url === '' ? setting()->forget($key) : setting($key, $url);
+        }
+        $this->auditLog('android_test_link', null, trim((string) $this->request->getPost('group_url')) . ' | ' . trim((string) $this->request->getPost('join_url')));
+        return $back->with('success', 'Links saved.');
+    }
+
     public function resortVote(): string|\CodeIgniter\HTTP\RedirectResponse
     {
         if (!$this->checkAdmin()) return redirect()->to('/dashboard')->with('error', 'Unauthorized access.');

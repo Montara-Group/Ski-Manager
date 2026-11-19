@@ -1,1 +1,0 @@
-import{n as e}from"./api-DhQwUZyH.js";function t(){return e(`day/next`,{method:`POST`,body:{}})}var n=`sm.dayReport`;function r(e){try{sessionStorage.setItem(n,e)}catch{}}function i(){try{let e=sessionStorage.getItem(n);return sessionStorage.removeItem(n),e}catch{return null}}function a(t){return e(`day/autopilot`,{method:`POST`,body:{on:t}})}export{i,a as n,t as r,r as t};
