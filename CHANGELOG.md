@@ -1,3 +1,11 @@
+## Release 2026-11-21 18:51
+
+* Merge pull request #155 from Montara-Group/perf/map-tiles (9f8e9189)
+* perf(map): load the trail map as 256 px tiles (d7e780c2)
+* Merge pull request #154 from Montara-Group/feat/leaflet-npm-typed (56bab1bc)
+* feat(map): bundle Leaflet from npm with typed calls (a142cf09)
+* Merge pull request #153 from Montara-Group/feat/leaflet-v2-features (b19f6b93)
+
 ## Release 2026-11-21 01:40
 
 * Merge branch 'MontaraGroup:main' into main (1eba3c5f)
